@@ -1,11 +1,11 @@
-from flask import Blueprint, request, jsonify, current_app
-from db import get_connection
-from datetime import datetime, timedelta
-from werkzeug.security import generate_password_hash
-from werkzeug.utils import secure_filename
 import os
 import random
+from datetime import datetime, timedelta
+from flask import Blueprint, request, jsonify, current_app
+from werkzeug.security import generate_password_hash
+from werkzeug.utils import secure_filename
 
+from db import get_connection
 from services.email_service import send_verify_email
 
 register_bp = Blueprint(
@@ -16,9 +16,9 @@ register_bp = Blueprint(
 
 @register_bp.route("", methods=["POST"])
 def register():
-    # =========================
+    # ==========================================
     # 1. รับข้อมูลจาก FormData
-    # =========================
+    # ==========================================
     email = request.form.get("email")
     password = request.form.get("password")
     display_name = request.form.get("display_name")
@@ -30,16 +30,15 @@ def register():
             "message": "กรอกข้อมูลไม่ครบ"
         }), 400
 
-    # =========================
-    # 2. Hash Password (Werkzeug)
-    # =========================
+    # ==========================================
+    # 2. Hash Password (ความปลอดภัย)
+    # ==========================================
     password_hash = generate_password_hash(password)
 
-    # =========================
+    # ==========================================
     # 3. จัดการรูปโปรไฟล์
-    # =========================
+    # ==========================================
     filename = "default.png"
-
     if file and file.filename != "":
         filename = secure_filename(file.filename)
         upload_path = os.path.join(
@@ -48,32 +47,34 @@ def register():
         )
         file.save(upload_path)
 
-    # =========================
-    # 4. สร้างรหัสยืนยัน
-    # =========================
+    # ==========================================
+    # 4. สร้างรหัสยืนยัน (OTP) และเวลาปัจจุบัน
+    # ==========================================
     verify_code = str(random.randint(100000, 999999))
     expire = datetime.now() + timedelta(minutes=30)
+    current_time = datetime.now()
 
-    # =========================
-    # 5. บันทึกลง Database
-    # =========================
+    # ==========================================
+    # 5. บันทึกลง Database (MySQL)
+    # ==========================================
     conn = get_connection()
     cursor = conn.cursor()
 
     try:
-        # แก้ชื่อคอลัมน์ตรงนี้ให้ตรงกับ Database ของคุณเป๊ะๆ
         cursor.execute("""
-            INSERT INTO member
-            (Email, Password, DisplayName, ProfileImage,
-             VerifyCode, VerifyExpire, EmailVerified)
-            VALUES (%s,%s,%s,%s,%s,%s,0)
+            INSERT INTO member (
+                Email, Password, DisplayName, ProfileImage,
+                VerifyCode, VerifyExpire, EmailVerified, RegisterDate, MemberStatus
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, 0, %s, 'Pending')
         """, (
             email,
             password_hash,
             display_name,
             filename,
             verify_code,
-            expire
+            expire,
+            current_time
         ))
         conn.commit()
     except Exception as e:
@@ -83,16 +84,18 @@ def register():
             "message": "อีเมลซ้ำหรือเกิดข้อผิดพลาดกับฐานข้อมูล"
         }), 400
     finally:
-        # ปิดการเชื่อมต่อฐานข้อมูลเสมอเพื่อป้องกันเซิร์ฟเวอร์ค้าง
         cursor.close()
         conn.close()
 
-    # =========================
-    # 6. ส่งอีเมลยืนยัน
-    # =========================
+    # ==========================================
+    # 6. ส่งอีเมลยืนยันตัวตน
+    # ==========================================
     try:
         send_verify_email(email, verify_code)
     except Exception as e:
-        print("❌ Email Error:", str(e)) # ถ้าส่งเมลไม่ผ่าน จะได้ไม่พา Database พังไปด้วย
+        print("❌ Email Error:", str(e))
 
-    return jsonify({"success": True}), 200
+    return jsonify({
+        "success": True,
+        "message": "สมัครสมาชิกสำเร็จ กรุณาตรวจสอบรหัส OTP ในอีเมลของคุณ"
+    }), 200
