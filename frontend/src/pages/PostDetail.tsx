@@ -1,39 +1,18 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
-import {
-  ArrowLeft,
-  MapPin,
-  ArrowRightLeft,
-  Star,
-  MessageCircle,
-  Globe,
-  FileText,
-  ChevronLeft,
-  ChevronRight,
-  ShieldAlert,
-  Flag,
-  CheckCircle,
-} from "lucide-react";
-
+import { ArrowLeft,MapPin,ArrowRightLeft,Star,MessageCircle,Globe,FileText,ChevronLeft,ChevronRight,ShieldAlert,Flag,CheckCircle,} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import AppLayout from "@/components/AppLayout";
-
 import { useToast } from "@/hooks/use-toast";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import {Dialog,DialogContent,DialogFooter,DialogHeader,DialogTitle,} from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-
 // 💡 ดึงฟังก์ชัน getUserStats เพิ่มเติมเพื่อดึงคะแนนจริงจาก database
 import { getItems as fetchItemsAPI, getUserStats, IMAGE_BASE_URL } from "@/api/api";
+import { reportItem } from "@/api/api";
 
 interface DBItemDetail {
   ItemID?: number;
@@ -285,25 +264,60 @@ export default function PostDetail() {
   const prevImage = () =>
     setCurrentImageIndex((p) => (p === 0 ? images.length - 1 : p - 1));
 
-  const handleReport = () => {
+  const handleReport = async () => {
+
     if (!reportReason.trim()) {
-      toast({
-        title: "ยังไม่ได้ระบุเหตุผล",
-        description: "กรุณากรอกเหตุผลก่อนส่งรายงาน",
-        variant: "destructive",
-      });
-      return;
+
+        toast({
+            title: "กรุณาระบุเหตุผล",
+            variant: "destructive"
+        });
+
+        return;
     }
 
-    toast({
-      title: "ส่งรายงานโพสต์เรียบร้อย",
-      description:
-        "ระบบจะดำเนินการตรวจสอบให้เร็วที่สุด ขอบคุณที่แจ้งเข้ามาครับ",
-    });
+    try {
 
-    setIsReportOpen(false);
-    setReportReason("");
-  };
+        await reportItem({
+
+            ItemID: itemId,
+
+            MemberID: user.MemberID,
+
+            ProblemType: "รายงานโพสต์",
+
+            HelpCenterData: reportReason
+
+        });
+
+        toast({
+
+            title: "ส่งรายงานสำเร็จ",
+
+            description: "ขอบคุณสำหรับการแจ้งปัญหา"
+
+        });
+
+        setReportReason("");
+
+        setIsReportOpen(false);
+
+    }
+    catch(err){
+
+        console.log(err);
+
+        toast({
+
+            title:"ส่งรายงานไม่สำเร็จ",
+
+            variant:"destructive"
+
+        });
+
+    }
+
+};
 
   return (
     <AppLayout>

@@ -1,26 +1,12 @@
 import { useEffect, useState } from "react";
-import {
-  Star,
-  ArrowRightLeft,
-  Award,
-  HelpCircle,
-  LogOut,
-  UserCog,
-  ChevronRight,
-  AlertTriangle,
-  LucideIcon,
-  Map,
+import { Star,ArrowRightLeft,Award,HelpCircle,LogOut,UserCog,ChevronRight,AlertTriangle,LucideIcon,Map,
 } from "lucide-react";
-
 import { useNavigate } from "react-router-dom";
-
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-
 import AppLayout from "@/components/AppLayout";
-
 import { getUserStats, getItems } from "@/api/api";
 
 interface ProfileUser {
@@ -225,11 +211,6 @@ export default function Profile() {
             onClick={() => navigate("/help")}
           />
 
-          <MenuButton
-            icon={Map}
-            label="แผนผังเว็บไซต์"
-            onClick={() => navigate("/sitemap")}
-          />
 
           <div className="h-px bg-border/40 my-2.5 mx-2" />
 

@@ -35,26 +35,61 @@ export default function Login() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!validateForm()) return;
 
     try {
-      const response = await loginApi(formData);
-      if (response.data.success) {
-        
-        // 1. เก็บข้อมูล User
-        localStorage.setItem("user", JSON.stringify(response.data.user));
-        
-        // 2. เก็บ Token ไว้ใช้ยืนยันตัวตนในหน้าอื่นๆ (เพิ่มบรรทัดนี้!)
-        localStorage.setItem("token", response.data.token); 
 
-        navigate(response.data.user.role === "admin" ? "/admin" : "/feed");
-      } else {
-        toast({ title: "อีเมลหรือรหัสผ่านไม่ถูกต้อง", variant: "destructive" });
-      }
+        const response = await loginApi(formData);
+
+        if (response.data.success) {
+
+            localStorage.setItem(
+                "user",
+                JSON.stringify(response.data.user)
+            );
+
+            localStorage.setItem(
+                "token",
+                response.data.token
+            );
+
+            localStorage.setItem(
+                "role",
+                response.data.role
+            );
+
+            if (response.data.role === "admin") {
+
+                navigate("/admin");
+
+            } else {
+
+                navigate("/feed");
+
+            }
+
+        } else {
+
+            toast({
+                title: "อีเมลหรือรหัสผ่านไม่ถูกต้อง",
+                variant: "destructive"
+            });
+
+        }
+
     } catch (error) {
-      toast({ title: "เกิดข้อผิดพลาดในการเข้าสู่ระบบ", variant: "destructive" });
+
+        console.log(error);
+
+        toast({
+            title: "เกิดข้อผิดพลาดในการเข้าสู่ระบบ",
+            variant: "destructive"
+        });
+
     }
-  };
+
+};
 
   return (
     <div className="min-h-screen bg-background flex flex-col select-none">

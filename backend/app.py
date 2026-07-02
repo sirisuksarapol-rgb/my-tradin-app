@@ -9,7 +9,8 @@ from routes.item import item_bp
 from routes.exchanges import exchanges_bp 
 from routes.notifications import notifications_bp
 from routes.users import users_bp
-from routes.problem import problem_bp
+from routes.reports import report_bp   
+from routes.admin import admin_bp 
 from flask import send_from_directory
 app = Flask(__name__)
 CORS(app) 
@@ -35,6 +36,8 @@ app.register_blueprint(item_bp)
 app.register_blueprint(notifications_bp)
 app.register_blueprint(users_bp)
 app.register_blueprint(exchanges_bp) 
-app.register_blueprint(problem_bp)
+app.register_blueprint(report_bp)  
+app.register_blueprint(admin_bp, url_prefix='/api/admin')
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)

@@ -18,10 +18,10 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { AdminNavbar } from "@/components/AdminNavbar";
 import { StatCard } from "@/components/StatCard";
-import { MOCK_USERS, mockUserReports, type User, type UserReport } from "@/lib/user_data";
-import { mockPosts, mockReports, type PostItem, type PostReport } from "@/lib/post_data";
-import { mockFeedbacks, type Feedback } from "@/lib/report_data";
 import Footer from "@/components/Footer";
+
+// โหลดฟังก์ชัน API จากไฟล์ api.js ของคุณ
+import { getAdminUsers, getAdminItems, getAdminReports } from "@/api/api";
 
 const feedbackCategoryIcon: Record<string, React.ReactNode> = {
    bug: <Bug className="w-4 h-4 text-destructive" />,
@@ -39,29 +39,111 @@ export default function AdminDashboard() {
    const navigate = useNavigate();
    const currentDate = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
 
-   const [users, setUsers] = useState<User[]>(MOCK_USERS || []);
-   const [posts, setPosts] = useState<PostItem[]>(mockPosts || []);
-
-   const formattedReports = (mockReports || []).map((r: any) => {
-      const targetPostId = r.postId || r.post_id || r.targetId || r.target_id || r.id;
-      const targetPost = posts.find((p) => String(p.id) === String(targetPostId));
-      return {
-         id: String(r.id || Math.random()),
-         targetId: String(targetPostId),
-         targetTitle: targetPost?.title || r.targetTitle || "ไม่พบชื่อโพสต์",
-         reason: r.reason || "ไม่ระบุเหตุผล",
-         reporter: r.reporter || "ไม่ระบุชื่อผู้แจ้ง",
-         createdAt: r.createdAt || "ไม่ระบุวันที่",
-         status: (r.status || "pending") as "pending" | "resolved"
-      };
-   }) as (PostReport & { targetId: string })[];
-
-   const [reports, setReports] = useState(formattedReports);
-   const [userReports, setUserReports] = useState<UserReport[]>(mockUserReports || []);
-   const [feedbacks, setFeedbacks] = useState<Feedback[]>(mockFeedbacks || []);
+   const [users, setUsers] = useState<any[]>([]);
+   const [posts, setPosts] = useState<any[]>([]);
+   const [reports, setReports] = useState<any[]>([]);
+   const [userReports, setUserReports] = useState<any[]>([]);
+   const [feedbacks, setFeedbacks] = useState<any[]>([]);
+   
+   const [isLoading, setIsLoading] = useState(true);
    const [activeTab, setActiveTab] = useState("users");
    const [searchInput, setSearchInput] = useState("");
    const [searchTerm, setSearchTerm] = useState("");
+
+   // ฟังก์ชันดึงข้อมูลจาก API และแปลง Key ให้ตรงกับ UI
+   const fetchDashboardData = async () => {
+      setIsLoading(true);
+      try {
+         const [usersRes, itemsRes, reportsRes] = await Promise.all([
+            getAdminUsers(),
+            getAdminItems(),
+            getAdminReports()
+         ]);
+
+         const usersData = usersRes.data || [];
+         const itemsData = itemsRes.data || [];
+         const allReportsData = reportsRes.data || [];
+
+         // 1. แปลงข้อมูลผู้ใช้งาน (member)
+         setUsers(usersData.map((u: any) => ({
+            id: u.MemberID,
+            name: u.DisplayName || "ไม่ระบุชื่อ",
+            email: u.Email,
+            joinedAt: u.RegisterDate ? new Date(u.RegisterDate).toLocaleDateString('th-TH') : "ไม่ระบุ",
+            suspended: u.MemberStatus === 'Suspended',
+            postCount: u.PostCount || 0
+         })));
+
+         // 2. แปลงข้อมูลโพสต์ (item)
+         setPosts(itemsData.map((p: any) => ({
+            id: String(p.ItemID),
+            title: p.ItemName || "ไม่พบชื่อโพสต์",
+            category: p.CategoryID || "ทั่วไป",
+            createdAt: p.PostDate ? new Date(p.PostDate).toLocaleDateString('th-TH') : "ไม่ระบุ",
+            author: { 
+               id: p.MemberID, 
+               name: p.DisplayName || "ไม่ระบุชื่อ" 
+            }
+         })));
+
+         // 3. แปลงข้อมูลการแจ้งปัญหา (problem) และแยกหมวดหมู่
+         const formattedReports: any[] = [];
+         const formattedUserReports: any[] = [];
+         const formattedFeedbacks: any[] = [];
+
+         allReportsData.forEach((r: any) => {
+            const reportObj = {
+               id: String(r.ProblemID),
+               reason: r.ProblemType || "ไม่ระบุเหตุผล",
+               reporter: r.DisplayName || "ไม่ระบุผู้แจ้ง",
+               createdAt: r.ReportDate ? new Date(r.ReportDate).toLocaleDateString('th-TH') : "ไม่ระบุวันที่",
+               status: (r.ReportStatus || "pending").toLowerCase() === "pending" ? "pending" : "resolved"
+            };
+
+            if (r.ItemID) {
+               // รายงานเกี่ยวกับโพสต์สิ่งของ
+               formattedReports.push({
+                  ...reportObj,
+                  targetId: String(r.ItemID),
+                  targetTitle: r.ItemName || "ไม่พบชื่อโพสต์",
+                  reason: r.HelpCenterData || r.ProblemType
+               });
+            } else if (r.ProblemType && r.ProblemType.toLowerCase().includes('feedback')) {
+               // รายงานที่เป็นข้อเสนอแนะระบบ
+               formattedFeedbacks.push({
+                  ...reportObj,
+                  category: "suggestion",
+                  title: r.ProblemType,
+                  description: r.HelpCenterData || "",
+               });
+            } else {
+               // รายงานพฤติกรรมผู้ใช้ / ปัญหาอื่นๆ
+               formattedUserReports.push({
+                  ...reportObj,
+                  reportedUserId: String(r.MemberID || "Unknown"),
+                  reportedUserName: r.DisplayName || "ระบบ/บัญชีผู้ใช้",
+                  details: r.HelpCenterData || "",
+               });
+            }
+         });
+
+         setReports(formattedReports);
+         setUserReports(formattedUserReports);
+         setFeedbacks(formattedFeedbacks);
+
+      } catch (error) {
+         console.error("Error fetching dashboard data:", error);
+         toast({ title: "เกิดข้อผิดพลาด", description: "ไม่สามารถโหลดข้อมูลระบบได้", variant: "destructive" });
+      } finally {
+         setIsLoading(false);
+      }
+   };
+
+   // เรียกใช้งาน API เมื่อโหลดหน้าเว็บครั้งแรก
+   useEffect(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      fetchDashboardData();
+   }, []);
 
    const pendingReports = reports.filter((r) => r.status === "pending");
    const pendingUserReports = userReports.filter((r) => r.status === "pending");
@@ -106,7 +188,16 @@ export default function AdminDashboard() {
       }
    };
 
-   useEffect(() => { window.scrollTo({ top: 0, behavior: "smooth" }); }, []);
+   if (isLoading) {
+      return (
+         <div className="min-h-screen flex items-center justify-center bg-background">
+            <div className="text-center space-y-2">
+               <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
+               <p className="text-sm text-muted-foreground">กำลังโหลดข้อมูลระบบ...</p>
+            </div>
+         </div>
+      );
+   }
 
    return (
       <div className="min-h-screen flex flex-col bg-background/50">
@@ -125,7 +216,6 @@ export default function AdminDashboard() {
                   <p className="text-xs md:text-sm font-medium">{currentDate}</p>
                </div>
             </div>
-
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
                <StatCard value={users.length} label="ผู้ใช้ทั้งหมด" icon={<Users className="w-5 h-5 text-primary" />} colorClass="bg-primary/10" />
@@ -179,7 +269,7 @@ export default function AdminDashboard() {
                               </thead>
                               <tbody className="divide-y divide-border/50">
                                  {filteredUsers.map((user) => {
-                                    const userPostCount = posts.filter(p => p.author?.id === user.id).length;
+                                    // ดึงค่า postCount จากที่ SQL คำนวณมาให้ได้เลย
                                     return (
                                        <tr key={user.id} className="hover:bg-muted/20 transition-colors">
                                           <td className="px-4 md:px-5 py-3">
@@ -189,7 +279,7 @@ export default function AdminDashboard() {
                                                 </div>
                                                 <div className="flex flex-col">
                                                    <p className="font-semibold text-foreground cursor-pointer hover:text-primary hover:underline" onClick={() => navigate(`/user/${user.id}`, { state: { fromAdmin: true } })}>
-                                                      {user.name || "ไม่ระบุชื่อ"}
+                                                      {user.name}
                                                    </p>
                                                    <span className="text-[10px] text-muted-foreground lg:hidden">{user.email}</span>
                                                 </div>
@@ -197,7 +287,7 @@ export default function AdminDashboard() {
                                           </td>
                                           <td className="px-4 md:px-5 py-3 text-muted-foreground hidden lg:table-cell">{user.email}</td>
                                           <td className="px-4 md:px-5 py-3 text-center text-muted-foreground hidden sm:table-cell">{user.joinedAt}</td>
-                                          <td className="px-4 md:px-5 py-3 text-right font-medium">{userPostCount}</td>
+                                          <td className="px-4 md:px-5 py-3 text-right font-medium">{user.postCount}</td>
                                           <td className="px-4 md:px-5 py-3 text-center">
                                              {user.suspended ? (
                                                 <Badge variant="destructive" className="text-[10px]">ระงับ</Badge>
@@ -226,7 +316,7 @@ export default function AdminDashboard() {
                                                          <p className="text-sm text-muted-foreground break-all">{user.email}</p>
                                                          <div className="flex flex-wrap items-center gap-2 mt-2">
                                                             <Badge variant="secondary" className="text-[10px]">เข้าร่วม: {user.joinedAt}</Badge>
-                                                            <Badge variant="secondary" className="text-[10px]">โพสต์: {userPostCount}</Badge>
+                                                            <Badge variant="secondary" className="text-[10px]">โพสต์: {user.postCount}</Badge>
                                                          </div>
                                                       </div>
                                                    </div>

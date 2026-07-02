@@ -30,7 +30,7 @@ import ExchangeReview from "./pages/ExchangeReview";
 import ExchangeHistory from "./pages/ExchangeHistory";
 import ExchangeDetail from "./pages/ExchangeDetail";
 import EditProfile from "./pages/EditProfile";
-import Sitemap from "./pages/Sitemap";
+
 // Import ThemeProvider มาแล้ว
 import { ThemeProvider } from "@/hooks/use-theme";
 
@@ -72,7 +72,6 @@ const App = () => (
             <Route path="/exchange-history" element={<ExchangeHistory />} />
             <Route path="/exchange-detail/:id" element={<ExchangeDetail />} />
             <Route path="/edit-profile" element={<EditProfile />} />
-            <Route path="/sitemap" element={<Sitemap />} />
           </Routes>
         </BrowserRouter>
       </TooltipProvider>

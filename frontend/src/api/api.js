@@ -145,4 +145,44 @@ export const updateUserProfile = async (
 
 export const reportItem = (data) => axios.post(`${API_BASE_URL}/reports`, data);
 
+// ========================================================
+// ADMIN API
+// ========================================================
+
+// Dashboard Summary
+export const getAdminDashboard = () =>
+  axios.get(`${API_BASE_URL}/admin/dashboard`);
+
+// Users
+export const getAdminUsers = () =>
+  axios.get(`${API_BASE_URL}/admin/users`);
+
+// Items
+export const getAdminItems = () =>
+  axios.get(`${API_BASE_URL}/admin/items`);
+
+// Reports
+export const getAdminReports = () =>
+  axios.get(`${API_BASE_URL}/admin/reports`);
+
+
+// ระงับสมาชิก
+export const suspendMember = (memberId) =>
+  axios.put(`${API_BASE_URL}/admin/users/${memberId}/suspend`);
+
+
+// ยกเลิกการระงับ
+export const unsuspendMember = (memberId) =>
+  axios.put(`${API_BASE_URL}/admin/users/${memberId}/unsuspend`);
+
+
+// ลบโพสต์
+export const adminDeleteItem = (itemId) =>
+  axios.delete(`${API_BASE_URL}/admin/items/${itemId}`);
+
+
+// จัดการรายงาน
+export const resolveReport = (problemId) =>
+  axios.put(`${API_BASE_URL}/admin/reports/${problemId}`);
+
 export default API_BASE_URL;
