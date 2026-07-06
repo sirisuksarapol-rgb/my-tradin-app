@@ -62,14 +62,18 @@ def get_items():
         # 💡 ใช้ LEFT JOIN ดึงข้อมูลจากตาราง item และตาราง member มารวมกันใน Query เดียว
         # ดึงมาทั้งข้อมูลสิ่งของ ชื่อสมาชิก (DisplayName) อีเมล (Email) และรูปโปรไฟล์ (ProfileImage)
         query = """
-            SELECT 
-                i.*, 
-                i.ItemImage AS image_name,
-                m.DisplayName, 
-                m.Email, 
-                m.ProfileImage
-            FROM item i
-            LEFT JOIN member m ON i.MemberID = m.MemberID
+        SELECT
+            i.*,
+            i.ItemImage AS image_name,
+            c.CategoryName,
+            m.DisplayName,
+            m.Email,
+            m.ProfileImage
+        FROM item i
+        LEFT JOIN member m
+            ON i.MemberID = m.MemberID
+        LEFT JOIN category c
+            ON i.CategoryID = c.CategoryID
         """
         cursor.execute(query)
         items = cursor.fetchall()

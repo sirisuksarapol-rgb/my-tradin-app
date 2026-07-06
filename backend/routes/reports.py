@@ -16,19 +16,21 @@ def create_report():
 
         item_id = data.get("ItemID")
         member_id = data.get("MemberID")
+        reported_member_id = data.get("ReportedMemberID")
         problem_type = data.get("ProblemType")
         help_center = data.get("HelpCenterData")
-
-        if not item_id:
-            return jsonify({
-                "success": False,
-                "message": "ไม่พบ ItemID"
-            }), 400
 
         if not member_id:
             return jsonify({
                 "success": False,
                 "message": "ไม่พบ MemberID"
+            }), 400
+
+        # ต้องมีอย่างน้อยอย่างใดอย่างหนึ่ง
+        if not item_id and not reported_member_id:
+            return jsonify({
+                "success": False,
+                "message": "กรุณาระบุสิ่งของหรือสมาชิกที่ต้องการรายงาน"
             }), 400
 
         conn = get_connection()
@@ -39,6 +41,7 @@ def create_report():
         (
             ItemID,
             MemberID,
+            ReportedMemberID,
             ReportStatus,
             HelpCenterData,
             ReportDate,
@@ -46,6 +49,7 @@ def create_report():
         )
         VALUES
         (
+            %s,
             %s,
             %s,
             'รอดำเนินการ',
@@ -60,6 +64,7 @@ def create_report():
             (
                 item_id,
                 member_id,
+                reported_member_id,
                 help_center,
                 problem_type
             )
@@ -95,79 +100,69 @@ def create_report():
 def get_reports():
 
     conn = get_connection()
-    cursor = conn.cursor(dictionary=True)
+    # 🟢 1. เอา dictionary=True ออก ให้เหลือแค่นี้พอครับ
+    cursor = conn.cursor()
 
     sql = """
     SELECT
-
-        p.ProblemID,
-        p.ReportStatus,
-        p.ReportDate,
-        p.ProblemType,
-        p.HelpCenterData,
-
-        i.ItemID,
-        i.ItemName,
-        i.ItemImage,
-
-        m.MemberID,
-        m.DisplayName
-
+        p.ProblemID, p.ItemID, p.MemberID, p.ReportedMemberID,
+        p.ReportStatus, p.ReportDate, p.ResolveDate, p.ProblemType, p.HelpCenterData,
+        i.ItemName, i.ItemImage,
+        reporter.DisplayName AS ReporterName,
+        reported.DisplayName AS ReportedMemberName,
+        a.AdminName
     FROM problem p
-
-    LEFT JOIN item i
-    ON p.ItemID=i.ItemID
-
-    LEFT JOIN member m
-    ON p.MemberID=m.MemberID
-
+    LEFT JOIN item i ON p.ItemID = i.ItemID
+    LEFT JOIN member reporter ON p.MemberID = reporter.MemberID
+    LEFT JOIN member reported ON p.ReportedMemberID = reported.MemberID
+    LEFT JOIN admin a ON p.AdminID = a.AdminID
     ORDER BY p.ReportDate DESC
     """
 
     cursor.execute(sql)
 
-    reports = cursor.fetchall()
+    # 🟢 2. ใช้ zip เพื่อบังคับให้ Python จับคู่ชื่อคอลัมน์ (AS) ให้ถูกต้อง
+    columns = [col[0] for col in cursor.description]
+    reports = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
     cursor.close()
     conn.close()
 
     return jsonify(reports)
-
-
 # ===========================
 # ดูรายงานเดียว
 # ===========================
 @report_bp.route("/api/reports/<int:id>", methods=["GET"])
 def get_report(id):
-
     conn = get_connection()
-
-    cursor = conn.cursor(dictionary=True)
+    # 🟢 1. ใช้ Cursor ธรรมดา
+    cursor = conn.cursor()
 
     sql = """
     SELECT
-
         p.*,
-
         i.ItemName,
         i.ItemImage,
-
-        m.DisplayName
-
+        reporter.DisplayName AS ReporterName,
+        reported.DisplayName AS ReportedMemberName,
+        a.AdminName
     FROM problem p
-
-    LEFT JOIN item i
-    ON p.ItemID=i.ItemID
-
-    LEFT JOIN member m
-    ON p.MemberID=m.MemberID
-
-    WHERE p.ProblemID=%s
+    LEFT JOIN item i ON p.ItemID = i.ItemID
+    LEFT JOIN member reporter ON p.MemberID = reporter.MemberID
+    LEFT JOIN member reported ON p.ReportedMemberID = reported.MemberID
+    LEFT JOIN admin a ON p.AdminID = a.AdminID
+    WHERE p.ProblemID = %s
     """
 
-    cursor.execute(sql,(id,))
+    cursor.execute(sql, (id,))
+    row = cursor.fetchone()
 
-    report = cursor.fetchone()
+    # 🟢 2. แปลงข้อมูลแบบเดียวกับด้านบน
+    if row:
+        columns = [col[0] for col in cursor.description]
+        report = dict(zip(columns, row))
+    else:
+        report = None
 
     cursor.close()
     conn.close()
