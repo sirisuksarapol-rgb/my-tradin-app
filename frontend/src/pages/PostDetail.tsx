@@ -10,9 +10,8 @@ import AppLayout from "@/components/AppLayout";
 import { useToast } from "@/hooks/use-toast";
 import {Dialog,DialogContent,DialogFooter,DialogHeader,DialogTitle,} from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-// 💡 ดึงฟังก์ชัน getUserStats เพิ่มเติมเพื่อดึงคะแนนจริงจาก database
 import { getItems as fetchItemsAPI, getUserStats, IMAGE_BASE_URL } from "@/api/api";
-import { reportItem } from "@/api/api";
+import { createReport } from "@/api/api";
 
 interface DBItemDetail {
   ItemID?: number;
@@ -278,7 +277,7 @@ export default function PostDetail() {
 
     try {
 
-        await reportItem({
+        await createReport({
 
             ItemID: itemId,
 

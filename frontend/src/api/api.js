@@ -1,31 +1,45 @@
 import axios from 'axios';
 
-const API_BASE_URL = `http://${window.location.hostname}:5000/api`;
-export const IMAGE_BASE_URL = `http://${window.location.hostname}:5000`;
-const API_URL = "http://localhost:5000";
+// ========================================================
+// 📌 CONFIGURATION & CONSTANTS
+// ========================================================
+const BASE_URL = `http://${window.location.hostname}:5000`;
+export const IMAGE_BASE_URL = BASE_URL;
+export const API_BASE_URL = `${BASE_URL}/api`;
+
+/**
+ * Helper ฟังก์ชันสำหรับดึง Member ID จาก localStorage (ลดการเขียนโค้ดซ้ำ)
+ */
+const getStoredMemberId = () => {
+  const savedUser = localStorage.getItem("user");
+  if (!savedUser) return "";
+  const user = JSON.parse(savedUser);
+  return user.id || user.user_id || user.UserID || user.MemberID || "";
+};
+
+// ========================================================
+// 🔐 1. AUTHENTICATION API
+// ========================================================
 export const login = (data) => axios.post(`${API_BASE_URL}/login`, data);
 export const register = (data) => axios.post(`${API_BASE_URL}/register`, data);
+
+// ========================================================
+// 📦 2. CATEGORIES & ITEMS API (จัดการสิ่งของ)
+// ========================================================
 export const getCategories = () => axios.get(`${API_BASE_URL}/categories`);
 export const getItems = () => axios.get(`${API_BASE_URL}/items`);
-export const getItemById = (id) => axios.get(`${API_BASE_URL}/items/${id}`); // 👈 ต้องเป็น axios.get เท่านั้น!
-// ฟังก์ชัน Delete
+export const getItemById = (id) => axios.get(`${API_BASE_URL}/items/${id}`);
+
+export const createItem = (formData) => axios.post(`${API_BASE_URL}/items`, formData);
+export const updateItem = (id, formData) => axios.put(`${API_BASE_URL}/items/${id}`, formData);
 export const deleteItem = (id) => axios.delete(`${API_BASE_URL}/items/${id}`);
 
-export const createItem = (formData) => {
-    return axios.post(`${API_BASE_URL}/items`, formData);
-};
-
-// 📝 เพิ่มฟังก์ชันสำหรับอัปเดตแก้ไขโพสต์สิ่งของ
-export const updateItem = (id, formData) => {
-    return axios.put(`${API_BASE_URL}/items/${id}`, formData);
-};
-
+// ========================================================
+// 🔄 3. EXCHANGES API (ระบบจับคู่/แลกเปลี่ยน)
+// ========================================================
 export const getExchanges = async () => {
   try {
-    const savedUser = localStorage.getItem("user");
-    const user = savedUser ? JSON.parse(savedUser) : null;
-    const memberId = user ? (user.id || user.UserID || user.MemberID) : "";
-
+    const memberId = getStoredMemberId();
     const response = await axios.get(`${API_BASE_URL}/exchanges?member_id=${memberId}`);
     return response.data; 
   } catch (error) {
@@ -34,15 +48,9 @@ export const getExchanges = async () => {
   }
 };
 
-/**
- * ส่งคำขอสร้างการแลกเปลี่ยนใหม่ (รองรับทั้งการส่งแบบแจกแจงค่า และแบบมัดรวม Object Payload)
- */
 export const createExchangeRequest = async (param1, param2) => {
   try {
-    const savedUser = localStorage.getItem("user");
-    const user = savedUser ? JSON.parse(savedUser) : null;
-    const memberId = user ? (user.id || user.UserID || user.MemberID) : "";
-
+    const memberId = getStoredMemberId();
     let payload = {};
 
     if (typeof param1 === "object" && param1 !== null) {
@@ -71,18 +79,11 @@ export const createExchangeRequest = async (param1, param2) => {
 };
 
 // ========================================================
-// 🔥 [ADDED NEW] ฟังก์ชันสำหรับระบบแจ้งเตือน (Notifications)
+// 🔔 4. NOTIFICATIONS API (ระบบแจ้งเตือน)
 // ========================================================
-
-/**
- * 1. ดึงรายการแจ้งเตือนทั้งหมดของผู้ใช้งานปัจจุบัน
- */
 export const getNotifications = async () => {
   try {
-    const savedUser = localStorage.getItem("user");
-    const user = savedUser ? JSON.parse(savedUser) : null;
-    const memberId = user ? (user.id || user.UserID || user.MemberID) : "";
-
+    const memberId = getStoredMemberId();
     const response = await axios.get(`${API_BASE_URL}/notifications?member_id=${memberId}`);
     return response.data;
   } catch (error) {
@@ -93,12 +94,9 @@ export const getNotifications = async () => {
 
 export const getUnreadNotificationCount = async () => {
   try {
-    const savedUser = localStorage.getItem("user");
-    const user = savedUser ? JSON.parse(savedUser) : null;
-    const memberId = user ? (user.id || user.UserID || user.MemberID) : "";
-
+    const memberId = getStoredMemberId();
     const response = await axios.get(`${API_BASE_URL}/notifications/unread-count?member_id=${memberId}`);
-    return response.data; // จะส่ง { success: true, count: X } กลับไป
+    return response.data;
   } catch (error) {
     console.error("Error fetching unread notification count API:", error);
     throw error;
@@ -115,9 +113,13 @@ export const markNotificationAsRead = async (notificationId) => {
   }
 };
 
+// ========================================================
+// 👤 5. USER PROFILE & STATS API (ข้อมูลสมาชิก)
+// ========================================================
 export const getUserStats = async (userId) => {
   try {
-    const response = await axios.get(`${API_URL}/api/users/${userId}/stats`);
+    // 💡 ปรับจาก API_URL เดิม (localhost) มาใช้ API_BASE_URL เพื่อป้องกันปัญหาเว็บบอร์ดพังเวลารันเครื่องอื่น
+    const response = await axios.get(`${API_BASE_URL}/users/${userId}/stats`);
     return response.data;
   } catch (error) {
     console.error("❌ Error fetching user stats:", error);
@@ -125,64 +127,55 @@ export const getUserStats = async (userId) => {
   }
 };
 
-export const updateUserProfile = async (
-  memberId,
-  formData
-) => {
-  const response = await axios.put(
-    `${API_BASE_URL}/members/${memberId}`,
-    formData,
-    {
+export const updateUserProfile = async (memberId, formData) => {
+  try {
+    const response = await axios.put(`${API_BASE_URL}/members/${memberId}`, formData, {
       headers: {
-        "Content-Type":
-          "multipart/form-data",
+        "Content-Type": "multipart/form-data",
       },
-    }
-  );
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error updating user profile:", error);
+    throw error;
+  }
+};
 
+// ========================================================
+// ⚠️ 6. REPORTS API (ระบบรายงานปัญหา)
+// ========================================================
+export const createReport = async (data) => {
+  try {
+    const response = await axios.post(`${API_BASE_URL}/reports`, data);
+    return response.data; // Backend คืนค่า { success: true, ProblemID: ... }
+  } catch (error) {
+    console.error("Error creating report:", error);
+    // ส่ง Error Message ที่มาจาก Flask ไปให้หน้าบ้านแสดงผลต่อบน Toast
+    throw error.response?.data || error;
+  }
+};
+
+export const getReports = async () => {
+  const response = await axios.get(`${API_BASE_URL}/reports`);
   return response.data;
 };
 
-export const reportItem = (data) => axios.post(`${API_BASE_URL}/reports`, data);
+export const getReportById = async (problemId) => {
+  const response = await axios.get(`${API_BASE_URL}/reports/${problemId}`);
+  return response.data;
+};
 
 // ========================================================
-// ADMIN API
+// 👑 7. ADMIN API (ระบบหลังบ้านผู้ดูแล)
 // ========================================================
+export const getAdminDashboard = () => axios.get(`${API_BASE_URL}/admin/dashboard`);
+export const getAdminUsers = () => axios.get(`${API_BASE_URL}/admin/users`);
+export const getAdminItems = () => axios.get(`${API_BASE_URL}/admin/items`);
+export const getAdminReports = () => axios.get(`${API_BASE_URL}/admin/reports`);
 
-// Dashboard Summary
-export const getAdminDashboard = () =>
-  axios.get(`${API_BASE_URL}/admin/dashboard`);
-
-// Users
-export const getAdminUsers = () =>
-  axios.get(`${API_BASE_URL}/admin/users`);
-
-// Items
-export const getAdminItems = () =>
-  axios.get(`${API_BASE_URL}/admin/items`);
-
-// Reports
-export const getAdminReports = () =>
-  axios.get(`${API_BASE_URL}/admin/reports`);
-
-
-// ระงับสมาชิก
-export const suspendMember = (memberId) =>
-  axios.put(`${API_BASE_URL}/admin/users/${memberId}/suspend`);
-
-
-// ยกเลิกการระงับ
-export const unsuspendMember = (memberId) =>
-  axios.put(`${API_BASE_URL}/admin/users/${memberId}/unsuspend`);
-
-
-// ลบโพสต์
-export const adminDeleteItem = (itemId) =>
-  axios.delete(`${API_BASE_URL}/admin/items/${itemId}`);
-
-
-// จัดการรายงาน
-export const resolveReport = (problemId) =>
-  axios.put(`${API_BASE_URL}/admin/reports/${problemId}`);
+export const suspendMember = (memberId) => axios.put(`${API_BASE_URL}/admin/users/${memberId}/suspend`);
+export const unsuspendMember = (memberId) => axios.put(`${API_BASE_URL}/admin/users/${memberId}/unsuspend`);
+export const adminDeleteItem = (itemId) => axios.delete(`${API_BASE_URL}/admin/items/${itemId}`);
+export const resolveReport = (problemId) => axios.put(`${API_BASE_URL}/admin/reports/${problemId}`);
 
 export default API_BASE_URL;

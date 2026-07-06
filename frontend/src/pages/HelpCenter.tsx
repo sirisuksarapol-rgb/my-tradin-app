@@ -1,40 +1,111 @@
-import { useState } from "react";
+import { useState, ChangeEvent } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MessageCircle, Bug, Lightbulb, HelpCircle, Send, CheckCircle, FileText, ArrowLeft } from "lucide-react";
+import { MessageCircle, Bug, Lightbulb, HelpCircle, Send, CheckCircle, FileText, ArrowLeft, Loader2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 
-const categories = [
+// 🚀 นำเข้าฟังก์ชันจากไฟล์ api.js ส่วนกลางของคุณ
+import { createReport } from "@/api/api";
+
+// กำหนด Type ของประเภทปัญหาให้ชัดเจนแทนการใช้ string หว่านแห
+type ProblemCategory = "bug" | "suggestion" | "other";
+
+interface CategoryItem {
+   value: ProblemCategory;
+   label: string;
+   icon: React.ComponentType<{ className?: string }>;
+   color: string;
+}
+
+// โครงสร้างข้อมูลสมาชิกที่เก็บใน LocalStorage
+interface LocalUser {
+   id?: string | number;
+   MemberID?: string | number;
+   UserID?: string | number;
+   user_id?: string | number;
+}
+
+// โครงสร้างข้อผิดพลาดที่ส่งมาจาก Axios / Backend
+interface AxiosErrorResponse {
+   response?: {
+      data?: {
+         message?: string;
+      };
+   };
+   message?: string;
+}
+
+const categories: CategoryItem[] = [
    { value: "bug", label: "แจ้งปัญหาระบบ", icon: Bug, color: "text-destructive" },
    { value: "suggestion", label: "ข้อเสนอแนะ", icon: Lightbulb, color: "text-accent" },
    { value: "other", label: "อื่น ๆ", icon: HelpCircle, color: "text-primary" },
 ];
 
 export default function HelpCenter() {
-   const [category, setCategory] = useState("bug");
-   const [message, setMessage] = useState("");
-   const [submitted, setSubmitted] = useState(false);
+   const [category, setCategory] = useState<ProblemCategory>("bug");
+   const [message, setMessage] = useState<string>("");
+   const [submitted, setSubmitted] = useState<boolean>(false);
+   const [isLoading, setIsLoading] = useState<boolean>(false);
+   
    const { toast } = useToast();
    const navigate = useNavigate();
 
-   const submit = () => {
+   const submit = async (): Promise<void> => {
       if (!message.trim()) return;
-      const feedback = {
-         id: Date.now().toString(),
-         category,
-         description: message,
-         status: "pending",
-         createdAt: new Date().toLocaleDateString(),
-      };
-      const list = JSON.parse(localStorage.getItem("feedbacks") || "[]");
-      list.push(feedback);
-      localStorage.setItem("feedbacks", JSON.stringify(list));
-      setMessage("");
-      setSubmitted(true);
-      toast({ title: "ส่งข้อมูลเรียบร้อยแล้ว", description: "ทีมงานจะตรวจสอบข้อมูลของคุณเร็ว ๆ นี้" });
-      setTimeout(() => setSubmitted(false), 3000);
+      
+      try {
+         setIsLoading(true);
+         
+         const savedUser = localStorage.getItem("user");
+         const currentUser: LocalUser | null = savedUser ? JSON.parse(savedUser) : null;
+         const memberId = currentUser?.id || currentUser?.MemberID || currentUser?.UserID || currentUser?.user_id;
+
+         if (!memberId) {
+             toast({ 
+                 title: "เกิดข้อผิดพลาด", 
+                 description: "กรุณาเข้าสู่ระบบก่อนทำการส่งรายงาน",
+                 variant: "destructive"
+             });
+             return;
+         }
+
+         const payload = {
+             MemberID: Number(memberId),
+             ProblemType: category,
+             HelpCenterData: message,
+             ReportedMemberID: Number(memberId), 
+             ItemID: null
+         };
+
+         const result = await createReport(payload);
+
+         if (result && result.success) {
+             setMessage("");
+             setSubmitted(true);
+             toast({ 
+                 title: "ส่งข้อมูลเรียบร้อยแล้ว", 
+                 description: "ทีมงานจะตรวจสอบข้อมูลของคุณเร็ว ๆ นี้" 
+             });
+             setTimeout(() => setSubmitted(false), 3000);
+         } else {
+             throw new Error(result?.message || "ไม่สามารถส่งข้อมูลได้");
+         }
+
+      } catch (error) {
+         console.error("Error submitting report:", error);
+         const err = error as AxiosErrorResponse;
+         const errorMessage = err.response?.data?.message || err.message || "เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์";
+         
+         toast({ 
+             title: "ส่งข้อมูลไม่สำเร็จ", 
+             description: errorMessage,
+             variant: "destructive"
+         });
+      } finally {
+         setIsLoading(false);
+      }
    };
 
    return (
@@ -85,11 +156,23 @@ export default function HelpCenter() {
                         className="w-full h-32 p-3 border rounded-md focus:ring-2 focus:ring-primary/50 focus:outline-none resize-none transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-background"
                         placeholder="อธิบายปัญหาหรือข้อเสนอแนะของคุณ..."
                         value={message}
-                        onChange={(e) => setMessage(e.target.value)}
+                        onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setMessage(e.target.value)}
+                        disabled={isLoading}
                      />
                   </div>
-                  <Button onClick={submit} disabled={!message.trim() || submitted} className="w-full gap-2 eco-gradient text-primary-foreground" size="lg">
-                     {submitted ? (<><CheckCircle className="w-4 h-4" /> ส่งข้อมูลเรียบร้อย!</>) : (<><Send className="w-4 h-4" /> ส่งข้อมูล</>)}
+                  <Button 
+                     onClick={submit} 
+                     disabled={!message.trim() || submitted || isLoading} 
+                     className="w-full gap-2 eco-gradient text-primary-foreground transition-all" 
+                     size="lg"
+                  >
+                     {isLoading ? (
+                        <><Loader2 className="w-4 h-4 animate-spin" /> กำลังส่งข้อมูล...</>
+                     ) : submitted ? (
+                        <><CheckCircle className="w-4 h-4" /> ส่งข้อมูลเรียบร้อย!</>
+                     ) : (
+                        <><Send className="w-4 h-4" /> ส่งข้อมูล</>
+                     )}
                   </Button>
                </CardContent>
             </Card>

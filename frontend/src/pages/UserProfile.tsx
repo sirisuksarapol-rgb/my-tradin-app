@@ -9,8 +9,12 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import AppLayout from "@/components/AppLayout";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
-import { getItems as fetchItemsAPI, getUserStats, IMAGE_BASE_URL } from "@/api/api";
-
+import {
+  getItems as fetchItemsAPI,
+  getUserStats,
+  IMAGE_BASE_URL,
+  createReport
+} from "@/api/api";
 // 💡 กำหนด Interface ของคำรีวิวจริงที่ส่งมาจาก API หลังบ้าน
 interface DBUserReview {
   ExchangeID: number;
@@ -141,27 +145,68 @@ export default function UserProfile() {
   const isOwner = String(loggedInUser?.MemberID || loggedInUser?.member_id || "") === String(userData?.MemberID || "");
 
   const handleReport = async () => {
-    if (!reportReason.trim()) return;
 
-    try {
-      // 💡 พื้นที่สำหรับยิง API ส่งรายงาน (ถ้ามี API สามารถเอาคอมเมนต์ด้านล่างออกและใช้งานได้เลย)
-      // await reportUserApi({ targetUserId: userId, reason: reportReason, reporterId: loggedInUser.MemberID });
+  if (!reportReason.trim()) return;
 
-      toast({ 
-        title: "ส่งรายงานเรียบร้อย", 
-        description: "ระบบได้รับข้อมูลและกำลังตรวจสอบพฤติกรรมผู้ใช้รายนี้" 
-      });
-      setIsReportOpen(false);
-      setReportReason("");
-    } catch (error) {
-      console.error("Error submitting user report:", error);
+  try {
+
+    const reporterId =
+      loggedInUser.MemberID ||
+      loggedInUser.member_id ||
+      loggedInUser.id;
+
+    if (!reporterId) {
       toast({
-        title: "เกิดข้อผิดพลาด",
-        description: "ไม่สามารถส่งรายงานได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง",
+        title: "กรุณาเข้าสู่ระบบ",
         variant: "destructive"
       });
+      return;
     }
-  };
+
+    await createReport({
+
+      ItemID: null,
+
+      MemberID: reporterId,
+
+      ReportedMemberID: Number(userId),
+
+      ProblemType: "รายงานผู้ใช้งาน",
+
+      HelpCenterData: reportReason
+
+    });
+
+    toast({
+
+      title: "ส่งรายงานเรียบร้อย",
+
+      description:
+        "ระบบได้รับรายงานของคุณแล้ว"
+
+    });
+
+    setReportReason("");
+
+    setIsReportOpen(false);
+
+  } catch (error) {
+
+    console.error(error);
+
+    toast({
+
+      title: "เกิดข้อผิดพลาด",
+
+      description: "ไม่สามารถส่งรายงานได้",
+
+      variant: "destructive"
+
+    });
+
+  }
+
+};
 
   if (isLoading) {
     return (

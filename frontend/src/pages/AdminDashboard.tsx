@@ -1,132 +1,215 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-   Users, FileWarning, Trash2, Ban, CheckCircle,
-   Flag, MessageSquare, Bug, Lightbulb, HelpCircle, Search,
-   Calendar, ExternalLink, FileText, AlertTriangle, ShieldAlert,
-   Settings
-} from "lucide-react";
+import { Users, FileWarning, Trash2, Ban, CheckCircle, Flag, MessageSquare, Bug, Lightbulb, HelpCircle, Search, Calendar, ExternalLink, FileText, AlertTriangle, ShieldAlert,Settings } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { AdminNavbar } from "@/components/AdminNavbar";
 import { StatCard } from "@/components/StatCard";
 import Footer from "@/components/Footer";
+import { getAdminUsers, getAdminItems, getReports } from "@/api/api";
+import { LucideIcon } from "lucide-react";
+interface ApiUser {
+   MemberID: string | number;
+   DisplayName?: string;
+   Email?: string;
+   RegisterDate?: string;
+   MemberStatus?: string;
+   PostCount?: number;
+}
 
-// โหลดฟังก์ชัน API จากไฟล์ api.js ของคุณ
-import { getAdminUsers, getAdminItems, getAdminReports } from "@/api/api";
+interface ApiItem {
+   ItemID: string | number;
+   ItemName?: string;
+   CategoryID?: string | number;
+   PostDate?: string;
+   MemberID: string | number;
+   DisplayName?: string;
+}
 
+interface ApiReport {
+   ProblemID: string | number;
+   ProblemType?: string;
+   ReporterName?: string;
+   ReportDate?: string;
+   ReportStatus?: string;
+   ItemID?: string | number;
+   ItemName?: string;
+   ReportedMemberID?: string | number;
+   ReportedMemberName?: string;
+   HelpCenterData?: string;
+}
+
+// --- 2. ประเภทข้อมูลสำหรับใช้งานใน State (หลังจัดรูปแล้ว) ---
+interface DashboardUser {
+   id: string;
+   name: string;
+   email: string;
+   joinedAt: string;
+   suspended: boolean;
+   postCount: number;
+}
+
+interface DashboardPost {
+   id: string;
+   title: string;
+   category: string | number;
+   createdAt: string;
+   author: {
+      id: string | number;
+      name: string;
+   };
+}
+
+interface BaseReport {
+   id: string;
+   reason: string;
+   reporter: string;
+   createdAt: string;
+   status: "pending" | "resolved";
+}
+
+interface PostReport extends BaseReport {
+   targetId: string;
+   targetTitle: string;
+}
+
+interface UserReport extends BaseReport {
+   reportedUserId: string;
+   reportedUserName: string;
+   details: string;
+}
+
+interface FeedbackReport extends BaseReport {
+   category: string;
+   title: string;
+   description: string;
+}
 const feedbackCategoryIcon: Record<string, React.ReactNode> = {
    bug: <Bug className="w-4 h-4 text-destructive" />,
    suggestion: <Lightbulb className="w-4 h-4 text-warning" />,
    other: <HelpCircle className="w-4 h-4 text-muted-foreground" />,
 };
-
 const feedbackCategoryLabel: Record<string, string> = {
    bug: "แจ้งบั๊ก/ปัญหา",
    suggestion: "ข้อเสนอแนะ",
    other: "อื่นๆ",
 };
-
 export default function AdminDashboard() {
    const navigate = useNavigate();
    const currentDate = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
-
-   const [users, setUsers] = useState<any[]>([]);
-   const [posts, setPosts] = useState<any[]>([]);
-   const [reports, setReports] = useState<any[]>([]);
-   const [userReports, setUserReports] = useState<any[]>([]);
-   const [feedbacks, setFeedbacks] = useState<any[]>([]);
-   
+   const [users, setUsers] = useState<DashboardUser[]>([]);
+   const [posts, setPosts] = useState<DashboardPost[]>([]);
+   const [reports, setReports] = useState<PostReport[]>([]);
+   const [userReports, setUserReports] = useState<UserReport[]>([]);
+   const [feedbacks, setFeedbacks] = useState<FeedbackReport[]>([]);
    const [isLoading, setIsLoading] = useState(true);
    const [activeTab, setActiveTab] = useState("users");
    const [searchInput, setSearchInput] = useState("");
    const [searchTerm, setSearchTerm] = useState("");
-
-   // ฟังก์ชันดึงข้อมูลจาก API และแปลง Key ให้ตรงกับ UI
    const fetchDashboardData = async () => {
       setIsLoading(true);
       try {
          const [usersRes, itemsRes, reportsRes] = await Promise.all([
             getAdminUsers(),
             getAdminItems(),
-            getAdminReports()
+            getReports() 
          ]);
 
-         const usersData = usersRes.data || [];
-         const itemsData = itemsRes.data || [];
-         const allReportsData = reportsRes.data || [];
+         const usersData: ApiUser[] = usersRes.data || [];
+         const itemsData: ApiItem[] = itemsRes.data || [];
+         const allReportsData: ApiReport[] = reportsRes || [];
 
-         // 1. แปลงข้อมูลผู้ใช้งาน (member)
-         setUsers(usersData.map((u: any) => ({
-            id: u.MemberID,
+         // เปลี่ยน (u: any) เป็น (u: ApiUser)
+         setUsers(usersData.map((u: ApiUser) => ({
+            id: String(u.MemberID),
             name: u.DisplayName || "ไม่ระบุชื่อ",
-            email: u.Email,
+            email: u.Email || "",
             joinedAt: u.RegisterDate ? new Date(u.RegisterDate).toLocaleDateString('th-TH') : "ไม่ระบุ",
-            suspended: u.MemberStatus === 'Suspended',
+            suspended: (u.MemberStatus || "").toLowerCase() === 'suspended',
             postCount: u.PostCount || 0
          })));
 
-         // 2. แปลงข้อมูลโพสต์ (item)
-         setPosts(itemsData.map((p: any) => ({
+         // เปลี่ยน (p: any) เป็น (p: ApiItem)
+         setPosts(itemsData.map((p: ApiItem) => ({
             id: String(p.ItemID),
             title: p.ItemName || "ไม่พบชื่อโพสต์",
             category: p.CategoryID || "ทั่วไป",
             createdAt: p.PostDate ? new Date(p.PostDate).toLocaleDateString('th-TH') : "ไม่ระบุ",
             author: { 
-               id: p.MemberID, 
+               id: String(p.MemberID), 
                name: p.DisplayName || "ไม่ระบุชื่อ" 
             }
          })));
 
-         // 3. แปลงข้อมูลการแจ้งปัญหา (problem) และแยกหมวดหมู่
-         const formattedReports: any[] = [];
-         const formattedUserReports: any[] = [];
-         const formattedFeedbacks: any[] = [];
+         const formattedReports: PostReport[] = [];
+         const formattedUserReports: UserReport[] = [];
+         const formattedFeedbacks: FeedbackReport[] = [];
 
-         allReportsData.forEach((r: any) => {
-            const reportObj = {
+         console.log("👉 ข้อมูลรายงานทั้งหมดจาก Backend:", allReportsData);
+
+         allReportsData.forEach((r: ApiReport) => {
+            // 1. ดักจับค่าให้รัดกุม
+            const hasItem = r.ItemID !== null && r.ItemID !== undefined && r.ItemID !== "";
+            const hasReportedUser = r.ReportedMemberID !== null && r.ReportedMemberID !== undefined && r.ReportedMemberID !== "";
+
+            const rawStatus = (r.ReportStatus || "").toLowerCase().trim();
+            const isPending = rawStatus === "pending" || rawStatus === "รอดำเนินการ" || rawStatus === "in progress";
+
+            const reportObj: BaseReport = {
                id: String(r.ProblemID),
                reason: r.ProblemType || "ไม่ระบุเหตุผล",
-               reporter: r.DisplayName || "ไม่ระบุผู้แจ้ง",
+               reporter: r.ReporterName || "ไม่ระบุผู้แจ้ง",
                createdAt: r.ReportDate ? new Date(r.ReportDate).toLocaleDateString('th-TH') : "ไม่ระบุวันที่",
-               status: (r.ReportStatus || "pending").toLowerCase() === "pending" ? "pending" : "resolved"
+               status: isPending ? "pending" : "resolved"
             };
 
-            if (r.ItemID) {
-               // รายงานเกี่ยวกับโพสต์สิ่งของ
+            // ตรวจสอบว่าเป็นข้อมูลจากศูนย์ช่วยเหลือ (Help Center) หรือไม่
+            const probTypeLow = (r.ProblemType || "").toLowerCase().trim();
+            const isHelpCenter = ["bug", "suggestion", "other"].includes(probTypeLow) || 
+                                 probTypeLow.includes("บั๊ก") || 
+                                 probTypeLow.includes("เสนอแนะ");
+
+            // 2. แยกกลุ่มข้อมูลด้วยเงื่อนไขที่ถูกต้อง
+            if (isHelpCenter) {
+               // ✉️ ถ้าเป็นกลุ่มศูนย์ช่วยเหลือ/ข้อเสนอแนะ บังคับเข้ากลุ่ม Feedbacks เท่านั้น
+               let categoryType = "other";
+               if (probTypeLow.includes("bug") || probTypeLow.includes("บั๊ก") || probTypeLow.includes("ขัดข้อง")) {
+                   categoryType = "bug";
+               } else if (probTypeLow.includes("feedback") || probTypeLow.includes("เสนอแนะ") || probTypeLow === "suggestion") {
+                   categoryType = "suggestion";
+               }
+
+               formattedFeedbacks.push({
+                  ...reportObj,
+                  category: categoryType,
+                  title: r.ProblemType || "รายงานระบบ",
+                  description: r.HelpCenterData || ""
+               });
+            } else if (hasItem) {
+               // 🚫 รายงานโพสต์/สิ่งของที่ไม่เหมาะสม
                formattedReports.push({
                   ...reportObj,
                   targetId: String(r.ItemID),
                   targetTitle: r.ItemName || "ไม่พบชื่อโพสต์",
-                  reason: r.HelpCenterData || r.ProblemType
+                  reason: r.HelpCenterData || r.ProblemType || "ไม่มีรายละเอียด"
                });
-            } else if (r.ProblemType && r.ProblemType.toLowerCase().includes('feedback')) {
-               // รายงานที่เป็นข้อเสนอแนะระบบ
-               formattedFeedbacks.push({
-                  ...reportObj,
-                  category: "suggestion",
-                  title: r.ProblemType,
-                  description: r.HelpCenterData || "",
-               });
-            } else {
-               // รายงานพฤติกรรมผู้ใช้ / ปัญหาอื่นๆ
+            } else if (hasReportedUser) {
+               // 👤 รายงานพฤติกรรมผู้ใช้ทั่วไป
                formattedUserReports.push({
                   ...reportObj,
-                  reportedUserId: String(r.MemberID || "Unknown"),
-                  reportedUserName: r.DisplayName || "ระบบ/บัญชีผู้ใช้",
+                  reportedUserId: String(r.ReportedMemberID),
+                  reportedUserName: r.ReportedMemberName || `ผู้ใช้ (ID: ${r.ReportedMemberID})`,
                   details: r.HelpCenterData || "",
                });
             }
          });
-
+         // อัปเดตลง State
          setReports(formattedReports);
          setUserReports(formattedUserReports);
          setFeedbacks(formattedFeedbacks);
@@ -139,7 +222,6 @@ export default function AdminDashboard() {
       }
    };
 
-   // เรียกใช้งาน API เมื่อโหลดหน้าเว็บครั้งแรก
    useEffect(() => {
       window.scrollTo({ top: 0, behavior: "smooth" });
       fetchDashboardData();
@@ -179,7 +261,6 @@ export default function AdminDashboard() {
 
    const filteredUsers = users.filter(u => !searchTerm || (u.name && u.name.toLowerCase().includes(searchTerm)) || (u.email && u.email.toLowerCase().includes(searchTerm)));
    const filteredPosts = posts.filter(p => !searchTerm || (p.title && p.title.toLowerCase().includes(searchTerm)) || (p.author?.name && p.author.name.toLowerCase().includes(searchTerm)));
-
    const getSearchPlaceholder = () => {
       switch (activeTab) {
          case "users": return "ค้นหาชื่อ หรือ อีเมล...";
@@ -187,7 +268,6 @@ export default function AdminDashboard() {
          default: return "ค้นหา...";
       }
    };
-
    if (isLoading) {
       return (
          <div className="min-h-screen flex items-center justify-center bg-background">
@@ -198,7 +278,6 @@ export default function AdminDashboard() {
          </div>
       );
    }
-
    return (
       <div className="min-h-screen flex flex-col bg-background/50">
          <AdminNavbar onLogout={handleLogout} />
@@ -216,14 +295,12 @@ export default function AdminDashboard() {
                   <p className="text-xs md:text-sm font-medium">{currentDate}</p>
                </div>
             </div>
-
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
                <StatCard value={users.length} label="ผู้ใช้ทั้งหมด" icon={<Users className="w-5 h-5 text-primary" />} colorClass="bg-primary/10" />
                <StatCard value={posts.length} label="โพสต์ทั้งหมด" icon={<FileText className="w-5 h-5 text-primary" />} colorClass="bg-primary/10" />
                <StatCard value={pendingReports.length + pendingUserReports.length} label="รายงานรอดำเนินการ" icon={<AlertTriangle className="w-5 h-5 text-warning" />} colorClass="bg-warning/10" />
                <StatCard value={pendingFeedbacks.length} label="ข้อเสนอแนะใหม่" icon={<MessageSquare className="w-5 h-5 text-primary" />} colorClass="bg-primary/10" />
             </div>
-
             <Tabs defaultValue="users" value={activeTab} onValueChange={setActiveTab}>
                <div className="flex flex-col lg:flex-row lg:items-center gap-4 justify-between bg-card p-3 rounded-xl border border-border/50 shadow-sm mb-6">
                   <TabsList className="bg-transparent h-auto flex flex-row flex-wrap lg:flex-nowrap justify-start gap-1 p-0 w-full lg:w-auto">
@@ -248,7 +325,6 @@ export default function AdminDashboard() {
                      </div>
                   )}
                </div>
-
                {/* Users */}
                <TabsContent value="users" className="space-y-3 m-0">
                   {filteredUsers.length === 0 ? (
@@ -345,7 +421,6 @@ export default function AdminDashboard() {
                      </div>
                   )}
                </TabsContent>
-
                {/* Posts */}
                <TabsContent value="posts" className="space-y-3 m-0">
                   {filteredPosts.length === 0 ? (
@@ -374,7 +449,6 @@ export default function AdminDashboard() {
                      </div>
                   )}
                </TabsContent>
-
                {/* Reports */}
                <TabsContent value="reports" className="space-y-8 m-0">
                   <div className="space-y-3">
@@ -411,9 +485,7 @@ export default function AdminDashboard() {
                         </div>
                      )}
                   </div>
-
                   <Separator />
-
                   <div className="space-y-3">
                      <div className="flex items-center gap-2 px-1">
                         <div className="w-7 h-7 rounded-lg bg-warning/10 flex items-center justify-center"><Flag className="w-4 h-4 text-warning" /></div>
@@ -460,7 +532,6 @@ export default function AdminDashboard() {
                      )}
                   </div>
                </TabsContent>
-
                {/* Feedback */}
                <TabsContent value="feedback" className="space-y-3 m-0">
                   {feedbacks.length === 0 ? <EmptyState icon={MessageSquare} message="ไม่มีข้อเสนอแนะใหม่" /> : (
@@ -499,7 +570,6 @@ export default function AdminDashboard() {
                   )}
                </TabsContent>
             </Tabs>
-
             {/* Summary */}
             <div className="bg-primary/5 p-5 rounded-xl border border-primary/20 shadow-sm">
                <h3 className="text-sm md:text-base font-bold text-primary flex items-center gap-2 mb-2">
@@ -516,15 +586,14 @@ export default function AdminDashboard() {
       </div>
    );
 }
-
-function EmptyState({ icon: Icon, message }: { icon: any, message: string }) {
+function EmptyState({ icon: Icon, message }: { icon: LucideIcon | React.ElementType, message: string }) {
    return (
       <Card className="border-dashed border-2 border-border/60 bg-transparent shadow-none">
          <CardContent className="flex flex-col items-center justify-center p-12 text-center opacity-70">
             <div className="w-14 h-14 rounded-full bg-secondary/50 flex items-center justify-center mb-4 text-muted-foreground">
                <Icon className="w-7 h-7" />
             </div>
-            <p className="text-sm font-medium text-muted-foreground">{message}</p>
+            <p className="text-muted-foreground font-medium">{message}</p>
          </CardContent>
       </Card>
    );

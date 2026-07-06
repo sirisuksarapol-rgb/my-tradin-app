@@ -7,13 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem as SelectOption, SelectTrigger, SelectValue } from "@/components/ui/select";
 import AppLayout from "@/components/AppLayout";
-import { CATEGORIES } from "@/lib/categories_data";
 import { useToast } from "@/hooks/use-toast";
+import { getItems, updateItem, getCategories } from "@/api/api";
 
-// นำเข้าฟังก์ชันจาก api.js
-import { getItems as fetchItemsAPI, updateItem as updateItemAPI } from "@/api/api";
-
-// 📝 ประกาศ Interface แทนการใช้ any ป้องกันข้อผิดพลาด TypeScript ตัวแดง
 interface DBItemDetail {
   ItemID?: number;
   ItemName?: string;
@@ -28,6 +24,11 @@ interface DBItemDetail {
   image_paths?: string[];
 }
 
+interface Category {
+  category_id: number;
+  category_name: string;
+}
+
 export default function EditPost() {
   const { postId } = useParams<{ postId: string }>(); 
   const navigate = useNavigate();
@@ -37,7 +38,7 @@ export default function EditPost() {
   // States สำหรับเก็บข้อมูลฟอร์ม
   const [images, setImages] = useState<string[]>([]); 
   const [imageFiles, setImageFiles] = useState<(File | string)[]>([]); 
-  const [category, setCategory] = useState("");
+  const [categoriesList, setCategoriesList] = useState<Category[]>([]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [wantedItem, setWantedItem] = useState("");
@@ -45,19 +46,48 @@ export default function EditPost() {
   const [locationLink, setLocationLink] = useState("");
   const [categoryId, setCategoryId] = useState<number | string>("");
   const [memberId, setMemberId] = useState<number | string>("");
-
+  const [category, setCategory] = useState("");
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  
+ 
+  useEffect(() => {
+    const fetchCategoriesData = async () => {
+      try {
+        const res = await getCategories(); 
+        // เซ็ตข้อมูลลง State (สมมติว่า API ส่งข้อมูลกลับมาในรูปแบบ Array ผ่าน res.data)
+        setCategoriesList(res.data || []);
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+      }
+    };
+    
+    fetchCategoriesData();
+  }, []);
   // กรอง "ทั้งหมด" ออกเหมือนเดิม
-  const categories = CATEGORIES.filter(c => c !== "ทั้งหมด");
+  const filteredCategories = categoriesList.filter(
+  (cat) => cat.category_name !== "ทั้งหมด"
+);
+  
+  useEffect(() => {
+  const fetchCategoriesData = async () => {
+    try {
+      const res = await getCategories(); 
+      // 💡 เปิด F12 ดูในหน้าเว็บว่าอันนี้แสดงผลออกมาเป็นแบบไหน
+      console.log("โครงสร้างข้อมูล Categories จากหลังบ้าน:", res.data); 
+      setCategoriesList(res.data || []);
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+    }
+  };
+  fetchCategoriesData();
+}, []);
 
   // 1. ดึงข้อมูลโพสต์เดิมมาจัดใส่ฟอร์ม
   useEffect(() => {
     const fetchPostDetail = async () => {
       try {
         setLoading(true);
-        const res = await fetchItemsAPI();
+        const res = await getItems();
         const items: DBItemDetail[] = res.data || [];
         
         // ค้นหาโพสต์ที่รหัสตรงกันโดยระบุประเภทข้อมูลชัดเจนแทน any
@@ -71,7 +101,7 @@ export default function EditPost() {
           setLocationLink(currentPost.LocationLink || "");
           setCategoryId(currentPost.CategoryID || "");
           setMemberId(currentPost.MemberID || "");
-          setCategory(currentPost.CategoryName || "อื่นๆ");
+          setCategory(currentPost.CategoryName || "");
 
           if (currentPost.image_paths && currentPost.image_paths.length > 0) {
             setImages(currentPost.image_paths);
@@ -189,7 +219,7 @@ export default function EditPost() {
 
       // 💡 เรียกใช้ฟังก์ชันอัปเดตผ่าน api.js
       if (postId) {
-        await updateItemAPI(Number(postId), formData);
+        await updateItem(Number(postId), formData);
         toast({ title: "บันทึกการแก้ไขเรียบร้อยแล้ว!" });
         navigate("/my-posts");
       }
@@ -290,35 +320,33 @@ export default function EditPost() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className={`font-semibold ${errors.category ? "text-red-500" : ""}`}>
-                    หมวดหมู่ <span className="text-red-500">*</span>
-                  </Label>
-                  {/* 💡 ปรับปรุงตรงนี้: เมื่อผู้ใช้สลับชื่อข้อความ ให้จับคู่ตำแหน่งกับอาเรย์หลัก เพื่อแปลงกลับเป็นรหัสตัวเลขส่งหลังบ้าน */}
-                  <Select 
-                    value={category} 
-                    onValueChange={(val) => { 
-                      setCategory(val); 
-                      if (errors.category) setErrors(prev => ({ ...prev, category: "" }));
-                      
-                      // หาไอดีที่ถูกต้อง: ดึงตำแหน่งของคำศัพท์ในไฟล์ดาต้าตั้งต้น (บวกด้วย 1 เพื่อให้ตรงกับ Auto Increment ของ DB ที่เริ่มจากเลข 1)
-                      const foundIdx = CATEGORIES.indexOf(val);
-                      if (foundIdx !== -1) {
-                        setCategoryId(foundIdx);
-                      }
-                    }}
-                  >
-                    <SelectTrigger className={`h-11 ${errors.category ? "border-red-500 ring-red-500" : ""}`}>
-                      <SelectValue placeholder="เลือกหมวดหมู่" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((cat) => (
-                        <SelectOption key={cat} value={cat}>{cat}</SelectOption>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {errors.category && <p className="text-xs text-red-500">{errors.category}</p>}
-                </div>
-
+  <Label className={`font-semibold ${errors.category ? "text-red-500" : ""}`}>
+    หมวดหมู่ <span className="text-red-500">*</span>
+  </Label>
+  
+  <Select 
+    // 💡 ใช้ category_id ในการคุมค่าเปิด-ปิด และแปลงเป็น String เสมอ
+    value={categoryId ? String(categoryId) : ""} 
+    onValueChange={(val) => { 
+      setCategoryId(Number(val)); // แปลงกลับเป็น Number ตอนเซ็ตค่ากลับเข้า State
+      if (errors.category) setErrors(prev => ({ ...prev, category: "" }));
+    }}
+  >
+    <SelectTrigger className={`h-11 ${errors.category ? "border-red-500 ring-red-500" : ""}`}>
+      <SelectValue placeholder="เลือกหมวดหมู่" />
+    </SelectTrigger>
+    <SelectContent>
+      {filteredCategories.map((cat) => (
+        // 💡 เปลี่ยนมาใช้ cat.category_id และ cat.category_name ตัวพิมพ์เล็กตาม API เป๊ะๆ
+        <SelectOption key={cat.category_id} value={String(cat.category_id)}>
+          {cat.category_name}
+        </SelectOption>
+      ))}
+    </SelectContent>
+  </Select>
+  
+  {errors.category && <p className="text-xs text-red-500">{errors.category}</p>}
+</div>
                 <div className="space-y-2">
                   <Label htmlFor="desc" className={`font-semibold ${errors.description ? "text-red-500" : ""}`}>
                     รายละเอียดสินค้า <span className="text-red-500">*</span>

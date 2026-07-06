@@ -27,7 +27,7 @@ interface DBItem {
   ItemID: string | number;
   ItemName: string;
   CategoryName?: string;
-  WantedItem?: string;
+  DesiredItem?: string;
   ItemImage?: string;
   MemberID: string | number;
 }
@@ -226,8 +226,8 @@ export default function Matching() {
                           <p className="text-sm font-bold truncate">{post.ItemName}</p>
                           <Badge variant="secondary" className="text-[10px]">{post.CategoryName || "ทั่วไป"}</Badge>
                           <p className="text-xs text-muted-foreground truncate">
-                            ต้องการแลก: <span className="font-medium text-foreground">{post.WantedItem || "อะไรก็ได้"}</span>
-                          </p>
+  ต้องการแลก: <span className="font-medium text-foreground">{post.DesiredItem || "อะไรก็ได้"}</span>
+</p>
                           <Button size="sm" className="w-full h-8" onClick={() => navigate(`/match-results/${post.ItemID}`)}>
                             ค้นหาคู่แมตช์
                           </Button>
