@@ -13,8 +13,8 @@ import { CATEGORY_ICONS } from "@/lib/categories_data";
 
 // 🌟 1. สร้าง Interface มาแทนที่ "any" เพื่อกำจัดเส้นแดง
 interface DBCategory {
-  category_id: number;
-  category_name: string;
+  CategoryID: number;
+  CategoryName: string;
 }
 
 interface DBItem {
@@ -177,8 +177,8 @@ export default function Feed() {
           <div className="flex overflow-x-auto gap-4 scrollbar-hide" ref={scrollContainerRef}>
             {["ทั้งหมด", ...categoryList].map((catObj, index) => {
               const isAll = catObj === "ทั้งหมด";
-              const catName = isAll ? "ทั้งหมด" : (catObj as DBCategory).category_name;
-              const catId = isAll ? "ทั้งหมด" : (catObj as DBCategory).category_id;
+              const catName = isAll ? "ทั้งหมด" : (catObj as DBCategory).CategoryName;
+              const catId = isAll ? "ทั้งหมด" : (catObj as DBCategory).CategoryID;
               
               const Icon = isAll ? LayoutGrid : (CATEGORY_ICONS[catName as keyof typeof CATEGORY_ICONS] || Sparkles);
               const isActive = selectedCategory === String(catId);

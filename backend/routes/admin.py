@@ -2,9 +2,12 @@ import datetime
 from flask import Blueprint, jsonify
 from db import get_connection
 
+# สร้าง Blueprint สำหรับจัดกลุ่ม API ที่เกี่ยวกับ Admin
 admin_bp = Blueprint("admin", __name__)
 
-# ฟังก์ชันช่วยจัดฟอร์แมตข้อมูลดิกชันนารี และจัดการปัญหา Date/Datetime แปลงเป็น JSON ไม่ได้
+# ======================================
+# ฟังก์ชันช่วยจัดฟอร์แมตข้อมูลดิกชันนารี
+# ======================================
 def format_cursor_data(cursor, data, is_single=False):
     if not cursor.description or data is None:
         return data if not is_single else None
@@ -12,6 +15,7 @@ def format_cursor_data(cursor, data, is_single=False):
     columns = [col[0] for col in cursor.description]
     
     def serialize_item(val):
+        # จัดการปัญหา Date/Datetime แปลงเป็น JSON ไม่ได้
         if isinstance(val, (datetime.datetime, datetime.date)):
             return val.isoformat()  # แปลง datetime เป็น string รูปแบบ ISO (เช่น 2026-07-02T16:30:00)
         return val
@@ -37,17 +41,17 @@ def dashboard():
     conn = get_connection()
     cursor = conn.cursor()
 
-    # จำนวนสมาชิก
+    # 1. นับจำนวนสมาชิกทั้งหมด
     cursor.execute("SELECT COUNT(*) total FROM member")
     row = cursor.fetchone()
     total_users = row["total"] if isinstance(row, dict) else row[0]
 
-    # จำนวนโพสต์
+    # 2. นับจำนวนโพสต์ทั้งหมด
     cursor.execute("SELECT COUNT(*) total FROM item")
     row = cursor.fetchone()
     total_items = row["total"] if isinstance(row, dict) else row[0]
 
-    # จำนวนรายงาน
+    # 3. นับจำนวนรายงานปัญหาที่ยังรอดำเนินการ (Pending)
     cursor.execute("SELECT COUNT(*) total FROM problem WHERE ReportStatus='Pending'")
     row = cursor.fetchone()
     total_reports = row["total"] if isinstance(row, dict) else row[0]
@@ -79,7 +83,7 @@ def users():
             (
                 SELECT COUNT(*)
                 FROM item i
-                WHERE i.MemberID=m.MemberID
+                WHERE i.MemberID = m.MemberID
             ) AS PostCount
         FROM member m
         ORDER BY m.RegisterDate DESC
@@ -110,7 +114,7 @@ def items():
             m.DisplayName,
             i.CategoryID
         FROM item i
-        LEFT JOIN member m ON i.MemberID=m.MemberID
+        LEFT JOIN member m ON i.MemberID = m.MemberID
         ORDER BY i.PostDate DESC
     """)
     raw_data = cursor.fetchall()
@@ -139,8 +143,8 @@ def reports():
             m.MemberID,
             m.DisplayName
         FROM problem p
-        LEFT JOIN item i ON p.ItemID=i.ItemID
-        LEFT JOIN member m ON p.MemberID=m.MemberID
+        LEFT JOIN item i ON p.ItemID = i.ItemID
+        LEFT JOIN member m ON p.MemberID = m.MemberID
         ORDER BY p.ReportDate DESC
     """)
     raw_data = cursor.fetchall()

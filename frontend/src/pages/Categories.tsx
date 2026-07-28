@@ -9,8 +9,8 @@ import {
 import { getCategories } from "@/api/api";
 
 interface DBCategory {
-  category_id: number;     // ✅ ใช้พิมพ์เล็กตาม Console ของคุณ
-  category_name: string;   // ✅ ใช้พิมพ์เล็กตาม Console ของคุณ
+  CategoryID: number;     // ✅ ใช้พิมพ์เล็กตาม Console ของคุณ
+  CategoryName: string;   // ✅ ใช้พิมพ์เล็กตาม Console ของคุณ
 }
 
 const CATEGORY_COLORS = [
@@ -76,12 +76,12 @@ export default function Categories() {
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 sm:gap-6">
                 {categoriesList.map((cat, i) => {
-                  const name = cat.category_name || ""; // ✅ ดึงผ่านพิมพ์เล็ก
+                  const name = cat.CategoryName || ""; // ✅ ดึงผ่านพิมพ์เล็ก
                   const Icon = CATEGORY_ICONS[name] || MoreHorizontal;
                   const colorClass = CATEGORY_COLORS[i % CATEGORY_COLORS.length];
 
                   return (
-                    <Card key={cat.category_id || i} className="border-border/50 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300 overflow-hidden group">
+                    <Card key={cat.CategoryID || i} className="border-border/50 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300 overflow-hidden group">
                       <CardContent className="p-5 sm:p-6 flex flex-col items-center text-center space-y-3">
                         <div className={`h-14 w-14 rounded-xl ${colorClass} flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform`}>
                           <Icon className="h-7 w-7 shrink-0" />

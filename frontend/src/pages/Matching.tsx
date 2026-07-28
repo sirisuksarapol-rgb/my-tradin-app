@@ -117,34 +117,49 @@ export default function Matching() {
     }
   };
 
+  // 🌟 [ส่วนที่หายไป] กรองไอเทมของคุณเพื่อแสดงในหน้า "เริ่มหาคู่แมตช์"
   const displayItems = useMemo(() => {
     if (!currentUserId) return [];
     return items.filter((item) => String(item.MemberID) === currentUserId);
   }, [items, currentUserId]);
 
-  // ✨ นับคำขอแจ้งเตือนสีแดง (นับเฉพาะคำขอที่มีคนส่งมาหาเรา และสถานะยังเป็น pending)
+  // ✨ นับคำขอแจ้งเตือนสีแดง (นับเฉพาะคำขอที่มีคนส่งมาหาเรา, สถานะ pending และ "ยังไม่เคยเปิดดู")
   const incomingCount = useMemo(() => {
     if (!currentUserId) return 0;
+    
+    // ดึงรายการ ID คำขอที่เคยเปิดดูแล้วจาก LocalStorage
+    const seenIds: number[] = JSON.parse(localStorage.getItem("seen_exchange_ids") || "[]");
+
     return exchanges.filter((exch) => {
+      // 1. เช็กว่าเป็นคำขอที่ส่งมาหาเราใช่หรือไม่
       const isReceiver = exch.ReceiverID 
         ? String(exch.ReceiverID) === currentUserId 
         : String(exch.TargetMemberID) === currentUserId;
+        
+      // 2. เช็กว่าสถานะยังรอการตอบรับอยู่ใช่หรือไม่
       const isPending = (exch.ExchangeStatus || "").toLowerCase() === "pending";
-      return isReceiver && isPending;
+      
+      // 3. 🌟 เช็กว่า ID นี้ "ยังไม่เคย" ถูกบันทึกใน seenIds ใช่หรือไม่
+      const isUnseen = !seenIds.includes(exch.ExchangeID);
+
+      // นับเฉพาะที่ตรงตามเงื่อนไขทั้ง 3 ข้อ
+      return isReceiver && isPending && isUnseen;
     }).length;
   }, [exchanges, currentUserId]);
 
-  // 3. กรองรายการที่เราส่งไปหาคนอื่น
+  // 3. กรองรายการแลกเปลี่ยนทั้งหมดที่เกี่ยวข้องกับเรา (แสดงทั้งในฐานะคนส่งและคนรับ)
   const filteredMatches = useMemo(() => {
     if (!currentUserId) return [];
     
-    const mySentExchanges = exchanges.filter((exch) => {
-      const isSender = exch.SenderID ? String(exch.SenderID) === currentUserId : String(exch.MemberID) === currentUserId;
-      const isReceiver = exch.ReceiverID ? String(exch.ReceiverID) === currentUserId : false;
-      return isSender && !isReceiver;
+    const myExchanges = exchanges.filter((exch) => {
+      // 🌟 ปรับตรรกะใหม่: ดึงรายการทั้งหมดที่เราเป็นคนเสนอแลก (MemberID) หรือเป็นคนตอบรับ (TargetMemberID)
+      const isSender = String(exch.MemberID) === currentUserId;
+      const isReceiver = String(exch.TargetMemberID) === currentUserId;
+      
+      return isSender || isReceiver;
     });
 
-    const sorted = [...mySentExchanges].sort((a, b) => (b.Score || 0) - (a.Score || 0));
+    const sorted = [...myExchanges].sort((a, b) => (b.Score || 0) - (a.Score || 0));
 
     return sorted.filter((match) => {
       const status = (match.ExchangeStatus || "pending").toLowerCase();

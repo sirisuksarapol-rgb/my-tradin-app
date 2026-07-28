@@ -1,14 +1,15 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { ArrowRightLeft, MapPin, Phone, ShieldCheck, Sparkles, ArrowLeft, Box, CheckCircle2, Circle } from "lucide-react";
+import { 
+  ArrowRightLeft, MapPin, Phone, ShieldCheck, Sparkles, ArrowLeft, 
+  Box, CheckCircle2, Circle, Loader2, Info, FileText 
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import AppLayout from "@/components/AppLayout";
 import { useToast } from "@/hooks/use-toast";
-
-// 💡 ดึงฟังก์ชันสำหรับการยิงหลังบ้านมาใช้งานจริงอย่างถูกต้อง
 import { getItems as fetchItemsAPI, IMAGE_BASE_URL, createExchangeRequest } from "@/api/api";
 
 interface RealPostItem {
@@ -22,6 +23,12 @@ interface RealPostItem {
   Username?: string;    
   MemberName?: string;  
   OwnerName?: string;   
+  DisplayName?: string;
+}
+
+interface ApiErrorResponse {
+  message?: string;
+  error?: string;
 }
 
 export default function ExchangePreview() {
@@ -36,8 +43,9 @@ export default function ExchangePreview() {
   
   const [dbItems, setDbItems] = useState<RealPostItem[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string>("");
+  const [selectedMyPostId, setSelectedMyPostId] = useState<string | number>("");
 
-  // 1. โหลดข้อมูลสิ่งของและ User ปัจจุบันจากระบบคลังข้อมูล
+  // 1. โหลดข้อมูลสิ่งของและ User ปัจจุบันจากระบบ DB
   useEffect(() => {
     const loadRealData = async () => {
       try {
@@ -53,7 +61,7 @@ export default function ExchangePreview() {
         if (res && Array.isArray(res.data)) {
           setDbItems(res.data);
         }
-      } catch (error) {
+      } catch (error: unknown) {
         console.error("Error fetching items for preview:", error);
       } finally {
         setLoading(false);
@@ -62,7 +70,7 @@ export default function ExchangePreview() {
     loadRealData();
   }, []);
 
-  // 2. จัดการแกะ Path รูปภาพให้ออกมาแสดงผลได้อย่างถูกต้อง
+  // 2. แปลง Path รูปภาพ
   const getCorrectImagePath = (imageName: string | undefined) => {
     if (!imageName || imageName.trim() === "undefined" || imageName === "null") return "/placeholder.jpg";
     try {
@@ -81,58 +89,84 @@ export default function ExchangePreview() {
     }
   };
 
-  // ค้นหาสิ่งของทั้งหมดที่เป็นของฉัน
+  // ดึงคลังสิ่งของของเราจาก DB
   const myInventory = useMemo(() => {
     if (!currentUserId) return [];
     return dbItems.filter(item => String(item.MemberID) === currentUserId);
   }, [dbItems, currentUserId]);
 
-  const [selectedMyPostId, setSelectedMyPostId] = useState<string | number>("");
+  // แกะ ID จาก URL (match- หรือ post-)
+  const { targetId, preSelectedMyId } = useMemo(() => {
+    if (!matchId) return { targetId: "", preSelectedMyId: "" };
+    if (matchId.startsWith("match-")) {
+      const parts = matchId.split("-");
+      return { preSelectedMyId: parts[1], targetId: parts[2] };
+    }
+    if (matchId.startsWith("post-")) {
+      return { preSelectedMyId: "", targetId: matchId.replace("post-", "") };
+    }
+    return { targetId: matchId, preSelectedMyId: "" };
+  }, [matchId]);
 
-  // ปักเลือกไอเทมชิ้นแรกของฉันเป็นค่าเริ่มต้น
   useEffect(() => {
-    if (myInventory.length > 0 && !selectedMyPostId) {
+    if (preSelectedMyId && !selectedMyPostId) {
+      setSelectedMyPostId(preSelectedMyId);
+    } else if (myInventory.length > 0 && !selectedMyPostId) {
       setSelectedMyPostId(myInventory[0].ItemID);
     }
-  }, [myInventory, selectedMyPostId]);
+  }, [myInventory, selectedMyPostId, preSelectedMyId]);
 
-  const isInitiating = matchId?.startsWith("post-");
+  const isFromMatchResults = matchId?.startsWith("match-");
+  const isFromPostDetails = matchId?.startsWith("post-");
 
-  // 3. ประกอบโครงสร้างข้อมูลการจับคู่แลกเปลี่ยน (ดึงข้อมูลชื่อคู่แลกจากฐานข้อมูลจริง)
+  // 3. ผูกข้อมูลสิ่งของจริงจาก DB เข้ากับฝั่งของเราและฝั่งคู่แลก
   const match = useMemo(() => {
-    if (location.state?.matchData) {
-      return location.state.matchData;
-    }
-
-    const targetPostId = matchId ? matchId.replace("post-", "") : "";
-    const theirPost = dbItems.find(p => String(p.ItemID) === String(targetPostId));
+    const theirPost = dbItems.find(p => String(p.ItemID) === String(targetId));
     const mySelectedPost = myInventory.find(p => String(p.ItemID) === String(selectedMyPostId)) || myInventory[0];
 
-    // เจาะหาชื่อคู่แลกเปลี่ยนจากฟิลด์ต่างๆ ที่ระบบหลังบ้านอาจจะส่งมา
     const theirActualName = theirPost 
-      ? theirPost.Username || theirPost.MemberName || theirPost.OwnerName || "ผู้ใช้งานระบบ"
+      ? theirPost.DisplayName || theirPost.MemberName || theirPost.OwnerName || theirPost.Username || "ผู้ใช้งานระบบ"
       : "ผู้ใช้งานระบบ";
+
+    const stateData = location.state?.matchData;
 
     return {
       id: matchId,
+      score: stateData?.score || null,
+      
       myPost: mySelectedPost ? {
         title: mySelectedPost.ItemName,
+        description: mySelectedPost.ItemDescription || "ไม่มีรายละเอียดเพิ่มเติม",
         category: mySelectedPost.CategoryName || "ทั่วไป",
         image: getCorrectImagePath(mySelectedPost.ItemImage),
-        location: mySelectedPost.MeetingLocation || "ไม่ระบุสถานที่"
+        location: mySelectedPost.MeetingLocation || "นัดเจอตามตกลง"
+      } : stateData?.myPost ? {
+        title: stateData.myPost.ItemName || stateData.myPost.title || "สิ่งของของคุณ",
+        description: stateData.myPost.ItemDescription || stateData.myPost.description || "ไม่มีรายละเอียดเพิ่มเติม",
+        category: stateData.myPost.CategoryName || "ทั่วไป",
+        image: getCorrectImagePath(stateData.myPost.ItemImage || (stateData.myPost.images ? stateData.myPost.images[0] : "")),
+        location: stateData.myPost.MeetingLocation || "นัดเจอตามตกลง"
       } : null,
+      
       theirPost: theirPost ? {
         title: theirPost.ItemName,
+        description: theirPost.ItemDescription || "ไม่มีรายละเอียดเพิ่มเติม",
         category: theirPost.CategoryName || "ทั่วไป",
         image: getCorrectImagePath(theirPost.ItemImage),
-        location: theirPost.MeetingLocation || "ไม่ระบุสถานที่",
+        location: theirPost.MeetingLocation || "นัดเจอตามตกลง",
         authorName: theirActualName
+      } : stateData?.theirPost ? {
+        title: stateData.theirPost.title || "สิ่งของคู่แลก",
+        description: stateData.theirPost.description || "ไม่มีรายละเอียดเพิ่มเติม",
+        category: stateData.theirPost.category || "ทั่วไป",
+        image: getCorrectImagePath(stateData.theirPost.images ? stateData.theirPost.images[0] : ""),
+        location: stateData.theirPost.location || "นัดเจอตามตกลง",
+        authorName: "ผู้ใช้งานระบบ"
       } : null,
-      score: 95, 
     };
-  }, [matchId, selectedMyPostId, dbItems, myInventory, location.state]);
+  }, [matchId, selectedMyPostId, dbItems, myInventory, location.state, targetId]);
 
-  // 4. 🛠️ ฟังก์ชันการส่งคำขอแลกเปลี่ยน สลับไปหน้า Matching แท็บสถานะแบบเรียลไทม์
+  // 4. ส่งคำขอแลกเปลี่ยน
   const handleConfirm = async () => {
     if (!phone || phone.replace(/-/g, "").length < 10) {
       toast({
@@ -152,8 +186,7 @@ export default function ExchangePreview() {
       return;
     }
 
-    const targetPostId = matchId ? matchId.replace("post-", "") : "";
-    const theirPostData = dbItems.find(p => String(p.ItemID) === String(targetPostId));
+    const theirPostData = dbItems.find(p => String(p.ItemID) === String(targetId));
     const targetMemberId = theirPostData ? theirPostData.MemberID : null;
 
     if (!targetMemberId) {
@@ -168,46 +201,39 @@ export default function ExchangePreview() {
     try {
       setSubmitting(true);
 
-      // ✨ ตรวจสอบและยิง API อย่างยืดหยุ่น ป้องกันปัญหาความไม่สอดคล้องของ Parameter โครงสร้างหลังบ้าน
-      let response;
-      if (typeof createExchangeRequest === "function") {
-        // ลองยิงแบบกระจายพารามิเตอร์ตามลักษณะ API ดั้งเดิมของโปรเจกต์คุณก่อน
-        try {
-          response = await createExchangeRequest(
-            String(targetMemberId), 
-            match.myPost?.location || "นัดเจอตามตกลง"
-          );
-        } catch {
-          // หากพัง ให้สลับมายิงแบบสากล (Object Payload)
-          const payload = {
-            sender_id: currentUserId,
-            receiver_id: String(targetMemberId),
-            my_item_id: String(selectedMyPostId),
-            their_item_id: String(targetPostId),
-            location: match.myPost?.location || "นัดเจอตามตกลง",
-            phone_number: phone.replace(/-/g, "")
-          };
-          response = await (createExchangeRequest )(payload);
-        }
-      } else {
-        throw new Error("API function 'createExchangeRequest' is not declared or exported properly.");
-      }
+      const payload = {
+        sender_id: currentUserId,
+        receiver_id: String(targetMemberId),
+        my_item_id: String(selectedMyPostId),
+        their_item_id: String(targetId),
+        location: match.myPost?.location || "นัดเจอตามตกลง",
+        phone_number: phone.replace(/-/g, "")
+      };
 
-      if (response && (response.success || response.data)) {
+      const response = await createExchangeRequest(payload);
+
+      if (response && (response.success || response.status === "success")) {
         toast({
           title: "ส่งคำขอแลกเปลี่ยนสำเร็จ!",
-          description: "ระบบได้ส่งคำขอไปยังเจ้าของโพสต์ และเพิ่มประวัติในสถานะรอตอบรับแล้ว",
+          description: "ระบบได้ส่งคำขอไปยังเจ้าของโพสต์เรียบร้อยแล้ว",
         });
         
-        // 🚀 พาวิ่งกลับไปหน้า Matching พร้อมสั่งให้เปิดแท็บ status (สถานะการแมตช์) อัตโนมัติ
         navigate("/matching", { state: { activeTab: "status" } }); 
       } else {
         throw new Error(response?.message || "เซิร์ฟเวอร์ปฏิเสธการทำรายการ");
       }
 
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error submitting exchange request:", error);
-      const errorMessage = error instanceof Error ? error.message : "ไม่สามารถติดต่อกับโครงสร้างระบบ API แลกเปลี่ยนได้ในขณะนี้";
+      
+      let errorMessage = "ไม่สามารถติดต่อระบบ API ได้ในขณะนี้";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === "object" && error !== null) {
+        const errObj = error as ApiErrorResponse;
+        errorMessage = errObj.message || errObj.error || errorMessage;
+      }
+
       toast({
         title: "เกิดข้อผิดพลาดในการบันทึก",
         description: errorMessage,
@@ -221,205 +247,270 @@ export default function ExchangePreview() {
   if (loading) {
     return (
       <AppLayout>
-        <div className="px-4 py-12 text-center text-muted-foreground animate-pulse">กำลังดึงข้อมูลเตรียมการแลกเปลี่ยน...</div>
+        <div className="px-4 py-12 text-center text-muted-foreground animate-pulse flex flex-col items-center gap-3 h-[60vh] justify-center">
+           <Loader2 className="h-10 w-10 animate-spin text-emerald-600" />
+           กำลังดึงข้อมูลเตรียมการแลกเปลี่ยน...
+        </div>
       </AppLayout>
     );
   }
 
   return (
     <AppLayout>
-      <section className="py-8 sm:py-12">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+      <section className="py-8 sm:py-12 bg-slate-50/50 min-h-screen">
+        <div className="mx-auto max-w-3xl px-4 sm:px-6 space-y-6">
+          
           {/* Header */}
-          <div className="flex items-center gap-2 mb-8">
-            <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="rounded-full">
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <ShieldCheck className="h-5 w-5 text-primary" />
-            <h1 className="text-xl sm:text-2xl font-bold">ยืนยันการแลกเปลี่ยน</h1>
+            <div>
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="h-6 w-6 text-emerald-600" />
+                <h1 className="text-xl sm:text-2xl font-bold text-slate-800">ยืนยันการแลกเปลี่ยน</h1>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">ตรวจสอบรายละเอียดสินค้าและสถานที่ก่อนส่งคำขอ</p>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Left Column */}
-            <div className="lg:col-span-2 space-y-6">
-              {isInitiating && (
-                <Card className="glass-card border-primary/20 shadow-sm">
-                  <CardContent className="p-5 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h2 className="text-sm font-semibold flex items-center gap-2">
-                        <Box className="h-4 w-4 text-primary" />
-                        เลือกสิ่งของที่คุณต้องการเสนอแลก
-                      </h2>
-                      <span className="text-xs font-medium text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">
-                        มี {myInventory.length} ชิ้น
-                      </span>
-                    </div>
+          {/* 1. เลือกสิ่งของของตัวเอง (แสดงเมื่อเข้าผ่านหน้า Post Detail) */}
+          {isFromPostDetails && (
+            <Card className="border-emerald-200/80 shadow-sm bg-white">
+              <CardHeader className="pb-3 pt-4 px-5">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2 text-slate-800">
+                    <Box className="h-4 w-4 text-emerald-600" />
+                    เลือกสิ่งของของคุณที่จะนำไปแลก
+                  </CardTitle>
+                  <Badge variant="secondary" className="bg-emerald-50 text-emerald-700">
+                    มี {myInventory.length} ชิ้น
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="px-5 pb-5 pt-0">
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {myInventory.length === 0 ? (
+                    <p className="text-xs text-center py-6 text-slate-400">คุณยังไม่มีโพสต์สิ่งของ สามารถไปเพิ่มโพสต์ก่อนเสนอแลกได้ครับ</p>
+                  ) : (
+                    myInventory.map((post) => {
+                      const isSelected = String(selectedMyPostId) === String(post.ItemID);
+                      return (
+                        <div
+                          key={post.ItemID}
+                          onClick={() => setSelectedMyPostId(post.ItemID)}
+                          className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer select-none
+                            ${isSelected
+                              ? "border-emerald-500 bg-emerald-50/40 shadow-sm"
+                              : "border-slate-200 bg-slate-50/50 hover:bg-slate-100/80"
+                            }`}
+                        >
+                          <img 
+                            src={getCorrectImagePath(post.ItemImage)} 
+                            alt={post.ItemName} 
+                            className="w-14 h-14 rounded-lg object-cover shadow-sm shrink-0 bg-slate-200" 
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              if (target.src !== window.location.origin + "/placeholder.jpg") target.src = "/placeholder.jpg";
+                            }}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-sm font-semibold truncate ${isSelected ? "text-emerald-800" : "text-slate-700"}`}>
+                              {post.ItemName}
+                            </p>
+                            <p className="text-xs text-slate-500 truncate">{post.CategoryName || "ทั่วไป"}</p>
+                          </div>
+                          <div className="shrink-0 pl-2">
+                            {isSelected ? (
+                              <CheckCircle2 className="w-5 h-5 text-emerald-600 fill-emerald-100" />
+                            ) : (
+                              <Circle className="w-5 h-5 text-slate-300" />
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                      {myInventory.length === 0 ? (
-                        <p className="text-xs text-center py-6 text-muted-foreground">คุณยังไม่มีโพสต์สิ่งของ สามารถไปเพิ่มโพสต์ก่อนเสนอแลกได้ครับ</p>
-                      ) : (
-                        myInventory.map((post) => {
-                          const isSelected = String(selectedMyPostId) === String(post.ItemID);
-                          return (
-                            <div
-                              key={post.ItemID}
-                              onClick={() => setSelectedMyPostId(post.ItemID)}
-                              className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all cursor-pointer select-none
-                                ${isSelected
-                                  ? "border-primary bg-primary/5 shadow-sm"
-                                  : "border-transparent bg-secondary/30 hover:bg-secondary/60"
-                                }`}
-                            >
-                              <img 
-                                src={getCorrectImagePath(post.ItemImage)} 
-                                alt={post.ItemName} 
-                                className="w-14 h-14 rounded-lg object-cover shadow-sm shrink-0 bg-muted" 
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement;
-                                  if (target.src !== window.location.origin + "/placeholder.jpg") target.src = "/placeholder.jpg";
-                                }}
-                              />
-                              <div className="flex-1 min-w-0">
-                                <p className={`text-sm font-semibold truncate transition-colors ${isSelected ? "text-primary" : "text-foreground"}`}>
-                                  {post.ItemName}
-                                </p>
-                                <p className="text-xs text-muted-foreground truncate">{post.CategoryName || "ทั่วไป"}</p>
-                              </div>
-                              <div className="shrink-0 pl-2">
-                                {isSelected ? (
-                                  <CheckCircle2 className="w-5 h-5 text-primary fill-primary/20" />
-                                ) : (
-                                  <Circle className="w-5 h-5 text-muted-foreground/30" />
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
+          {/* 2. Match Comparison Display */}
+          <Card className="border-slate-200 shadow-sm bg-white overflow-hidden">
+            {match.score && isFromMatchResults && (
+              <div className="bg-emerald-700 px-4 py-2.5 flex items-center justify-center gap-2">
+                <Sparkles className="h-4 w-4 text-emerald-200" />
+                <span className="text-sm font-semibold text-white">
+                  คะแนนความเหมาะสมจาก AI: {match.score}%
+                </span>
+              </div>
+            )}
+            
+            <CardContent className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
+                
+                {/* สิ่งของของคุณ */}
+                {match.myPost ? (
+                  <div className="space-y-3 p-4 rounded-xl bg-slate-50/80 border border-slate-200/80 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200 font-semibold">
+                          ของคุณ
+                        </Badge>
+                        <Badge variant="secondary" className="text-[10px]">
+                          {match.myPost.category}
+                        </Badge>
+                      </div>
+                      <img
+                        src={match.myPost.image}
+                        alt={match.myPost.title}
+                        className="w-full h-48 rounded-lg object-cover border border-slate-200 mb-3 bg-white"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          if (target.src !== window.location.origin + "/placeholder.jpg") target.src = "/placeholder.jpg";
+                        }}
+                      />
+                      <h3 className="text-base font-bold text-slate-800 line-clamp-1">{match.myPost.title}</h3>
+                      
+                      <div className="mt-2 text-xs text-slate-600 space-y-1">
+                        <div className="flex items-start gap-1.5">
+                          <FileText className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                          <p className="line-clamp-3 leading-relaxed">{match.myPost.description}</p>
+                        </div>
+                      </div>
                     </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Match Comparison Display */}
-              <Card className="glass-card overflow-hidden">
-                {match.score && (
-                  <div className="bg-primary px-4 py-3 flex items-center justify-center gap-2">
-                    <Sparkles className="h-4 w-4 text-primary-foreground" />
-                    <span className="text-sm font-semibold text-primary-foreground">
-                      คะแนนความเหมาะสม {match.score}%
-                    </span>
+                  </div>
+                ) : (
+                  <div className="p-8 text-center text-xs text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200 flex items-center justify-center">
+                    กรุณาเลือกสิ่งของของคุณ
                   </div>
                 )}
-                <CardContent className="p-6 space-y-4">
-                  <div className="flex items-center gap-4 sm:gap-8 justify-center">
-                    {match.myPost ? (
-                      <div className="flex-1 text-center space-y-3 min-w-0">
-                        <img
-                          src={match.myPost.image}
-                          alt={match.myPost.title}
-                          className="w-24 h-24 sm:w-28 sm:h-28 rounded-xl object-cover mx-auto border-2 border-primary/20 bg-muted"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            if (target.src !== window.location.origin + "/placeholder.jpg") target.src = "/placeholder.jpg";
-                          }}
-                        />
-                        <p className="text-sm font-semibold truncate">{match.myPost.title}</p>
-                        <Badge variant="secondary" className="text-[10px]">{match.myPost.category}</Badge>
-                        <p className="text-[10px] text-muted-foreground">ของคุณ</p>
+
+                {/* ปุ่มลูกศรตรงกลาง */}
+                <div className="hidden md:flex absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-emerald-600 text-white items-center justify-center shadow-md border-2 border-white z-10">
+                  <ArrowRightLeft className="h-5 w-5" />
+                </div>
+
+                {/* สิ่งของคู่แลกเปลี่ยน */}
+                {match.theirPost ? (
+                  <div className="space-y-3 p-4 rounded-xl bg-slate-50/80 border border-slate-200/80 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 font-semibold truncate max-w-[140px]">
+                          {match.theirPost.authorName}
+                        </Badge>
+                        <Badge variant="secondary" className="text-[10px]">
+                          {match.theirPost.category}
+                        </Badge>
                       </div>
-                    ) : (
-                      <div className="flex-1 text-center text-xs text-muted-foreground">กรุณาเลือกหรือสร้างโพสต์สินค้า</div>
-                    )}
-
-                    <div className="flex flex-col items-center gap-1 shrink-0">
-                      <ArrowRightLeft className="h-6 w-6 text-primary" />
-                      <span className="text-[10px] text-muted-foreground">แลก</span>
-                    </div>
-
-                    {match.theirPost ? (
-                      <div className="flex-1 text-center space-y-3 min-w-0">
-                        <img
-                          src={match.theirPost.image}
-                          alt={match.theirPost.title}
-                          className="w-24 h-24 sm:w-28 sm:h-28 rounded-xl object-cover mx-auto border-2 border-accent/20 bg-muted"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            if (target.src !== window.location.origin + "/placeholder.jpg") target.src = "/placeholder.jpg";
-                          }}
-                        />
-                        <p className="text-sm font-semibold truncate">{match.theirPost.title}</p>
-                        <Badge variant="secondary" className="text-[10px]">{match.theirPost.category}</Badge>
-                        <p className="text-[10px] text-muted-foreground">{match.theirPost.authorName}</p>
+                      <img
+                        src={match.theirPost.image}
+                        alt={match.theirPost.title}
+                        className="w-full h-48 rounded-lg object-cover border border-slate-200 mb-3 bg-white"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          if (target.src !== window.location.origin + "/placeholder.jpg") target.src = "/placeholder.jpg";
+                        }}
+                      />
+                      <h3 className="text-base font-bold text-slate-800 line-clamp-1">{match.theirPost.title}</h3>
+                      
+                      <div className="mt-2 text-xs text-slate-600 space-y-1">
+                        <div className="flex items-start gap-1.5">
+                          <FileText className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                          <p className="line-clamp-3 leading-relaxed">{match.theirPost.description}</p>
+                        </div>
                       </div>
-                    ) : (
-                      <div className="flex-1 text-center text-xs text-muted-foreground">ไม่พบข้อมูลสิ่งของคู่แลกเปลี่ยน</div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Right Column */}
-            <div className="space-y-6">
-              <Card className="glass-card">
-                <CardContent className="p-5 space-y-3">
-                  <h2 className="text-sm font-semibold flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-primary" />
-                    สถานที่นัดรับ
-                  </h2>
-                  <div className="space-y-3">
-                    <div className="bg-muted rounded-lg p-3">
-                      <p className="text-[10px] text-muted-foreground mb-1">ของคุณ</p>
-                      <p className="text-xs font-medium">{match.myPost?.location || "ยังไม่มีข้อมูล"}</p>
-                    </div>
-                    <div className="bg-muted rounded-lg p-3">
-                      <p className="text-[10px] text-muted-foreground mb-1">คู่แลกเปลี่ยน</p>
-                      <p className="text-xs font-medium">{match.theirPost?.location || "ยังไม่มีข้อมูล"}</p>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                ) : (
+                  <div className="p-8 text-center text-xs text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200 flex items-center justify-center">
+                    ไม่พบข้อมูลสิ่งของคู่แลกเปลี่ยน
+                  </div>
+                )}
 
-              <Card className="glass-card">
-                <CardContent className="p-5 space-y-3">
-                  <h2 className="text-sm font-semibold flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-primary" />
-                    หมายเลขโทรศัพท์ของคุณ
-                  </h2>
-                  <p className="text-xs text-muted-foreground">
-                    เบอร์นี้จะแสดงให้คู่แลกเห็นเมื่อยืนยันรหัสความปลอดภัยเท่านั้น
-                  </p>
-                  <Input
-                    type="tel"
-                    placeholder="08X-XXX-XXXX"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value.replace(/[^0-9-]/g, ""))}
-                    maxLength={12}
-                    className="h-11"
-                  />
-                </CardContent>
-              </Card>
-
-              <div className="space-y-2">
-                <Button
-                  className="w-full text-primary-foreground h-12 bg-primary hover:bg-primary/90"
-                  onClick={handleConfirm}
-                  disabled={submitting}
-                >
-                  {submitting ? "กำลังส่งคำขอไปยังระบบ..." : "ยืนยันส่งคำขอแลกเปลี่ยน"}
-                </Button>
-                <Button
-                  variant="secondary"
-                  className="w-full hover:bg-orange-500/85 hover:text-white transition-colors"
-                  onClick={() => navigate(-1)}
-                >
-                  ยกเลิก
-                </Button>
               </div>
-            </div>
+            </CardContent>
+          </Card>
+
+          {/* 3. สถานที่นัดรับ */}
+          <Card className="border-slate-200 shadow-sm bg-white">
+            <CardHeader className="pb-3 pt-4 px-5">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2 text-slate-800">
+                <MapPin className="h-4 w-4 text-emerald-600" />
+                สถานที่นัดรับ
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-5 pb-5 pt-0">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="bg-slate-50 border border-slate-200/60 rounded-lg p-3">
+                  <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block mb-1">ของคุณ</span>
+                  <p className="text-xs text-slate-800 font-medium">{match.myPost?.location || "นัดเจอตามตกลง"}</p>
+                </div>
+                <div className="bg-slate-50 border border-slate-200/60 rounded-lg p-3">
+                  <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider block mb-1">คู่แลกเปลี่ยน</span>
+                  <p className="text-xs text-slate-800 font-medium">{match.theirPost?.location || "นัดเจอตามตกลง"}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 4. หมายเลขโทรศัพท์ (ย้ายลงมา) */}
+          <Card className="border-slate-200 shadow-sm bg-white">
+            <CardHeader className="pb-2 pt-4 px-5">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2 text-slate-800">
+                <Phone className="h-4 w-4 text-emerald-600" />
+                หมายเลขโทรศัพท์ของคุณ
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-5 pb-5 pt-0 space-y-3">
+              <p className="text-xs text-slate-500 leading-relaxed">
+                เบอร์นี้จะแสดงให้คู่แลกเห็นเมื่อยืนยันรหัสความปลอดภัย OTP เท่านั้น
+              </p>
+              <Input
+                type="tel"
+                placeholder="08X-XXX-XXXX"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value.replace(/[^0-9-]/g, ""))}
+                maxLength={12}
+                className="h-11 text-sm font-medium"
+              />
+            </CardContent>
+          </Card>
+
+          {/* 5. คำแนะนำความปลอดภัย (ย้ายลงมา) */}
+          <div className="p-3.5 rounded-xl bg-amber-50/90 border border-amber-200/80 flex items-start gap-2.5">
+            <Info className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+            <p className="text-[11px] text-amber-800 leading-normal">
+              ตรวจสอบสภาพสินค้าจริง ณ วันนัดพบ และสามารถยกเลิกการแลกเปลี่ยนได้หากสินค้าไม่ตรงตามรายละเอียดที่ระบุ
+            </p>
           </div>
+
+          {/* 6. Action Buttons (ย้ายลงมาไว้ล่างสุด) */}
+          <div className="space-y-2 pt-2">
+            <Button
+              className="w-full text-white h-12 bg-emerald-700 hover:bg-emerald-800 shadow-sm transition-all font-semibold"
+              onClick={handleConfirm}
+              disabled={submitting}
+            >
+              {submitting ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" /> กำลังส่งคำขอ...
+                </span>
+              ) : (
+                "ยืนยันส่งคำขอแลกเปลี่ยน"
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full h-11 text-slate-600 hover:bg-slate-100 transition-colors"
+              onClick={() => navigate(-1)}
+              disabled={submitting}
+            >
+              ยกเลิก
+            </Button>
+          </div>
+
         </div>
       </section>
     </AppLayout>

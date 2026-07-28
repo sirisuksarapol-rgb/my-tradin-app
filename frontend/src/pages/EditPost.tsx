@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem as SelectOption, SelectTrigger, SelectValue } from "@/components/ui/select";
 import AppLayout from "@/components/AppLayout";
 import { useToast } from "@/hooks/use-toast";
-import { getItems, updateItem, getCategories } from "@/api/api";
+import { getItems, updateItem, getCategories, IMAGE_BASE_URL } from "@/api/api";
 
 interface DBItemDetail {
   ItemID?: number;
@@ -22,11 +22,12 @@ interface DBItemDetail {
   CategoryName?: string;
   ItemImage?: string;
   image_paths?: string[];
+  image_name?: string;
 }
 
 interface Category {
-  category_id: number;
-  category_name: string;
+  CategoryID: number;
+  CategoryName: string;
 }
 
 export default function EditPost() {
@@ -65,7 +66,7 @@ export default function EditPost() {
   }, []);
   // กรอง "ทั้งหมด" ออกเหมือนเดิม
   const filteredCategories = categoriesList.filter(
-  (cat) => cat.category_name !== "ทั้งหมด"
+  (cat) => cat.CategoryName !== "ทั้งหมด"
 );
   
   useEffect(() => {
@@ -103,13 +104,19 @@ export default function EditPost() {
           setMemberId(currentPost.MemberID || "");
           setCategory(currentPost.CategoryName || "");
 
-          if (currentPost.image_paths && currentPost.image_paths.length > 0) {
-            setImages(currentPost.image_paths);
+          // 💡 แก้ไข: ใช้ ItemImage สร้าง URL รูปภาพเองเลย เพราะ Backend อาจส่ง image_paths มาเป็น Array ว่าง
+          if (currentPost.ItemImage) {
+            // แยกชื่อไฟล์ดิบ (เช่น "รูป1.jpg", "รูป2.jpg")
+            const rawNames = currentPost.ItemImage
+              .split(",")
+              .map((name: string) => name.trim())
+              .filter((name: string) => name !== "");
             
-            // 💡 แก้ไขจุดสำคัญ: เอาเฉพาะชื่อไฟล์ดิบ (เช่น abc.jpg) จาก ItemImage มาเก็บไว้ใน imageFiles 
-            // ไม่เอา URL ยาว ๆ เพราะหลังบ้านต้องการตรวจสอบชื่อไฟล์ดิบในการคงอยู่ของรูปเดิม
-            const rawNames = currentPost.ItemImage ? currentPost.ItemImage.split(",") : [];
-            setImageFiles(rawNames.map((name: string) => name.trim()));
+            // นำชื่อไฟล์มาต่อกับ BASE URL เพื่อให้ Frontend แสดงรูปตัวอย่างได้ทันที
+            const imageUrls = rawNames.map((name: string) => `${IMAGE_BASE_URL}/uploads/${name}`);
+            
+            setImages(imageUrls);     // เอาไว้แสดงรูปพรีวิวบนหน้าจอ
+            setImageFiles(rawNames);  // เอาไว้เก็บชื่อไฟล์ดิบ เพื่อส่งยืนยันให้ Backend ว่าเรายังเก็บรูปเดิมไว้
           }
         }
       } catch (error) {
@@ -337,9 +344,9 @@ export default function EditPost() {
     </SelectTrigger>
     <SelectContent>
       {filteredCategories.map((cat) => (
-        // 💡 เปลี่ยนมาใช้ cat.category_id และ cat.category_name ตัวพิมพ์เล็กตาม API เป๊ะๆ
-        <SelectOption key={cat.category_id} value={String(cat.category_id)}>
-          {cat.category_name}
+        // 💡 เปลี่ยนมาใช้ cat.CategoryID และ cat.CategoryName ตัวพิมพ์เล็กตาม API เป๊ะๆ
+        <SelectOption key={cat.CategoryID} value={String(cat.CategoryID)}>
+          {cat.CategoryName}
         </SelectOption>
       ))}
     </SelectContent>

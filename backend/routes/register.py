@@ -8,6 +8,7 @@ from werkzeug.utils import secure_filename
 from db import get_connection
 from services.email_service import send_verify_email
 
+# สร้าง Blueprint กำหนดให้ API หมวดนี้ขึ้นต้นด้วย /api/register
 register_bp = Blueprint(
     "register",
     __name__,

@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   Eye,
   Loader2,
+  Phone,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import axios, { AxiosError } from "axios";
@@ -15,6 +16,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import AppLayout from "@/components/AppLayout";
 import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogFooter,
+  AlertDialogCancel,
+} from "@/components/ui/alert-dialog";
 
 interface ExchangeRequest {
   ExchangeID: number;
@@ -27,11 +36,32 @@ interface ExchangeRequest {
   TargetItemID: number;
   PhoneNumber: string;
   StartDate: string | null;
-  myPostTitle: string;
-  myPostImage: string;
-  theirPostTitle: string;
-  theirPostImage: string;
-  theirAuthorName: string;
+
+  // ของเรา (ผู้รับคำขอ)
+  myPostTitle?: string;
+  my_post_title?: string;
+  TargetItemName?: string;
+  target_item_name?: string;
+
+  myPostImage?: string;
+  my_post_image?: string;
+  TargetItemImage?: string;
+  target_item_image?: string;
+
+  // ของเขา (ผู้ส่งคำขอ)
+  theirPostTitle?: string;
+  their_post_title?: string;
+  MyItemName?: string;
+  my_item_name?: string;
+
+  theirPostImage?: string;
+  their_post_image?: string;
+  MyItemImage?: string;
+  my_item_image?: string;
+
+  theirAuthorName?: string;
+  sender_name?: string;
+  MemberName?: string;
 }
 
 interface ApiResponse<T> {
@@ -57,8 +87,46 @@ export default function IncomingRequests() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  // 🌟 State ควบคุมหน้าต่างกรอกเบอร์โทรศัพท์
+  const [isPhoneModalOpen, setIsPhoneModalOpen] = useState(false);
+  const [phoneInput, setPhoneInput] = useState("");
+  const [selectedRequest, setSelectedRequest] =
+    useState<ExchangeRequest | null>(null);
+  const [isAccepting, setIsAccepting] = useState(false);
+
   const [requests, setRequests] = useState<ExchangeRequest[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+
+  // 1. ดึง ID รายการที่เคยเปิดดูแล้วจาก localStorage
+  const [seenIds, setSeenIds] = useState<number[]>(() => {
+    const saved = localStorage.getItem("seen_exchange_ids");
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  // 2. ฟังก์ชันคำนวณจำนวนวัน (วันนี้ / X วันที่แล้ว)
+  const getRequestAgeText = (startDateStr: string | null): string => {
+    if (!startDateStr) return "เมื่อเร็วๆ นี้";
+
+    const createdDate = new Date(startDateStr);
+    const now = new Date();
+
+    // ปรับเป็นระดับวันที่ (ตัดเวลา HH:mm:ss ออกเพื่อเปรียบเทียบข้ามวัน)
+    const createdZero = new Date(
+      createdDate.getFullYear(),
+      createdDate.getMonth(),
+      createdDate.getDate(),
+    );
+    const nowZero = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    const diffTime = nowZero.getTime() - createdZero.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays <= 0) {
+      return "วันนี้";
+    } else {
+      return `${diffDays} วันที่แล้ว`;
+    }
+  };
 
   const savedUser = localStorage.getItem("user");
   const user: LoggedInUser | null = savedUser ? JSON.parse(savedUser) : null;
@@ -92,6 +160,18 @@ export default function IncomingRequests() {
 
         console.log("🎯 ข้อมูลคำขอเข้าที่กรองเสร็จแล้ว:", incoming);
         setRequests(incoming);
+
+        // 🌟 ส่วนที่เพิ่มเข้ามา: บันทึก ExchangeID ทั้งหมดลง localStorage
+        // เพื่อให้ระบบรู้ว่า "เคยเห็นคำขอเหล่านี้แล้ว" ในการเปิดดูครั้งถัดไป
+        const currentSeen: number[] = JSON.parse(
+          localStorage.getItem("seen_exchange_ids") || "[]",
+        );
+        const incomingIds = incoming.map((item) => item.ExchangeID);
+        const updatedSeen = Array.from(
+          new Set([...currentSeen, ...incomingIds]),
+        );
+
+        localStorage.setItem("seen_exchange_ids", JSON.stringify(updatedSeen));
       }
     } catch (error) {
       console.error("Error fetching incoming requests:", error);
@@ -109,18 +189,56 @@ export default function IncomingRequests() {
     fetchIncomingRequests();
   }, []);
 
-  const handleAccept = async (req: ExchangeRequest) => {
+  // 🌟 ฟังก์ชันนี้แค่เปิด Modal ขึ้นมาเฉยๆ ยังไม่ยิง API
+  const handleAccept = (req: ExchangeRequest) => {
+    setSelectedRequest(req);
+    setPhoneInput("");
+    setIsPhoneModalOpen(true);
+  };
+
+  // 🌟 ฟังก์ชันนี้จะทำงานเมื่อกด "ยืนยัน" ใน Modal
+  const confirmAccept = async () => {
+    if (!selectedRequest) return;
+
+    // ตรวจสอบว่ากรอกเบอร์หรือยัง
+    if (!phoneInput || phoneInput.trim().length < 9) {
+      toast({
+        title: "ข้อมูลไม่ครบถ้วน",
+        description: "กรุณากรอกเบอร์โทรศัพท์ที่ถูกต้อง (อย่างน้อย 9-10 หลัก)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsAccepting(true);
+    const req = selectedRequest;
+
     try {
       const response = await axios.put<ApiResponse<null>>(
         `${API_BASE_URL}/${req.ExchangeID}`,
-        { action: "accept" },
+        {
+          action: "accept",
+          phone_number: phoneInput.trim(),
+        },
       );
 
       if (response.data.success) {
         toast({
           title: "ตอบรับคำขอแล้ว! 🎉",
-          description: `ระบบกำลังพาคุณไปหน้าติดตามสถานะของ ${req.theirAuthorName || "ผู้ใช้งาน"}`,
+          description: "กำลังส่งรหัส OTP ให้คุณและคู่แลกเปลี่ยน...",
         });
+
+        // ยิง OTP ให้ทั้ง 2 ฝ่าย
+        try {
+          await axios.post(`${API_BASE_URL}/${req.ExchangeID}/request-code`, {
+            user_id: req.MemberID,
+          });
+          await axios.post(`${API_BASE_URL}/${req.ExchangeID}/request-code`, {
+            user_id: req.TargetMemberID,
+          });
+        } catch (otpError) {
+          console.error("แจ้งเตือน: ไม่สามารถส่ง OTP อัตโนมัติได้", otpError);
+        }
 
         const matchData = {
           id: req.ExchangeID,
@@ -132,11 +250,14 @@ export default function IncomingRequests() {
           },
         };
 
+        // ปิด Modal และพาไปหน้า Tracking
+        setIsPhoneModalOpen(false);
         setTimeout(() => {
+          // 🌟 เปลี่ยนชื่อคีย์ state เป็น newStatus หน้า Tracking ถึงจะรู้ตัวและอัปเดตสถานะให้ทันที
           navigate(`/exchange-tracking/${req.ExchangeID}`, {
-            state: { matchData },
+            state: { newStatus: "accepted" },
           });
-        }, 1000);
+        }, 1500);
       }
     } catch (error) {
       const axiosError = error as AxiosError<ErrorResponse>;
@@ -146,6 +267,8 @@ export default function IncomingRequests() {
           axiosError.response?.data?.message || "ไม่สามารถตอบรับคำขอได้",
         variant: "destructive",
       });
+    } finally {
+      setIsAccepting(false);
     }
   };
 
@@ -230,9 +353,21 @@ export default function IncomingRequests() {
               >
                 <CardContent className="p-4 space-y-3">
                   <div className="flex items-center gap-2">
-                    <Badge className="bg-warning/10 text-warning border-0 text-xs">
-                      คำขอใหม่
-                    </Badge>
+                    {/* เช็กว่าถ้ายังไม่เคยเห็น ID นี้มาก่อน ให้ขึ้นป้าย "คำขอใหม่" */}
+                    {!seenIds.includes(req.ExchangeID) ? (
+                      <Badge className="bg-warning/10 text-warning border-0 text-xs font-medium">
+                        คำขอใหม่
+                      </Badge>
+                    ) : (
+                      /* ถ้าเคยเปิดเข้ามาดูแล้ว ให้เปลี่ยนเป็น "วันนี้" หรือ "X วันที่แล้ว" */
+                      <Badge
+                        variant="outline"
+                        className="text-muted-foreground border-muted text-xs font-normal"
+                      >
+                        {getRequestAgeText(req.StartDate)}
+                      </Badge>
+                    )}
+
                     <span className="text-xs text-muted-foreground ml-auto">
                       {req.StartDate
                         ? new Date(req.StartDate).toLocaleDateString("th-TH")
@@ -244,10 +379,19 @@ export default function IncomingRequests() {
                     {/* ของของเขา (ผู้ส่ง) */}
                     <div className="flex-1 text-center space-y-1 min-w-0">
                       <img
-                        src={getImageUrl(req.theirPostImage)}
-                        alt={req.theirPostTitle}
+                        src={getImageUrl(
+                          req.theirPostImage ||
+                            req.their_post_image ||
+                            req.MyItemImage ||
+                            req.my_item_image,
+                        )}
+                        alt={
+                          req.theirPostTitle ||
+                          req.their_post_title ||
+                          req.MyItemName ||
+                          req.my_item_name
+                        }
                         className="w-16 h-16 rounded-lg object-cover mx-auto bg-muted shadow-sm"
-                        // ✅ แก้ไข: เพิ่ม onError handler เพื่อลดอาการกระพริบโดยใช้ placeholder
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
                           if (
@@ -259,10 +403,17 @@ export default function IncomingRequests() {
                         }}
                       />
                       <p className="text-xs font-medium truncate">
-                        {req.theirPostTitle || "ไม่มีชื่อสิ่งของของเขา"}
+                        {req.theirPostTitle ||
+                          req.their_post_title ||
+                          req.MyItemName ||
+                          req.my_item_name ||
+                          "ไม่มีชื่อสิ่งของของเขา"}
                       </p>
                       <p className="text-[10px] text-muted-foreground truncate">
-                        {req.theirAuthorName}
+                        {req.theirAuthorName ||
+                          req.sender_name ||
+                          req.MemberName ||
+                          "ผู้ใช้งาน"}
                       </p>
                     </div>
 
@@ -271,8 +422,18 @@ export default function IncomingRequests() {
                     {/* ของของเรา (ผู้รับ) */}
                     <div className="flex-1 text-center space-y-1 min-w-0">
                       <img
-                        src={getImageUrl(req.myPostImage)}
-                        alt={req.myPostTitle}
+                        src={getImageUrl(
+                          req.myPostImage ||
+                            req.my_post_image ||
+                            req.TargetItemImage ||
+                            req.target_item_image,
+                        )}
+                        alt={
+                          req.myPostTitle ||
+                          req.my_post_title ||
+                          req.TargetItemName ||
+                          req.target_item_name
+                        }
                         className="w-16 h-16 rounded-lg object-cover mx-auto bg-muted shadow-sm"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
@@ -285,7 +446,11 @@ export default function IncomingRequests() {
                         }}
                       />
                       <p className="text-xs font-medium truncate">
-                        {req.myPostTitle || "ไม่มีชื่อสิ่งของของเรา"}
+                        {req.myPostTitle ||
+                          req.my_post_title ||
+                          req.TargetItemName ||
+                          req.target_item_name ||
+                          "ไม่มีชื่อสิ่งของของเรา"}
                       </p>
                       <p className="text-[10px] text-muted-foreground">
                         ของคุณ
@@ -336,6 +501,61 @@ export default function IncomingRequests() {
           </div>
         )}
       </div>
+      {/* 🌟 Modal สำหรับกรอกเบอร์โทรศัพท์ */}
+      <AlertDialog open={isPhoneModalOpen} onOpenChange={setIsPhoneModalOpen}>
+        <AlertDialogContent className="rounded-2xl max-w-sm">
+          <AlertDialogHeader>
+            <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-2">
+              <Phone className="h-6 w-6 text-primary" />
+            </div>
+            <AlertDialogTitle className="text-center text-xl font-bold">
+              ระบุข้อมูลการติดต่อ
+            </AlertDialogTitle>
+            <p className="text-center text-sm text-muted-foreground mt-2">
+              กรุณากรอกเบอร์โทรศัพท์ของคุณเพื่อใช้ในการติดต่อกับ{" "}
+              <strong>{selectedRequest?.theirAuthorName}</strong>
+            </p>
+          </AlertDialogHeader>
+
+          <div className="my-4">
+            <input
+              type="tel"
+              maxLength={10}
+              value={phoneInput}
+              onChange={(e) => setPhoneInput(e.target.value.replace(/\D/g, ""))}
+              placeholder="08X-XXX-XXXX"
+              className="w-full text-center tracking-widest font-bold text-xl h-14 border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-background shadow-inner transition-all"
+            />
+          </div>
+
+          <AlertDialogFooter className="flex flex-row gap-3 mt-2">
+            <AlertDialogCancel
+              className="flex-1 mt-0 rounded-xl h-12"
+              onClick={() => {
+                setPhoneInput("");
+                setSelectedRequest(null);
+              }}
+              disabled={isAccepting}
+            >
+              ยกเลิก
+            </AlertDialogCancel>
+            <Button
+              onClick={confirmAccept}
+              disabled={phoneInput.length < 9 || isAccepting}
+              className="flex-1 rounded-xl h-12 bg-primary hover:bg-primary/90 text-primary-foreground shadow-md transition-all"
+            >
+              {isAccepting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />{" "}
+                  กำลังบันทึก...
+                </>
+              ) : (
+                "ยืนยันการตอบรับ"
+              )}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }

@@ -13,7 +13,9 @@ export const API_BASE_URL = `${BASE_URL}/api`;
 const getStoredMemberId = () => {
   const savedUser = localStorage.getItem("user");
   if (!savedUser) return "";
+  
   const user = JSON.parse(savedUser);
+  // ดักจับชื่อ Key ทุกรูปแบบเผื่อมีการเซฟต่างกัน
   return user.id || user.user_id || user.UserID || user.MemberID || "";
 };
 
@@ -48,33 +50,97 @@ export const getExchanges = async () => {
   }
 };
 
-export const createExchangeRequest = async (param1, param2) => {
+export const createExchangeRequest = async (payload) => {
   try {
     const memberId = getStoredMemberId();
-    let payload = {};
+    
+    // จัดรูปแบบข้อมูลให้อยู่ในโครงสร้างที่ Backend (Python) รอรับเสมอ
+    const requestData = {
+      member_id: payload.sender_id || payload.member_id || memberId,
+      target_member_id: payload.receiver_id || payload.target_member_id,
+      my_item_id: payload.my_item_id,       
+      their_item_id: payload.their_item_id, 
+      location: payload.location || 'นัดเจอตามตกลง',
+      phone_number: payload.phone_number || ''
+    };
 
-    if (typeof param1 === "object" && param1 !== null) {
-      payload = {
-        member_id: param1.sender_id || memberId,
-        target_member_id: param1.receiver_id,
-        my_item_id: param1.my_item_id,       
-        their_item_id: param1.their_item_id, 
-        location: param1.location,
-        phone_number: param1.phone_number
-      };
-    } else {
-      payload = {
-        member_id: memberId,
-        target_member_id: param1,
-        location: param2
-      };
-    }
-
-    const response = await axios.post(`${API_BASE_URL}/exchanges`, payload);
+    const response = await axios.post(`${API_BASE_URL}/exchanges`, requestData);
     return response.data;
   } catch (error) {
     console.error("Error creating exchange request:", error);
+    throw error.response?.data || error;
+  }
+};
+
+export const getAIRecommendations = (itemId) => axios.get(`${API_BASE_URL}/matches/${itemId}`);
+
+/**
+ * ขอรับรหัส OTP เพื่อเข้าดูเบอร์โทรศัพท์คู่แลกเปลี่ยน
+ */
+export const requestExchangeCode = async (exchangeId) => {
+  try {
+    const memberId = getStoredMemberId(); // ใช้ฟังก์ชัน Helper ที่คุณสร้างไว้ดึง ID ได้เลย
+    const response = await axios.post(`${API_BASE_URL}/exchanges/${exchangeId}/request-code`, {
+      user_id: memberId
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error requesting exchange OTP:", error);
+    throw error.response?.data || error;
+  }
+};
+
+/**
+ * ยืนยันรหัส OTP เพื่อเปิดดูเบอร์โทรศัพท์
+ */
+export const verifyExchangeCode = async (exchangeId, code) => {
+  try {
+    const memberId = getStoredMemberId();
+    const response = await axios.post(`${API_BASE_URL}/exchanges/${exchangeId}/verify-code`, {
+      user_id: memberId,
+      code: code
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error verifying exchange OTP:", error);
+    throw error.response?.data || error;
+  }
+};
+
+export const cancelExchange = async (exchangeId, reason) => {
+  try {
+    const response = await axios.put(`${API_BASE_URL}/exchanges/${exchangeId}/cancel`, {
+      reason: reason
+    });
+    return response.data;
+  } catch (error) { 
+    console.error("Error cancelling exchange:", error);
+    if (axios.isAxiosError(error)) {
+      throw error.response?.data || error;
+    }
     throw error;
+  }
+};
+
+export const completeExchange = async (exchangeId, reviewData) => {
+  try {
+    // 🌟 ดึง ID ของคนที่กำลังใช้งานอยู่ ณ ตอนนี้
+    const memberId = getStoredMemberId(); 
+    
+    // 🌟 ใช้ API_BASE_URL แทนพาร์ทดิบ เพื่อให้เชื่อมโยงได้ถูกต้อง
+    const response = await fetch(`${API_BASE_URL}/exchanges/${exchangeId}/complete`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      // 🌟 แนบ user_id รวมเข้าไปกับข้อมูลคะแนน (score, comment)
+      body: JSON.stringify({ ...reviewData, user_id: memberId }), 
+    });
+    
+    return await response.json();
+  } catch (error) {
+    console.error("Error calling complete API:", error);
+    return { success: false, message: "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้" };
   }
 };
 
@@ -118,7 +184,6 @@ export const markNotificationAsRead = async (notificationId) => {
 // ========================================================
 export const getUserStats = async (userId) => {
   try {
-    // 💡 ปรับจาก API_URL เดิม (localhost) มาใช้ API_BASE_URL เพื่อป้องกันปัญหาเว็บบอร์ดพังเวลารันเครื่องอื่น
     const response = await axios.get(`${API_BASE_URL}/users/${userId}/stats`);
     return response.data;
   } catch (error) {
@@ -129,7 +194,8 @@ export const getUserStats = async (userId) => {
 
 export const updateUserProfile = async (memberId, formData) => {
   try {
-    const response = await axios.put(`${API_BASE_URL}/members/${memberId}`, formData, {
+    // 🌟 เปลี่ยนจาก /members/ เป็น /users/ ให้ตรงกับที่ Backend เปิดรับ
+    const response = await axios.put(`${API_BASE_URL}/users/${memberId}`, formData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },
@@ -147,10 +213,9 @@ export const updateUserProfile = async (memberId, formData) => {
 export const createReport = async (data) => {
   try {
     const response = await axios.post(`${API_BASE_URL}/reports`, data);
-    return response.data; // Backend คืนค่า { success: true, ProblemID: ... }
+    return response.data; 
   } catch (error) {
     console.error("Error creating report:", error);
-    // ส่ง Error Message ที่มาจาก Flask ไปให้หน้าบ้านแสดงผลต่อบน Toast
     throw error.response?.data || error;
   }
 };

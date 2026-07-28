@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
-import { ArrowLeft,MapPin,ArrowRightLeft,Star,MessageCircle,Globe,FileText,ChevronLeft,ChevronRight,ShieldAlert,Flag,CheckCircle,} from "lucide-react";
+import { ArrowLeft, MapPin, ArrowRightLeft, Star, MessageCircle, Globe, FileText, ChevronLeft, ChevronRight, ShieldAlert, Flag, CheckCircle, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -90,6 +90,11 @@ export default function PostDetail() {
 
   const isOwnPostView = location.state?.isOwnPostView || false;
   const fromAdmin = location.state?.fromAdmin || false;
+
+  const matchScore = location.state?.matchScore;
+  const isFromMatch = location.state?.fromMatch;
+  const matchData = location.state?.matchData;
+
 
   useEffect(() => {
     const fetchPostDetail = async () => {
@@ -416,6 +421,18 @@ export default function PostDetail() {
 
             {/* Right: Content */}
             <div className="space-y-6">
+              
+              {/* แถบแสดงคะแนนความเหมาะสมจาก AI (จะแสดงเมื่อกดมาจากหน้า MatchResults) */}
+              {matchScore !== undefined && (
+                <div className="bg-primary rounded-xl px-4 py-3 flex items-center justify-center gap-2 shadow-sm">
+                  <Sparkles className="h-4 w-4 text-primary-foreground" />
+                  <span className="text-sm font-semibold text-primary-foreground">
+                    คะแนนความเหมาะสมจาก AI: {matchScore}%
+                  </span>
+                </div>
+              )}
+
+              {/* ส่วน Title และ Date */}
               <div className="space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
@@ -538,24 +555,22 @@ export default function PostDetail() {
                     <ShieldAlert className="h-5 w-5 mr-2" />
                     กลับหน้า Admin
                   </Button>
-                ) : isFromIncomingRequest ||
-                  location.state?.fromPage === "incoming" ? (
-                  <Button
-                    variant="outline"
-                    className="w-full bg-muted/60 text-muted-foreground border-dashed border-muted-foreground/30 cursor-not-allowed flex items-center justify-center gap-2"
-                    size="lg"
-                    disabled={true}
-                  >
-                    <CheckCircle className="h-5 w-5 text-muted-foreground/70" />
-                    สิ่งของชิ้นนี้เสนอแลกเปลี่ยนกับคุณอยู่
-                    (อยู่ในขั้นตอนพิจารณาคำขอ)
-                  </Button>
                 ) : (
                   <Button
                     className="flex-1 eco-gradient text-primary-foreground shadow-sm"
                     size="lg"
                     disabled={isOwner}
-                    onClick={() => navigate(`/exchange-preview/post-${itemId}`)}
+                    onClick={() => {
+                      // 💡 เช็กว่าถ้ามาจากหน้า AI Match ให้ส่ง URL แบบ match พร้อมแนบข้อมูลไปด้วย
+                      if (isFromMatch && matchData) {
+                        navigate(`/exchange-preview/match-${matchData.myPost.ItemID}-${itemId}`, {
+                          state: { matchData: matchData }
+                        });
+                      } else {
+                        // กรณีเข้ามาดูโพสต์ปกติทั่วไป
+                        navigate(`/exchange-preview/post-${itemId}`);
+                      }
+                    }}
                   >
                     <MessageCircle className="h-4 w-4 mr-2" />
                     {isOwner ? "โพสต์ของคุณ" : "ส่งคำขอแลกเปลี่ยน"}

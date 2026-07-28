@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, ArrowRightLeft, ChevronRight } from "lucide-react";
+// 💡 แก้ไข: เพิ่ม Loader2 เข้ามาใน import แล้ว
+import { Bell, ArrowRightLeft, ChevronRight, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import AppLayout from "@/components/AppLayout";
 import { getNotifications, markNotificationAsRead } from "@/api/api"; 
@@ -22,7 +23,9 @@ interface NotificationItem {
 export default function Notifications() {
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-
+  // 💡 แก้ไข: ลบโค้ดที่เบิ้ลซ้ำในบรรทัดเดียวกันออก
+  const [processingIds, setProcessingIds] = useState<Set<number>>(new Set());
+  
   // 1. ดึงข้อมูลการแจ้งเตือนจาก API ทันทีเมื่อเปิดหน้าจอ
   useEffect(() => {
     const fetchNotifs = async () => {
@@ -41,26 +44,35 @@ export default function Notifications() {
   // 2. ฟังก์ชันจัดการเมื่อผู้ใช้งานคลิกเลือกที่กล่องการแจ้งเตือน
   const handleNotificationClick = async (e: React.MouseEvent, clickedNotif: NotificationItem) => {
     e.stopPropagation();
-
+    
+    // 💡 แก้ไข: ลบโค้ดที่เบิ้ลซ้ำในบรรทัดเดียวกันออก
+    if (processingIds.has(clickedNotif.NotificationID)) return;
+    
     try {
-      // ถ้าการแจ้งเตือนนี้ยังไม่ได้อ่าน (IsRead === 0) ให้ส่งคำขออัปเดตไปที่ฝั่งหลังบ้าน
       if (clickedNotif.IsRead === 0) {
+        // 🔒 บันทึก ID ลงใน State ว่า "กำลังโหลดนะ ห้ามกดซ้ำ"
+        setProcessingIds((prev) => new Set(prev).add(clickedNotif.NotificationID));
+
         await markNotificationAsRead(clickedNotif.NotificationID);
         
-        // ปรับสถานะใน State หน้าบ้านทันที เพื่อลบจุดส้มออก (โดยที่กล่องแจ้งเตือนไม่หายไป)
         setNotifications((prev) =>
           prev.map((n) =>
             n.NotificationID === clickedNotif.NotificationID ? { ...n, IsRead: 1 } : n
           )
         );
 
-        // ยิง Event เพื่อรีเฟรชและลดตัวเลข Badge บนกระดิ่งแจ้งเตือนที่ Navbar แถวบน
         window.dispatchEvent(new Event("notificationUpdate"));
       }
     } catch (error) {
       console.error("อัปเดตสถานะการอ่านล้มเหลว:", error);
     } finally {
-      // เปลี่ยนเส้นทางหน้าจอไปยังลิงก์ปลายทางที่แนบมากับแจ้งเตือนนั้นทันที
+      // 🔓 ปลดล็อก ID ออกจาก State เมื่อทำงานเสร็จ (ไม่ว่าจะสำเร็จหรือพัง)
+      setProcessingIds((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(clickedNotif.NotificationID);
+        return newSet;
+      });
+
       if (clickedNotif.Link) {
         navigate(clickedNotif.Link);
       }
@@ -69,7 +81,6 @@ export default function Notifications() {
 
   // 3. ฟังก์ชันแปลงและจัดฟอร์แมตข้อความแจ้งเตือนให้เป็นตัวหนาในจุดสำคัญ
   const formatNotificationMessage = (n: NotificationItem) => {
-    // 💡 กรณีที่ 1: ตรวจสอบข้อมูลหากหลังบ้านส่งมาในรูปแบบโครงสร้าง JSON string
     try {
       const jsonData = JSON.parse(n.Message);
       if (jsonData.sender_name || jsonData.SenderName) {
@@ -83,10 +94,9 @@ export default function Notifications() {
         );
       }
     } catch (e) {
-      // หากไม่ใช่โครงสร้าง JSON ให้ปล่อยผ่านไปทำงานในเงื่อนไขถัดไป
+      // ปล่อยผ่านไปทำงานในเงื่อนไขถัดไป
     }
 
-    // 💡 กรณีที่ 2: รองรับหากหลังบ้านแนบ Properties แยกมากับอ็อบเจกต์ตรง ๆ
     if (n.SenderName && n.SenderItemName && n.MyItemName) {
       return (
         <span>
@@ -95,7 +105,6 @@ export default function Notifications() {
       );
     }
 
-    // 💡 กรณีที่ 3: ตรวจจับและแยกคำจากข้อความยาวปกติของหลังบ้าน เพื่อเน้นตัวหนาให้สวยงามยิ่งขึ้น
     const msg = n.Message;
     if (msg && msg.includes("จาก") && msg.includes("ต้องการแลก") && msg.includes("กับ")) {
       try {
@@ -115,11 +124,10 @@ export default function Notifications() {
           </span>
         );
       } catch (err) {
-        // ป้องกันกรณีแบ่งคำล้มเหลว ให้กลับไปใช้ข้อความดิบ
+        // ป้องกันกรณีแบ่งคำล้มเหลว
       }
     }
 
-    // กรณีข้อความระบบทั่วไป ให้ส่งค่ากลับไปแสดงผลตรง ๆ
     return <span>{n.Message}</span>;
   };
 
@@ -144,21 +152,23 @@ export default function Notifications() {
         ) : (
           <div className="space-y-3">
             {notifications.map((n) => {
+              const isProcessing = processingIds.has(n.NotificationID);
+
               return (
                 <Card 
                   key={n.NotificationID} 
-                  className={`glass-card cursor-pointer hover:border-primary/40 hover:bg-muted/10 transition-all duration-200 shadow-sm ${
-                    n.IsRead === 0 ? "border-primary/30 bg-primary/5 ring-1 ring-primary/10" : ""
+                  className={`glass-card transition-all duration-200 shadow-sm ${
+                    isProcessing ? "opacity-70 cursor-not-allowed" : "cursor-pointer hover:border-primary/40 hover:bg-muted/10"
+                  } ${
+                    n.IsRead === 0 && !isProcessing ? "border-primary/30 bg-primary/5 ring-1 ring-primary/10" : ""
                   }`} 
                   onClick={(e) => handleNotificationClick(e, n)}
                 >
                   <CardContent className="p-4 flex items-center gap-3">
-                    {/* ไอคอนสัญลักษณ์ประเภทแจ้งเตือนการแลกเปลี่ยน */}
                     <div className={`p-2 rounded-full shrink-0 ${n.IsRead === 0 ? "bg-primary/10" : "bg-muted"}`}>
                       <ArrowRightLeft className={`h-4 w-4 ${n.IsRead === 0 ? "text-primary" : "text-muted-foreground"}`} />
                     </div>
                     
-                    {/* บล็อกเนื้อหาข้อความรายละเอียดผู้เสนอและสิ่งของ */}
                     <div className="flex-1 min-w-0">
                       <div className={`text-sm leading-relaxed ${n.IsRead === 0 ? "text-foreground font-medium" : "text-muted-foreground"}`}>
                         {formatNotificationMessage(n)}
@@ -168,10 +178,15 @@ export default function Notifications() {
                       </p>
                     </div>
 
-                    {/* สัญลักษณ์สถานะฝั่งขวา: จุดกะพริบสีส้ม (เมื่อยังไม่ได้อ่าน) และลูกศรนำทาง */}
                     <div className="flex items-center gap-2 shrink-0">
-                      {n.IsRead === 0 && <span className="h-2 w-2 rounded-full bg-orange-500 shrink-0 animate-pulse" />}
-                      <ChevronRight className="h-4 w-4 text-muted-foreground opacity-60" />
+                      {isProcessing ? (
+                        <Loader2 className="h-4 w-4 text-primary animate-spin" />
+                      ) : (
+                        <>
+                          {n.IsRead === 0 && <span className="h-2 w-2 rounded-full bg-orange-500 shrink-0 animate-pulse" />}
+                          <ChevronRight className="h-4 w-4 text-muted-foreground opacity-60" />
+                        </>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

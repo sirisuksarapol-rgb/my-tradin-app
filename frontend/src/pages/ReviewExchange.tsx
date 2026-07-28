@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import AppLayout from "@/components/AppLayout";
 import { useToast } from "@/hooks/use-toast";
+import { completeExchange } from "@/api/api";
 
 export default function ReviewExchange() {
   const { matchId } = useParams();
@@ -14,14 +15,38 @@ export default function ReviewExchange() {
   const [rating, setRating] = useState(0);
   const [hovered, setHovered] = useState(0);
   const [review, setReview] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (rating === 0) {
       toast({ title: "กรุณาให้คะแนน", variant: "destructive" });
       return;
     }
-    toast({ title: "ขอบคุณสำหรับรีวิว!", description: "คะแนนและรีวิวถูกบันทึกแล้ว" });
-    navigate("/matching");
+
+    try {
+      setIsSubmitting(true);
+      
+      // 🌟 2. เรียกใช้ API เพื่อส่งข้อมูลกลับไปที่ Backend 
+      // (ระบบหลังบ้านจะต้องรับค่าไปอัปเดต Status เป็น 'completed' พร้อมบันทึก Score และ Comment)
+      const response = await completeExchange(matchId, {
+        score: rating,
+        comment: review
+      });
+
+      if (response.success) {
+        toast({ title: "ขอบคุณสำหรับรีวิว!", description: "การแลกเปลี่ยนเสร็จสมบูรณ์แล้ว" });
+        // 🌟 3. ส่งกลับไปหน้าประวัติแทน เพื่อให้ผู้ใช้เห็นว่าของไปอยู่ในแท็บ "สำเร็จ" แล้ว
+        navigate("/exchange-history"); 
+      } else {
+        toast({ title: "เกิดข้อผิดพลาด", description: response.message, variant: "destructive" });
+      }
+
+    } catch (error) {
+      console.error("Error submitting review:", error);
+      toast({ title: "ระบบขัดข้อง", description: "ไม่สามารถบันทึกรีวิวได้ในขณะนี้", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -77,8 +102,13 @@ export default function ReviewExchange() {
               rows={4}
             />
 
-            <Button className="w-full eco-gradient text-primary-foreground" onClick={handleSubmit}>
-              <Send className="h-4 w-4 mr-1" /> ส่งรีวิว
+            <Button 
+              className="w-full eco-gradient text-primary-foreground" 
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+            >
+              <Send className="h-4 w-4 mr-1" /> 
+              {isSubmitting ? "กำลังบันทึกข้อมูล..." : "ส่งรีวิว"}
             </Button>
           </CardContent>
         </Card>
