@@ -91,7 +91,6 @@ export default function Register() {
         submitData.append("profile_image", selectedFile);
       }
 
-      // ยิงไปที่ Blueprint "register" ของ Flask
       const response = await fetch(`${API_BASE_URL}/register`, {
         method: "POST",
         body: submitData,
@@ -105,7 +104,7 @@ export default function Register() {
         toast({ title: "ส่งรหัสยืนยันแล้ว", description: "กรุณาตรวจสอบรหัส OTP ในอีเมลของคุณ" });
       } else {
         toast({ title: "เกิดข้อผิดพลาด", description: data.message || "อีเมลนี้อาจมีผู้ใช้งานแล้ว", variant: "destructive" });
-        setStep("form"); // กลับไปหน้าแก้ข้อมูลหากอีเมลซ้ำ
+        setStep("form");
       }
     } catch (error) {
       toast({ title: "เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ", description: "กรุณาตรวจสอบการรัน Backend", variant: "destructive" });
@@ -122,7 +121,6 @@ export default function Register() {
     setIsLoading(true);
     
     try {
-      // ยิงไปที่ Blueprint "verify" ของ Flask
       const response = await fetch(`${API_BASE_URL}/verify-email`, {
         method: "POST",
         headers: {
@@ -140,7 +138,7 @@ export default function Register() {
         setStep("success");
       } else {
         toast({ title: "ยืนยันไม่สำเร็จ", description: data.message || "รหัส OTP ไม่ถูกต้องหรือหมดอายุ", variant: "destructive" });
-        setOtp(""); // เคลียร์ช่องให้กรอกใหม่
+        setOtp("");
       }
     } catch (error) {
       toast({ title: "เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ", variant: "destructive" });
@@ -149,7 +147,6 @@ export default function Register() {
     }
   };
 
-  // จัดการเวลา OTP
   useEffect(() => {
     if (step !== "otp" || timeLeft <= 0) {
       if (timeLeft <= 0 && step === "otp") {
@@ -215,7 +212,7 @@ export default function Register() {
 
             {/* ขั้นตอน 1: กรอกฟอร์ม */}
             {step === "form" && (
-              <Card className="glass-card border-border/50 shadow-xl">
+              <Card className="glass-card border-border/50 shadow-xl animate-in fade-in duration-300">
                 <CardHeader className="text-center pb-2">
                   <h2 className="text-xl font-bold">สมัครสมาชิก</h2>
                   <p className="text-sm text-muted-foreground">เริ่มต้นการแลกเปลี่ยนได้ที่นี่</p>
@@ -280,7 +277,7 @@ export default function Register() {
 
             {/* ขั้นตอน 2: พรีวิวและยืนยันเพื่อยิง API เข้า Database */}
             {step === "preview" && (
-              <Card className="glass-card border-border/50 shadow-xl">
+              <Card className="glass-card border-border/50 shadow-xl animate-in fade-in duration-300">
                 <CardContent className="pt-6 space-y-6 text-center">
                   <Avatar className="h-24 w-24 mx-auto border-4 border-primary/10">
                     <AvatarImage src={profileImagePreview || ""} />
@@ -291,7 +288,6 @@ export default function Register() {
                     <div className="flex justify-between items-center"><span className="opacity-60">อีเมล</span><b>{formData.email}</b></div>
                   </div>
                   
-                  {/* ปุ่มนี้คือจุดที่ทำการ Insert ลง Database */}
                   <Button onClick={handleRegister} disabled={isLoading} className="w-full eco-gradient h-12 font-bold">
                     {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> กำลังประมวลผล...</> : "ยืนยันและรับรหัส OTP"}
                   </Button>
@@ -305,7 +301,7 @@ export default function Register() {
 
             {/* ขั้นตอน 3: กรอกรหัส OTP (ยิง API ตรวจสอบกับ Database) */}
             {step === "otp" && (
-              <Card className="glass-card border-border/50 shadow-xl">
+              <Card className="glass-card border-border/50 shadow-xl animate-in fade-in duration-300">
                 <CardContent className="pt-8 space-y-6 text-center">
                   <div className="h-14 w-14 bg-primary/10 rounded-full flex items-center justify-center mx-auto text-primary animate-pulse"><Mail /></div>
                   <div className="space-y-1">
@@ -325,7 +321,6 @@ export default function Register() {
                     </InputOTP>
                   </div>
                   
-                  {/* ปุ่มนี้คือจุดที่ตรวจสอบ Update verified=1 ใน Database */}
                   <Button onClick={handleVerifyOTP} disabled={isLoading || otp.length < 6} className="w-full eco-gradient h-12 font-bold">
                      {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> กำลังตรวจสอบ...</> : "ยืนยันรหัส"}
                   </Button>
@@ -335,7 +330,7 @@ export default function Register() {
 
             {/* ขั้นตอน 4: สมัครสำเร็จ */}
             {step === "success" && (
-              <Card className="glass-card border-border/50 shadow-xl py-6 text-center">
+              <Card className="glass-card border-border/50 shadow-xl py-6 text-center animate-in fade-in duration-300">
                 <CardContent className="space-y-4">
                   <div className="h-20 w-20 bg-green-500/10 rounded-full flex items-center justify-center mx-auto text-green-500 animate-bounce"><CheckCircle2 size={40} /></div>
                   <h2 className="text-2xl font-black">สมัครสำเร็จ! 🎉</h2>

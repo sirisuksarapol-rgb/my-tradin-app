@@ -50,12 +50,11 @@ export default function EditPost() {
   const [category, setCategory] = useState("");
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
- 
+
   useEffect(() => {
     const fetchCategoriesData = async () => {
       try {
         const res = await getCategories(); 
-        // เซ็ตข้อมูลลง State (สมมติว่า API ส่งข้อมูลกลับมาในรูปแบบ Array ผ่าน res.data)
         setCategoriesList(res.data || []);
       } catch (error) {
         console.error("Error fetching categories:", error);
@@ -64,24 +63,11 @@ export default function EditPost() {
     
     fetchCategoriesData();
   }, []);
-  // กรอง "ทั้งหมด" ออกเหมือนเดิม
+
+  // กรอง "ทั้งหมด" ออก
   const filteredCategories = categoriesList.filter(
-  (cat) => cat.CategoryName !== "ทั้งหมด"
-);
-  
-  useEffect(() => {
-  const fetchCategoriesData = async () => {
-    try {
-      const res = await getCategories(); 
-      // 💡 เปิด F12 ดูในหน้าเว็บว่าอันนี้แสดงผลออกมาเป็นแบบไหน
-      console.log("โครงสร้างข้อมูล Categories จากหลังบ้าน:", res.data); 
-      setCategoriesList(res.data || []);
-    } catch (error) {
-      console.error("Error fetching categories:", error);
-    }
-  };
-  fetchCategoriesData();
-}, []);
+    (cat) => cat.CategoryName !== "ทั้งหมด"
+  );
 
   // 1. ดึงข้อมูลโพสต์เดิมมาจัดใส่ฟอร์ม
   useEffect(() => {
@@ -91,7 +77,6 @@ export default function EditPost() {
         const res = await getItems();
         const items: DBItemDetail[] = res.data || [];
         
-        // ค้นหาโพสต์ที่รหัสตรงกันโดยระบุประเภทข้อมูลชัดเจนแทน any
         const currentPost = items.find((p: DBItemDetail) => String(p.ItemID) === String(postId));
 
         if (currentPost) {
@@ -104,19 +89,16 @@ export default function EditPost() {
           setMemberId(currentPost.MemberID || "");
           setCategory(currentPost.CategoryName || "");
 
-          // 💡 แก้ไข: ใช้ ItemImage สร้าง URL รูปภาพเองเลย เพราะ Backend อาจส่ง image_paths มาเป็น Array ว่าง
           if (currentPost.ItemImage) {
-            // แยกชื่อไฟล์ดิบ (เช่น "รูป1.jpg", "รูป2.jpg")
             const rawNames = currentPost.ItemImage
               .split(",")
               .map((name: string) => name.trim())
               .filter((name: string) => name !== "");
             
-            // นำชื่อไฟล์มาต่อกับ BASE URL เพื่อให้ Frontend แสดงรูปตัวอย่างได้ทันที
             const imageUrls = rawNames.map((name: string) => `${IMAGE_BASE_URL}/uploads/${name}`);
             
-            setImages(imageUrls);     // เอาไว้แสดงรูปพรีวิวบนหน้าจอ
-            setImageFiles(rawNames);  // เอาไว้เก็บชื่อไฟล์ดิบ เพื่อส่งยืนยันให้ Backend ว่าเรายังเก็บรูปเดิมไว้
+            setImages(imageUrls);
+            setImageFiles(rawNames);
           }
         }
       } catch (error) {
@@ -224,10 +206,12 @@ export default function EditPost() {
       
       formData.append("existing_images", existingImages.join(","));
 
-      // 💡 เรียกใช้ฟังก์ชันอัปเดตผ่าน api.js
       if (postId) {
         await updateItem(Number(postId), formData);
-        toast({ title: "บันทึกการแก้ไขเรียบร้อยแล้ว!" });
+        toast({ 
+          title: "สำเร็จ",
+          description: "บันทึกการแก้ไขเรียบร้อยแล้ว" 
+        });
         navigate("/my-posts");
       }
     } catch (error) {
@@ -327,33 +311,32 @@ export default function EditPost() {
                 </div>
 
                 <div className="space-y-2">
-  <Label className={`font-semibold ${errors.category ? "text-red-500" : ""}`}>
-    หมวดหมู่ <span className="text-red-500">*</span>
-  </Label>
-  
-  <Select 
-    // 💡 ใช้ category_id ในการคุมค่าเปิด-ปิด และแปลงเป็น String เสมอ
-    value={categoryId ? String(categoryId) : ""} 
-    onValueChange={(val) => { 
-      setCategoryId(Number(val)); // แปลงกลับเป็น Number ตอนเซ็ตค่ากลับเข้า State
-      if (errors.category) setErrors(prev => ({ ...prev, category: "" }));
-    }}
-  >
-    <SelectTrigger className={`h-11 ${errors.category ? "border-red-500 ring-red-500" : ""}`}>
-      <SelectValue placeholder="เลือกหมวดหมู่" />
-    </SelectTrigger>
-    <SelectContent>
-      {filteredCategories.map((cat) => (
-        // 💡 เปลี่ยนมาใช้ cat.CategoryID และ cat.CategoryName ตัวพิมพ์เล็กตาม API เป๊ะๆ
-        <SelectOption key={cat.CategoryID} value={String(cat.CategoryID)}>
-          {cat.CategoryName}
-        </SelectOption>
-      ))}
-    </SelectContent>
-  </Select>
-  
-  {errors.category && <p className="text-xs text-red-500">{errors.category}</p>}
-</div>
+                  <Label className={`font-semibold ${errors.category ? "text-red-500" : ""}`}>
+                    หมวดหมู่ <span className="text-red-500">*</span>
+                  </Label>
+                  
+                  <Select 
+                    value={categoryId ? String(categoryId) : ""} 
+                    onValueChange={(val) => { 
+                      setCategoryId(Number(val));
+                      if (errors.category) setErrors(prev => ({ ...prev, category: "" }));
+                    }}
+                  >
+                    <SelectTrigger className={`h-11 ${errors.category ? "border-red-500 ring-red-500" : ""}`}>
+                      <SelectValue placeholder="เลือกหมวดหมู่" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {filteredCategories.map((cat) => (
+                        <SelectOption key={cat.CategoryID} value={String(cat.CategoryID)}>
+                          {cat.CategoryName}
+                        </SelectOption>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  
+                  {errors.category && <p className="text-xs text-red-500">{errors.category}</p>}
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="desc" className={`font-semibold ${errors.description ? "text-red-500" : ""}`}>
                     รายละเอียดสินค้า <span className="text-red-500">*</span>
@@ -421,7 +404,13 @@ export default function EditPost() {
                   <Button type="submit" className="flex-1 h-12 text-base font-bold shadow-lg">
                     บันทึกการแก้ไข
                   </Button>
-                  <Button type="button" variant="secondary" className="sm:w-auto hover:bg-orange-500/85 hover:text-white" onClick={() => navigate(-1)}>
+                  {/* 💡 ปรับปุ่มยกเลิกให้สูง h-12 และมีขนาดตัวหนังสือ text-base font-bold เท่ากับปุ่มส่งข้อมูล */}
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    className="h-12 text-base font-bold px-6 sm:w-auto hover:bg-orange-500/85 hover:text-white" 
+                    onClick={() => navigate(-1)}
+                  >
                     ยกเลิก
                   </Button>
                 </div>

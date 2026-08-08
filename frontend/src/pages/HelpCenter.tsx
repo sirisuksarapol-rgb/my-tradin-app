@@ -5,21 +5,18 @@ import { MessageCircle, Bug, Lightbulb, HelpCircle, Send, CheckCircle, FileText,
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
-
-// 🚀 นำเข้าฟังก์ชันจากไฟล์ api.js ส่วนกลางของคุณ
 import { createReport } from "@/api/api";
 
-// กำหนด Type ของประเภทปัญหาให้ชัดเจนแทนการใช้ string หว่านแห
 type ProblemCategory = "bug" | "suggestion" | "other";
 
 interface CategoryItem {
    value: ProblemCategory;
    label: string;
+   sublabel: string;
    icon: React.ComponentType<{ className?: string }>;
    color: string;
 }
 
-// โครงสร้างข้อมูลสมาชิกที่เก็บใน LocalStorage
 interface LocalUser {
    id?: string | number;
    MemberID?: string | number;
@@ -27,7 +24,6 @@ interface LocalUser {
    user_id?: string | number;
 }
 
-// โครงสร้างข้อผิดพลาดที่ส่งมาจาก Axios / Backend
 interface AxiosErrorResponse {
    response?: {
       data?: {
@@ -38,9 +34,27 @@ interface AxiosErrorResponse {
 }
 
 const categories: CategoryItem[] = [
-   { value: "bug", label: "แจ้งปัญหาระบบ", icon: Bug, color: "text-destructive" },
-   { value: "suggestion", label: "ข้อเสนอแนะ", icon: Lightbulb, color: "text-accent" },
-   { value: "other", label: "อื่น ๆ", icon: HelpCircle, color: "text-primary" },
+   { 
+      value: "bug", 
+      label: "แจ้งปัญหาระบบ", 
+      sublabel: "ระบบทำงานผิดปกติ บั๊ก หรือแสดงผลผิดพลาด",
+      icon: Bug, 
+      color: "text-destructive" 
+   },
+   { 
+      value: "suggestion", 
+      label: "ข้อเสนอแนะ", 
+      sublabel: "เสนอไอเดียหรือฟีเจอร์ที่อยากให้มีเพิ่มเติม",
+      icon: Lightbulb, 
+      color: "text-amber-500" 
+   },
+   { 
+      value: "other", 
+      label: "สอบถามอื่น ๆ", 
+      sublabel: "ข้อสงสัยการใช้งาน หรือต้องการความช่วยเหลือทั่วไป",
+      icon: HelpCircle, 
+      color: "text-primary" 
+   },
 ];
 
 export default function HelpCenter() {
@@ -64,31 +78,32 @@ export default function HelpCenter() {
 
          if (!memberId) {
              toast({ 
-                 title: "เกิดข้อผิดพลาด", 
-                 description: "กรุณาเข้าสู่ระบบก่อนทำการส่งรายงาน",
+                 title: "เข้าสู่ระบบก่อนทำรายการ", 
+                 description: "กรุณาเข้าสู่ระบบก่อนทำการส่งรายงานปัญหา",
                  variant: "destructive"
              });
              return;
          }
 
+         // แก้ไข Payload: กำหนด ReportedMemberID เป็น null เพื่อไม่ให้เป็นการรีพอร์ตตัวเอง
          const payload = {
              MemberID: Number(memberId),
              ProblemType: category,
-             HelpCenterData: message,
-             ReportedMemberID: Number(memberId), 
+             HelpCenterData: message.trim(),
+             ReportedMemberID: null, 
              ItemID: null
          };
 
          const result = await createReport(payload);
 
-         if (result && result.success) {
+         if (result && (result.success || result.ProblemID)) {
              setMessage("");
              setSubmitted(true);
              toast({ 
                  title: "ส่งข้อมูลเรียบร้อยแล้ว", 
-                 description: "ทีมงานจะตรวจสอบข้อมูลของคุณเร็ว ๆ นี้" 
+                 description: "ทีมงานได้รับข้อมูลแล้ว และจะดำเนินการตรวจสอบให้เร็วที่สุด" 
              });
-             setTimeout(() => setSubmitted(false), 3000);
+             setTimeout(() => setSubmitted(false), 4000);
          } else {
              throw new Error(result?.message || "ไม่สามารถส่งข้อมูลได้");
          }
@@ -111,37 +126,57 @@ export default function HelpCenter() {
    return (
       <AppLayout>
          <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-            <div className="flex items-center gap-2 mb-8">
-               <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-                  <ArrowLeft className="h-5 w-5" />
-               </Button>
+            {/* Navigation Header */}
+            <div className="flex items-center gap-2 mb-6">
+               <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate(-1)}
+                className="-ml-2"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
                <FileText className="h-5 w-5 text-primary" />
-               <h1 className="text-xl font-bold">ศูนย์ช่วยเหลือ</h1>
+               <h1 className="text-lg font-semibold">ศูนย์ช่วยเหลือ</h1>
             </div>
 
-            {/* Header */}
-            <div className="text-center mb-10 space-y-3">
-               <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/10 mb-4">
-                  <MessageCircle className="w-7 h-7 text-primary" />
+            {/* Banner Header */}
+            <div className="text-center mb-8 space-y-2">
+               <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-primary/10 mb-2">
+                  <MessageCircle className="w-6 h-6 text-primary" />
                </div>
-               <h1 className="text-3xl font-bold text-foreground tracking-tight">ศูนย์ช่วยเหลือ</h1>
-               <p className="text-muted-foreground mt-2">แจ้งปัญหาหรือส่งข้อเสนอแนะ เราพร้อมรับฟังเสมอ</p>
+               <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">เราพร้อมช่วยเหลือคุณ</h1>
+               <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                  แจ้งปัญหาการใช้งาน หรือส่งข้อเสนอแนะเพื่อให้เราพัฒนาบริการให้ดียิ่งขึ้น
+               </p>
             </div>
 
             {/* Category Selector */}
-            <div className="grid grid-cols-3 gap-3 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
                {categories.map((cat) => {
                   const Icon = cat.icon;
                   const isActive = category === cat.value;
                   return (
                      <button
                         key={cat.value}
+                        type="button"
                         onClick={() => setCategory(cat.value)}
-                        className={`relative flex flex-col items-center gap-2 rounded-xl border-2 px-4 py-5 text-sm font-medium transition-all duration-200 ${isActive ? "border-primary bg-primary/5 shadow-sm" : "border-border bg-card hover:border-muted-foreground/30 hover:shadow-sm"}`}
+                        className={`relative flex flex-col items-start p-4 rounded-xl border-2 text-left transition-all duration-200 ${
+                           isActive 
+                             ? "border-primary bg-primary/5 shadow-sm" 
+                             : "border-border bg-card hover:border-muted-foreground/30 hover:shadow-sm"
+                        }`}
                      >
-                        <Icon className={`w-6 h-6 ${isActive ? cat.color : "text-muted-foreground"}`} />
-                        <span className={isActive ? "text-foreground" : "text-muted-foreground"}>{cat.label}</span>
-                        {isActive && <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-primary" />}
+                        <div className="flex items-center justify-between w-full mb-2">
+                           <Icon className={`w-5 h-5 ${isActive ? cat.color : "text-muted-foreground"}`} />
+                           {isActive && <span className="w-2 h-2 rounded-full bg-primary" />}
+                        </div>
+                        <span className={`font-semibold text-sm ${isActive ? "text-foreground" : "text-muted-foreground"}`}>
+                           {cat.label}
+                        </span>
+                        <span className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                           {cat.sublabel}
+                        </span>
                      </button>
                   );
                })}
@@ -149,29 +184,34 @@ export default function HelpCenter() {
 
             {/* Form Card */}
             <Card className="border-border shadow-sm">
-               <CardContent className="p-6 space-y-5">
+               <CardContent className="p-6 space-y-4">
                   <div>
-                     <label className="block text-sm font-medium text-foreground mb-2">รายละเอียด</label>
+                     <div className="flex justify-between items-center mb-2">
+                        <label className="text-sm font-medium text-foreground">รายละเอียดปัญหา / ข้อเสนอแนะ</label>
+                        <span className="text-xs text-muted-foreground">{message.length}/1000</span>
+                     </div>
                      <textarea
-                        className="w-full h-32 p-3 border rounded-md focus:ring-2 focus:ring-primary/50 focus:outline-none resize-none transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-background"
-                        placeholder="อธิบายปัญหาหรือข้อเสนอแนะของคุณ..."
+                        className="w-full h-36 p-3 border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary focus:outline-none resize-none transition-colors disabled:cursor-not-allowed disabled:opacity-50 bg-background text-sm"
+                        placeholder="อธิบายรายละเอียด สิ่งที่เกิดขึ้น หรือขั้นตอนการพบปัญหาเพื่อให้ทีมงานตรวจสอบได้รวดเร็วขึ้น..."
                         value={message}
+                        maxLength={1000}
                         onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setMessage(e.target.value)}
                         disabled={isLoading}
                      />
                   </div>
+
                   <Button 
                      onClick={submit} 
                      disabled={!message.trim() || submitted || isLoading} 
-                     className="w-full gap-2 eco-gradient text-primary-foreground transition-all" 
+                     className="w-full gap-2 text-primary-foreground transition-all rounded-xl" 
                      size="lg"
                   >
                      {isLoading ? (
                         <><Loader2 className="w-4 h-4 animate-spin" /> กำลังส่งข้อมูล...</>
                      ) : submitted ? (
-                        <><CheckCircle className="w-4 h-4" /> ส่งข้อมูลเรียบร้อย!</>
+                        <><CheckCircle className="w-4 h-4 text-emerald-400" /> ส่งข้อมูลเรียบร้อยแล้ว!</>
                      ) : (
-                        <><Send className="w-4 h-4" /> ส่งข้อมูล</>
+                        <><Send className="w-4 h-4" /> ส่งรายงาน</>
                      )}
                   </Button>
                </CardContent>

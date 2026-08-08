@@ -1,6 +1,20 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
-import { ArrowLeft, MapPin, ArrowRightLeft, Star, MessageCircle, Globe, FileText, ChevronLeft, ChevronRight, ShieldAlert, Flag, CheckCircle, Sparkles } from "lucide-react";
+import {
+  ArrowLeft,
+  MapPin,
+  ArrowRightLeft,
+  Star,
+  MessageCircle,
+  Globe,
+  FileText,
+  ChevronLeft,
+  ChevronRight,
+  ShieldAlert,
+  Flag,
+  CheckCircle,
+  Sparkles,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,10 +22,21 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import AppLayout from "@/components/AppLayout";
 import { useToast } from "@/hooks/use-toast";
-import {Dialog,DialogContent,DialogFooter,DialogHeader,DialogTitle,} from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { getItems as fetchItemsAPI, getUserStats, IMAGE_BASE_URL } from "@/api/api";
+import {
+  getItems as fetchItemsAPI,
+  getUserStats,
+  IMAGE_BASE_URL,
+} from "@/api/api";
 import { createReport } from "@/api/api";
+import ReportModal from "@/components/ReportModal";
 
 interface DBItemDetail {
   ItemID?: number;
@@ -94,7 +119,6 @@ export default function PostDetail() {
   const matchScore = location.state?.matchScore;
   const isFromMatch = location.state?.fromMatch;
   const matchData = location.state?.matchData;
-
 
   useEffect(() => {
     const fetchPostDetail = async () => {
@@ -269,59 +293,45 @@ export default function PostDetail() {
     setCurrentImageIndex((p) => (p === 0 ? images.length - 1 : p - 1));
 
   const handleReport = async () => {
-
     if (!reportReason.trim()) {
+      toast({
+        title: "กรุณาระบุเหตุผล",
+        variant: "destructive",
+      });
 
-        toast({
-            title: "กรุณาระบุเหตุผล",
-            variant: "destructive"
-        });
-
-        return;
+      return;
     }
 
     try {
+      await createReport({
+        ItemID: itemId,
 
-        await createReport({
+        MemberID: user.MemberID,
 
-            ItemID: itemId,
+        ProblemType: "รายงานโพสต์",
 
-            MemberID: user.MemberID,
+        HelpCenterData: reportReason,
+      });
 
-            ProblemType: "รายงานโพสต์",
+      toast({
+        title: "ส่งรายงานสำเร็จ",
 
-            HelpCenterData: reportReason
+        description: "ขอบคุณสำหรับการแจ้งปัญหา",
+      });
 
-        });
+      setReportReason("");
 
-        toast({
+      setIsReportOpen(false);
+    } catch (err) {
+      console.log(err);
 
-            title: "ส่งรายงานสำเร็จ",
+      toast({
+        title: "ส่งรายงานไม่สำเร็จ",
 
-            description: "ขอบคุณสำหรับการแจ้งปัญหา"
-
-        });
-
-        setReportReason("");
-
-        setIsReportOpen(false);
-
+        variant: "destructive",
+      });
     }
-    catch(err){
-
-        console.log(err);
-
-        toast({
-
-            title:"ส่งรายงานไม่สำเร็จ",
-
-            variant:"destructive"
-
-        });
-
-    }
-
-};
+  };
 
   return (
     <AppLayout>
@@ -421,7 +431,6 @@ export default function PostDetail() {
 
             {/* Right: Content */}
             <div className="space-y-6">
-              
               {/* แถบแสดงคะแนนความเหมาะสมจาก AI (จะแสดงเมื่อกดมาจากหน้า MatchResults) */}
               {matchScore !== undefined && (
                 <div className="bg-primary rounded-xl px-4 py-3 flex items-center justify-center gap-2 shadow-sm">
@@ -501,7 +510,7 @@ export default function PostDetail() {
                   authorName,
                   authorEmail,
                   rawProfileImg,
-                  authorRating: realRating,       // 💡 ผูกข้อมูลจริงเรียบร้อย
+                  authorRating: realRating, // 💡 ผูกข้อมูลจริงเรียบร้อย
                   authorExchanges: realExchanges, // 💡 ผูกข้อมูลจริงเรียบร้อย
                 }}
               >
@@ -517,7 +526,9 @@ export default function PostDetail() {
                           />
                         ) : null}
                         <AvatarFallback className="eco-gradient text-primary-foreground font-bold text-lg">
-                          {authorName ? authorName.charAt(0).toUpperCase() : "U"}
+                          {authorName
+                            ? authorName.charAt(0).toUpperCase()
+                            : "U"}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
@@ -563,9 +574,12 @@ export default function PostDetail() {
                     onClick={() => {
                       // 💡 เช็กว่าถ้ามาจากหน้า AI Match ให้ส่ง URL แบบ match พร้อมแนบข้อมูลไปด้วย
                       if (isFromMatch && matchData) {
-                        navigate(`/exchange-preview/match-${matchData.myPost.ItemID}-${itemId}`, {
-                          state: { matchData: matchData }
-                        });
+                        navigate(
+                          `/exchange-preview/match-${matchData.myPost.ItemID}-${itemId}`,
+                          {
+                            state: { matchData: matchData },
+                          },
+                        );
                       } else {
                         // กรณีเข้ามาดูโพสต์ปกติทั่วไป
                         navigate(`/exchange-preview/post-${itemId}`);
@@ -583,39 +597,13 @@ export default function PostDetail() {
       </section>
 
       {/* Report Dialog */}
-      <Dialog open={isReportOpen} onOpenChange={setIsReportOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>รายงานโพสต์ที่ไม่เหมาะสม</DialogTitle>
-            <div className="p-3 mt-2 bg-muted/50 rounded-lg border border-border/50">
-              <p className="text-xs text-muted-foreground mb-1">
-                คุณกำลังรายงานโพสต์:
-              </p>
-              <p className="font-semibold text-sm line-clamp-1">{title}</p>
-            </div>
-          </DialogHeader>
-          <div className="space-y-3 py-2">
-            <Textarea
-              placeholder="ระบุเหตุผลที่รายงานโพสต์นี้ (เช่น สินค้าผิดกฎหมาย, ข้อมูลเท็จ, สแปม, หลอกลวง...)"
-              value={reportReason}
-              onChange={(e) => setReportReason(e.target.value)}
-              className="min-h-[120px] resize-none"
-            />
-          </div>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="ghost" onClick={() => setIsReportOpen(false)}>
-              ยกเลิก
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleReport}
-              disabled={!reportReason.trim()}
-            >
-              ส่งรายงาน
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ReportModal
+        isOpen={isReportOpen}
+        onClose={() => setIsReportOpen(false)}
+        targetType="item" // หรือใช้ "user" ถ้าเป็นหน้าโปรไฟล์
+        targetId={itemId}
+        targetTitle={title}
+      />
     </AppLayout>
   );
 }

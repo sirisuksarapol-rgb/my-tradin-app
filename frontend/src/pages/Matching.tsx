@@ -12,13 +12,38 @@ import AppLayout from "@/components/AppLayout";
 // เรียกฟังก์ชันจาก API ไฟล์ตั้งค่าหลัก
 import { getItems as fetchItemsAPI, IMAGE_BASE_URL, getExchanges } from "@/api/api"; 
 
+// 🌟 ปรับ Configuration สีและไอคอนให้ตรงกับสถานะจริงในฐานข้อมูล
 const statusConfig = {
-  pending: { label: "รอตอบรับ", icon: Clock, className: "bg-warning/10 text-warning" },
-  accepted: { label: "ตอบรับแล้ว", icon: CheckCircle, className: "bg-success/10 text-success" },
-  rejected: { label: "ปฏิเสธ", icon: XCircle, className: "bg-destructive/10 text-destructive" },
-  in_progress: { label: "ดำเนินการ", icon: ArrowRightLeft, className: "bg-info/10 text-info" },
-  completed: { label: "สำเร็จ", icon: CheckCircle, className: "bg-success/10 text-success" },
-  failed: { label: "ไม่สำเร็จ", icon: XCircle, className: "bg-destructive/10 text-destructive" }
+  pending: { 
+    label: "รอตอบรับ", 
+    icon: Clock, 
+    className: "bg-amber-500/10 text-amber-600 border border-amber-300" 
+  },
+  accepted: { 
+    label: "ตอบรับแล้ว (รอยืนยันตัวตน)", 
+    icon: CheckCircle, 
+    className: "bg-blue-500/10 text-blue-600 border border-blue-300" 
+  },
+  in_progress: { 
+    label: "กำลังดำเนินการ (นัดแลกของ)", 
+    icon: ArrowRightLeft, 
+    className: "bg-purple-500/10 text-purple-600 border border-purple-300" 
+  },
+  completed: { 
+    label: "สำเร็จแล้ว", 
+    icon: CheckCircle, 
+    className: "bg-emerald-500/10 text-emerald-600 border border-emerald-300" 
+  },
+  rejected: { 
+    label: "ถูกปฏิเสธ", 
+    icon: XCircle, 
+    className: "bg-rose-500/10 text-rose-600 border border-rose-300" 
+  },
+  failed: { 
+    label: "ยกเลิกแล้ว", 
+    icon: AlertCircle, 
+    className: "bg-slate-500/10 text-slate-600 border border-slate-300" 
+  }
 };
 
 type StatusFilterType = "all" | "pending" | "accepted" | "in_progress" | "completed" | "rejected" | "failed";
@@ -39,7 +64,7 @@ interface DBExchange {
   Score?: number;        
   SenderID?: number | string;   
   ReceiverID?: number | string; 
-  TargetMemberID?: number | string; // รองรับโครงสร้างทั้งสองฝั่ง
+  TargetMemberID?: number | string;
   MemberID: number | string;
   myPostTitle?: string;
   myPostImage?: string;
@@ -117,42 +142,35 @@ export default function Matching() {
     }
   };
 
-  // 🌟 [ส่วนที่หายไป] กรองไอเทมของคุณเพื่อแสดงในหน้า "เริ่มหาคู่แมตช์"
+  // กรองไอเทมของคุณเพื่อแสดงในหน้า "เริ่มหาคู่แมตช์"
   const displayItems = useMemo(() => {
     if (!currentUserId) return [];
     return items.filter((item) => String(item.MemberID) === currentUserId);
   }, [items, currentUserId]);
 
-  // ✨ นับคำขอแจ้งเตือนสีแดง (นับเฉพาะคำขอที่มีคนส่งมาหาเรา, สถานะ pending และ "ยังไม่เคยเปิดดู")
+  // นับคำขอแจ้งเตือนสีแดง
   const incomingCount = useMemo(() => {
     if (!currentUserId) return 0;
     
-    // ดึงรายการ ID คำขอที่เคยเปิดดูแล้วจาก LocalStorage
     const seenIds: number[] = JSON.parse(localStorage.getItem("seen_exchange_ids") || "[]");
 
     return exchanges.filter((exch) => {
-      // 1. เช็กว่าเป็นคำขอที่ส่งมาหาเราใช่หรือไม่
       const isReceiver = exch.ReceiverID 
         ? String(exch.ReceiverID) === currentUserId 
         : String(exch.TargetMemberID) === currentUserId;
         
-      // 2. เช็กว่าสถานะยังรอการตอบรับอยู่ใช่หรือไม่
       const isPending = (exch.ExchangeStatus || "").toLowerCase() === "pending";
-      
-      // 3. 🌟 เช็กว่า ID นี้ "ยังไม่เคย" ถูกบันทึกใน seenIds ใช่หรือไม่
       const isUnseen = !seenIds.includes(exch.ExchangeID);
 
-      // นับเฉพาะที่ตรงตามเงื่อนไขทั้ง 3 ข้อ
       return isReceiver && isPending && isUnseen;
     }).length;
   }, [exchanges, currentUserId]);
 
-  // 3. กรองรายการแลกเปลี่ยนทั้งหมดที่เกี่ยวข้องกับเรา (แสดงทั้งในฐานะคนส่งและคนรับ)
+  // 3. กรองรายการแลกเปลี่ยนตามสถานะจริง
   const filteredMatches = useMemo(() => {
     if (!currentUserId) return [];
     
     const myExchanges = exchanges.filter((exch) => {
-      // 🌟 ปรับตรรกะใหม่: ดึงรายการทั้งหมดที่เราเป็นคนเสนอแลก (MemberID) หรือเป็นคนตอบรับ (TargetMemberID)
       const isSender = String(exch.MemberID) === currentUserId;
       const isReceiver = String(exch.TargetMemberID) === currentUserId;
       
@@ -181,7 +199,6 @@ export default function Matching() {
               <p className="text-sm text-muted-foreground">ระบบแนะนำคู่แลกเปลี่ยนที่เหมาะสมสำหรับคุณ</p>
             </div>
             
-            {/* ปุ่มคำขอที่ได้รับ พร้อม Notification Badge แจ้งเตือน */}
             <Button 
               variant="outline" 
               onClick={() => navigate("/incoming-requests")} 
@@ -241,8 +258,8 @@ export default function Matching() {
                           <p className="text-sm font-bold truncate">{post.ItemName}</p>
                           <Badge variant="secondary" className="text-[10px]">{post.CategoryName || "ทั่วไป"}</Badge>
                           <p className="text-xs text-muted-foreground truncate">
-  ต้องการแลก: <span className="font-medium text-foreground">{post.DesiredItem || "อะไรก็ได้"}</span>
-</p>
+                            ต้องการแลก: <span className="font-medium text-foreground">{post.DesiredItem || "อะไรก็ได้"}</span>
+                          </p>
                           <Button size="sm" className="w-full h-8" onClick={() => navigate(`/match-results/${post.ItemID}`)}>
                             ค้นหาคู่แมตช์
                           </Button>
@@ -267,9 +284,10 @@ export default function Matching() {
                   { id: "all", label: "ทั้งหมด", icon: null },
                   { id: "pending", label: "รอตอบรับ", icon: Clock },
                   { id: "accepted", label: "ตอบรับแล้ว", icon: CheckCircle },
-                  { id: "in_progress", label: "ดำเนินการ", icon: ArrowRightLeft },
-                  { id: "completed", label: "สำเร็จ", icon: CheckCircle },
-                  { id: "failed", label: "ไม่สำเร็จ", icon: XCircle },
+                  { id: "in_progress", label: "กำลังดำเนินการ", icon: ArrowRightLeft },
+                  { id: "completed", label: "สำเร็จแล้ว", icon: CheckCircle },
+                  { id: "rejected", label: "ถูกปฏิเสธ", icon: XCircle },
+                  { id: "failed", label: "ยกเลิกแล้ว", icon: AlertCircle },
                 ].map((tab) => (
                   <Badge
                     key={tab.id}
@@ -283,7 +301,7 @@ export default function Matching() {
                 ))}
               </div>
 
-              {/* รายการแสดงข้อมูลผลการแมตช์ที่คุณเป็นคนร้องขอ */}
+              {/* รายการแสดงข้อมูลผลการแมตช์ที่คุณเกี่ยวข้อง */}
               {filteredMatches.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   {filteredMatches.map((match) => {
@@ -297,11 +315,12 @@ export default function Matching() {
                         onClick={() => navigate(`/exchange-tracking/${match.ExchangeID}`)}
                       >
                         <CardContent className="p-5 space-y-4">
-                          <div className="flex items-center justify-between">
-                            <Badge className={`${config.className} border-0 font-semibold`}>
-                              <StatusIcon className="h-3.5 w-3.5 mr-1.5" />{config.label}
+                          <div className="flex items-center justify-between gap-2">
+                            <Badge className={`${config.className} font-semibold py-1 px-2.5 rounded-full`}>
+                              <StatusIcon className="h-3.5 w-3.5 mr-1.5 shrink-0" />
+                              <span>{config.label}</span>
                             </Badge>
-                            <span className="rounded-full bg-primary/90 px-2.5 py-1 text-[10px] font-bold text-primary-foreground shadow-sm">
+                            <span className="rounded-full bg-primary/90 px-2.5 py-1 text-[10px] font-bold text-primary-foreground shadow-sm shrink-0">
                               เหมาะสม {match.Score ?? 95}%
                             </span>
                           </div>

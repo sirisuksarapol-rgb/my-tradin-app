@@ -1,6 +1,10 @@
 import os
-from flask import Flask
+from flask import Flask, send_from_directory
 from flask_cors import CORS
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from routes.login import login_bp
 from routes.verify import verify_bp
 from routes.register import register_bp
@@ -12,10 +16,11 @@ from routes.users import users_bp
 from routes.reports import report_bp   
 from routes.matches import match_bp
 from routes.admin import admin_bp 
-from flask import send_from_directory
 
 app = Flask(__name__)
 CORS(app) 
+
+app.config['SECRET_KEY'] = os.getenv('JWT_SECRET', 'supersecret123')
 
 UPLOAD_FOLDER = os.path.join(os.getcwd(), 'uploads')
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -25,10 +30,7 @@ if not os.path.exists(UPLOAD_FOLDER):
 
 @app.route('/uploads/<path:filename>')
 def uploaded_file(filename):
-    return send_from_directory(
-        'uploads',
-        filename
-    )
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 app.register_blueprint(login_bp)
 app.register_blueprint(verify_bp)

@@ -182,13 +182,13 @@ export default function MatchResults() {
       <div className="max-w-5xl mx-auto py-2 sm:py-6 space-y-8">
         <div className="flex items-center gap-2">
           <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate(-1)}
-            className="-ml-2"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate(-1)}
+                className="-ml-2"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
           <Search className="w-5 h-5 text-muted-foreground" />
           <span className="font-bold text-2xl font-heading">ค้นหาคู่แมตช์</span>
         </div>

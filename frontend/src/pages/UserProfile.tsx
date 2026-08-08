@@ -4,17 +4,15 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import AppLayout from "@/components/AppLayout";
-import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import {
   getItems as fetchItemsAPI,
   getUserStats,
-  IMAGE_BASE_URL,
-  createReport
+  IMAGE_BASE_URL
 } from "@/api/api";
+import ReportModal from "@/components/ReportModal";
+
 // 💡 กำหนด Interface ของคำรีวิวจริงที่ส่งมาจาก API หลังบ้าน
 interface DBUserReview {
   ExchangeID: number;
@@ -47,15 +45,13 @@ interface ItemData {
 
 export default function UserProfile() {
   const { userId } = useParams<{ userId: string }>();
-  const { toast } = useToast();
   const location = useLocation();
   const navigate = useNavigate();
 
   const [userData, setUserData] = useState<UserProfileData | null>(null);
-  const [reviews, setReviews] = useState<DBUserReview[]>([]); // 🔥 เก็บคำรีวิวจริงจากฐานข้อมูล
+  const [reviews, setReviews] = useState<DBUserReview[]>([]); 
   const [isLoading, setIsLoading] = useState(true);
   const [isReportOpen, setIsReportOpen] = useState(false);
-  const [reportReason, setReportReason] = useState("");
 
   const loggedInUser = JSON.parse(localStorage.getItem("user") || "{}");
   
@@ -82,7 +78,7 @@ export default function UserProfile() {
         const itemsRes = await fetchItemsAPI();
         const items = itemsRes.data || [];
         
-        // 💡 แปลง ID เป็น String ทั้งคู่ก่อนเทียบ ป้องกันบั๊กสิ่งของโชว์เลข 4 ซ้ำกัน
+        // 💡 แปลง ID เป็น String ทั้งคู่ก่อนเทียบ ป้องกันบั๊กสิ่งของโชว์เลขซ้ำกัน
         const userItemsCount = items.filter(
           (item: ItemData) => String(item.MemberID || item.member_id) === String(userId)
         ).length;
@@ -144,70 +140,6 @@ export default function UserProfile() {
 
   const isOwner = String(loggedInUser?.MemberID || loggedInUser?.member_id || "") === String(userData?.MemberID || "");
 
-  const handleReport = async () => {
-
-  if (!reportReason.trim()) return;
-
-  try {
-
-    const reporterId =
-      loggedInUser.MemberID ||
-      loggedInUser.member_id ||
-      loggedInUser.id;
-
-    if (!reporterId) {
-      toast({
-        title: "กรุณาเข้าสู่ระบบ",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    await createReport({
-
-      ItemID: null,
-
-      MemberID: reporterId,
-
-      ReportedMemberID: Number(userId),
-
-      ProblemType: "รายงานผู้ใช้งาน",
-
-      HelpCenterData: reportReason
-
-    });
-
-    toast({
-
-      title: "ส่งรายงานเรียบร้อย",
-
-      description:
-        "ระบบได้รับรายงานของคุณแล้ว"
-
-    });
-
-    setReportReason("");
-
-    setIsReportOpen(false);
-
-  } catch (error) {
-
-    console.error(error);
-
-    toast({
-
-      title: "เกิดข้อผิดพลาด",
-
-      description: "ไม่สามารถส่งรายงานได้",
-
-      variant: "destructive"
-
-    });
-
-  }
-
-};
-
   if (isLoading) {
     return (
       <AppLayout>
@@ -232,14 +164,14 @@ export default function UserProfile() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-8">
         {/* แถบด้านบน */}
         <div className="flex items-center justify-between">
-          <Button variant="ghost" onClick={() => navigate(-1)} className="gap-1 -ml-4">
-            <ArrowLeft className="h-4 w-4" /> กลับ
-          </Button>
-          {!isOwner && !fromAdmin && (
-            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive" onClick={() => setIsReportOpen(true)}>
-              <Flag className="h-5 w-5" />
-            </Button>
-          )}
+          <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate(-1)}
+                className="-ml-2"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
         </div>
 
         {/* ข้อมูลโปรไฟล์หลักและสถิติ 3 ช่อง */}
@@ -333,18 +265,13 @@ export default function UserProfile() {
       </div>
 
       {/* แจ้งปัญหา */}
-      <Dialog open={isReportOpen} onOpenChange={setIsReportOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>แจ้งปัญหาผู้ใช้งาน</DialogTitle>
-          </DialogHeader>
-          <Textarea placeholder="ระบุรายละเอียดปัญหา..." value={reportReason} onChange={(e) => setReportReason(e.target.value)} className="min-h-[120px]" />
-          <DialogFooter className="gap-2">
-            <Button variant="ghost" onClick={() => setIsReportOpen(false)}>ยกเลิก</Button>
-            <Button variant="destructive" onClick={handleReport} disabled={!reportReason.trim()}>ส่งรายงาน</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ReportModal
+        isOpen={isReportOpen}
+        onClose={() => setIsReportOpen(false)}
+        targetType="user" 
+        targetId={userId} 
+        targetTitle={profileName}
+      />
     </AppLayout>
   );
 }

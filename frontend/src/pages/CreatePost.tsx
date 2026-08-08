@@ -1,9 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  Camera, MapPin, Globe, Trash2, X,
-  Package, LayoutGrid, AlignLeft, ArrowRightLeft, Sparkles, Loader2
-} from "lucide-react";
+import { Camera, MapPin, Globe, Trash2, X, Package, LayoutGrid, AlignLeft, ArrowRightLeft, Sparkles, Loader2} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,7 +9,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import AppLayout from "@/components/AppLayout";
 import { useToast } from "@/hooks/use-toast";
 import { CATEGORIES } from "@/lib/categories_data";
-// นำเข้าฟังก์ชันสร้างไอเทมจาก API ของคุณ
 import { createItem } from "@/api/api"; 
 
 export default function CreatePost() {
@@ -24,9 +20,9 @@ export default function CreatePost() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [images, setImages] = useState<string[]>([]); // สำหรับ Preview
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]); // 🌟 สำหรับเก็บไฟล์จริงส่งให้ Backend
-  const [isLoading, setIsLoading] = useState(false); // 🌟 สถานะตอนกำลังโหลด
+  const [images, setImages] = useState<string[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("");
@@ -35,21 +31,6 @@ export default function CreatePost() {
   const [location, setLocation] = useState("");
   const [mapLink, setMapLink] = useState("");
   const categories = CATEGORIES.filter(c => c !== "ทั้งหมด");
-
-  const demo_images1 = "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=400";
-  const demo_images2 = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT-lbwWTcJPRjWqv8r-9OpRUrzOL5p9Lgog7Q&s";
-  const demo_images3 = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS7Z1OOEOkvx3Xv7HmipYfD-iE4aRi4qTp47Q&s";
-  
-  const fillDemoData = () => {
-    setImages([demo_images1, demo_images2, demo_images3]);
-    setTitle("กล้อง Canon EOS M50");
-    setCategory("อุปกรณ์อิเล็กทรอนิกส์และไอที");
-    setDescription("กล้อง Mirrorless สภาพดี ใช้งานปกติ ถ่ายวิดีโอ 4K ได้");
-    setWanted("iPad หรือ Tablet อื่นๆ");
-    setLocation("เซ็นทรัล ลาดพร้าว / BTS ห้าแยกลาดพร้าว");
-    setMapLink("https://maps.app.goo.gl/xxxxxx");
-    setErrors({});
-  };
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -62,11 +43,8 @@ export default function CreatePost() {
     }
 
     const newFilesArray = Array.from(files);
-    
-    // 🌟 เก็บไฟล์จริงลง State
     setSelectedFiles(prev => [...prev, ...newFilesArray]);
 
-    // สร้าง Preview
     newFilesArray.forEach((file) => {
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -84,7 +62,7 @@ export default function CreatePost() {
 
   const removeImage = (index: number) => {
     setImages(images.filter((_, i) => i !== index));
-    setSelectedFiles(selectedFiles.filter((_, i) => i !== index)); // 🌟 ลบไฟล์จริงออกด้วย
+    setSelectedFiles(selectedFiles.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -125,7 +103,6 @@ export default function CreatePost() {
       formData.append("category_id", "1"); 
       formData.append("member_id", String(currentMemberId)); 
 
-      // 🌟 แก้ไข: วนลูปส่งไฟล์รูปภาพทั้งหมดที่มีในอาเรย์ แทนการส่งแค่ตัวแรกตัวเดียว
       if (selectedFiles.length > 0) {
         selectedFiles.forEach((file) => {
           formData.append("images", file); 
@@ -134,7 +111,12 @@ export default function CreatePost() {
 
       await createItem(formData);
 
-      toast({ title: "สร้างโพสต์สำเร็จ!", description: "สิ่งของของคุณพร้อมให้แลกเปลี่ยนแล้ว" });
+      // 💡 แจ้งเตือนสำเร็จตามรูปแบบที่ต้องการ
+      toast({ 
+        title: "สำเร็จ", 
+        description: "ลงประกาศแลกเปลี่ยนเรียบร้อย" 
+      });
+
       navigate("/my-posts");
       
     } catch (error) {
@@ -158,14 +140,6 @@ export default function CreatePost() {
             <div>
               <div className="flex items-center gap-3">
                 <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight font-heading">สร้างโพสต์ใหม่</h1>
-                <Button
-                  type="button" variant="outline" size="icon"
-                  onClick={fillDemoData}
-                  className="h-8 w-8 border-primary/40 text-primary hover:bg-primary/10 rounded-full shrink-0"
-                  title="จำลองข้อมูล"
-                >
-                  <Sparkles className="w-4 h-4" />
-                </Button>
               </div>
               <p className="text-sm text-muted-foreground mt-1">กรอกข้อมูลสิ่งของที่ต้องการนำมาแลกเปลี่ยน</p>
             </div>
@@ -328,7 +302,14 @@ export default function CreatePost() {
                       "ลงประกาศแลกเปลี่ยน"
                     )}
                   </Button>
-                  <Button type="button" variant="outline" disabled={isLoading} className="sm:w-auto" onClick={() => navigate("/feed")}>
+                  {/* 💡 ปรับปุ่มยกเลิกให้สูง h-12 และมีขนาดตัวหนังสือ text-base font-bold เท่ากับปุ่ม submit */}
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    disabled={isLoading} 
+                    className="h-12 text-base font-bold px-6 sm:w-auto" 
+                    onClick={() => navigate("/feed")}
+                  >
                     ยกเลิก
                   </Button>
                 </div>

@@ -31,9 +31,14 @@ export default function SecurityVerify() {
     <AppLayout>
       <div className="max-w-lg mx-auto space-y-6 py-4">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="rounded-full">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+          <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate(-1)}
+                className="-ml-2"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
           <h1 className="text-xl font-bold font-heading">ความปลอดภัย</h1>
         </div>
 

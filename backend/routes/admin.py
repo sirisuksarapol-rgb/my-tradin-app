@@ -1,10 +1,10 @@
 import datetime
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 from db import get_connection
+from services.notification_service import notify_user
 
 # สร้าง Blueprint สำหรับจัดกลุ่ม API ที่เกี่ยวกับ Admin
 admin_bp = Blueprint("admin", __name__)
-
 # ======================================
 # ฟังก์ชันช่วยจัดฟอร์แมตข้อมูลดิกชันนารี
 # ======================================
@@ -17,7 +17,7 @@ def format_cursor_data(cursor, data, is_single=False):
     def serialize_item(val):
         # จัดการปัญหา Date/Datetime แปลงเป็น JSON ไม่ได้
         if isinstance(val, (datetime.datetime, datetime.date)):
-            return val.isoformat()  # แปลง datetime เป็น string รูปแบบ ISO (เช่น 2026-07-02T16:30:00)
+            return val.isoformat()  # แปลง datetime เป็น string รูปแบบ ISO
         return val
 
     if is_single:
@@ -34,24 +34,21 @@ def format_cursor_data(cursor, data, is_single=False):
         return results
 
 # ======================================
-# Dashboard Summary
+# 1. Dashboard Summary
 # ======================================
 @admin_bp.route("/dashboard", methods=["GET"])
 def dashboard():
     conn = get_connection()
     cursor = conn.cursor()
 
-    # 1. นับจำนวนสมาชิกทั้งหมด
     cursor.execute("SELECT COUNT(*) total FROM member")
     row = cursor.fetchone()
     total_users = row["total"] if isinstance(row, dict) else row[0]
 
-    # 2. นับจำนวนโพสต์ทั้งหมด
     cursor.execute("SELECT COUNT(*) total FROM item")
     row = cursor.fetchone()
     total_items = row["total"] if isinstance(row, dict) else row[0]
 
-    # 3. นับจำนวนรายงานปัญหาที่ยังรอดำเนินการ (Pending)
     cursor.execute("SELECT COUNT(*) total FROM problem WHERE ReportStatus='Pending'")
     row = cursor.fetchone()
     total_reports = row["total"] if isinstance(row, dict) else row[0]
@@ -66,7 +63,7 @@ def dashboard():
     })
 
 # ======================================
-# สมาชิกทั้งหมด
+# 2. รายชื่อสมาชิกทั้งหมด
 # ======================================
 @admin_bp.route("/users", methods=["GET"])
 def users():
@@ -96,7 +93,7 @@ def users():
     return jsonify(data)
 
 # ======================================
-# โพสต์ทั้งหมด
+# 3. รายการโพสต์ทั้งหมด
 # ======================================
 @admin_bp.route("/items", methods=["GET"])
 def items():
@@ -125,7 +122,7 @@ def items():
     return jsonify(data)
 
 # ======================================
-# รายงานทั้งหมด
+# 4. รายงานปัญหาทั้งหมด
 # ======================================
 @admin_bp.route("/reports", methods=["GET"])
 def reports():
@@ -153,3 +150,145 @@ def reports():
     cursor.close()
     conn.close()
     return jsonify(data)
+
+# ======================================
+# 5. อัปเดตสถานะรายงานปัญหา และแจ้งเตือนผู้ใช้งาน (PUT)
+# ======================================
+@admin_bp.route("/reports/<int:problem_id>", methods=["PUT"])
+def resolve_report(problem_id):
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    try:
+        cursor.execute("""
+            SELECT MemberID, ProblemType 
+            FROM problem 
+            WHERE ProblemID = %s
+        """, (problem_id,))
+        report = cursor.fetchone()
+
+        if not report:
+            return jsonify({"success": False, "message": "ไม่พบข้อมูลรายงานปัญหานี้"}), 404
+
+        update_sql = "UPDATE problem SET ReportStatus = 'Resolved' WHERE ProblemID = %s"
+        cursor.execute(update_sql, (problem_id,))
+        conn.commit()
+
+        if report.get("MemberID"):
+            member_id = report["MemberID"]
+            problem_type = report["ProblemType"] or "ปัญหาที่คุณแจ้ง"
+            
+            title = "อัปเดตสถานะการรายงานปัญหา"
+            message = f"แอดมินได้ตรวจสอบและแก้ไข '{problem_type}' เรียบร้อยแล้ว ขอบคุณที่ช่วยทำให้ชุมชน Tradin ของเราน่าอยู่ขึ้นครับ!"
+            
+            notify_user(
+                member_id=member_id, 
+                title=title, 
+                message=message, 
+                link="/notifications"
+            )
+
+        return jsonify({
+            "success": True, 
+            "message": "ปิดเคสและส่งแจ้งเตือนไปยังผู้แจ้งเรียบร้อยแล้ว"
+        }), 200
+
+    except Exception as e:
+        conn.rollback()
+        print(f"❌ Error resolving report {problem_id}: {str(e)}")
+        return jsonify({"success": False, "message": f"เกิดข้อผิดพลาด: {str(e)}"}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+# ======================================
+# 6. ระงับสิทธิ์ผู้ใช้งาน / แบน (PUT)
+# ======================================
+@admin_bp.route("/users/<int:member_id>/suspend", methods=["PUT"])
+def suspend_user(member_id):
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("UPDATE member SET MemberStatus = 'Suspended' WHERE MemberID = %s", (member_id,))
+        conn.commit()
+
+        # แจ้งเตือนผู้ใช้ผ่านอีเมลและระบบ
+        notify_user(
+            member_id=member_id,
+            title="แจ้งเตือนการระงับสิทธิ์ใช้งาน",
+            message="บัญชีของคุณถูกระงับการใช้งานเนื่องจากละเมิดเงื่อนไขข้อตกลงของระบบ หากมีข้อสงสัยโปรดติดต่อผู้ดูแลระบบ",
+            link="/contact"
+        )
+
+        return jsonify({"success": True, "message": "ระงับสิทธิ์ผู้ใช้งานเรียบร้อยแล้ว"}), 200
+    except Exception as e:
+        conn.rollback()
+        print(f"❌ Error suspending user {member_id}: {str(e)}")
+        return jsonify({"success": False, "message": str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+# ======================================
+# 7. คืนสิทธิ์ผู้ใช้งาน / ยกเลิกแบน (PUT)
+# ======================================
+@admin_bp.route("/users/<int:member_id>/unsuspend", methods=["PUT"])
+def unsuspend_user(member_id):
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("UPDATE member SET MemberStatus = 'Active' WHERE MemberID = %s", (member_id,))
+        conn.commit()
+
+        notify_user(
+            member_id=member_id,
+            title="แจ้งเตือนการคืนสิทธิ์ใช้งาน",
+            message="บัญชีของคุณได้รับการคืนสิทธิ์การใช้งานแล้ว คุณสามารถเข้าใช้งานและแลกเปลี่ยนสิ่งของได้ตามปกติ",
+            link="/"
+        )
+
+        return jsonify({"success": True, "message": "คืนสิทธิ์ผู้ใช้งานเรียบร้อยแล้ว"}), 200
+    except Exception as e:
+        conn.rollback()
+        print(f"❌ Error unsuspending user {member_id}: {str(e)}")
+        return jsonify({"success": False, "message": str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+# ======================================
+# 8. ลบโพสต์โดยแอดมิน (DELETE)
+# ======================================
+@admin_bp.route("/items/<int:item_id>", methods=["DELETE"])
+def delete_item_by_admin(item_id):
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        # ดึงข้อมูลเพื่อดูว่าใครเป็นเจ้าของโพสต์ และชื่อสิ่งของคืออะไร
+        cursor.execute("SELECT MemberID, ItemName FROM item WHERE ItemID = %s", (item_id,))
+        item = cursor.fetchone()
+
+        if not item:
+            return jsonify({"success": False, "message": "ไม่พบรายการโพสต์นี้"}), 404
+
+        # ลบโพสต์ออกจากตาราง item
+        cursor.execute("DELETE FROM item WHERE ItemID = %s", (item_id,))
+        conn.commit()
+
+        # แจ้งเตือนเจ้าของโพสต์
+        if item.get("MemberID"):
+            notify_user(
+                member_id=item["MemberID"],
+                title="แจ้งเตือนการลบโพสต์",
+                message=f"โพสต์เรื่อง '{item.get('ItemName', 'สิ่งของของคุณ')}' ถูกลบโดยผู้ดูแลระบบ เนื่องจากไม่ตรงตามเงื่อนไขการใช้งาน",
+                link="/my-items"
+            )
+
+        return jsonify({"success": True, "message": "ลบโพสต์เรียบร้อยแล้ว"}), 200
+    except Exception as e:
+        conn.rollback()
+        print(f"❌ Error deleting item {item_id}: {str(e)}")
+        return jsonify({"success": False, "message": str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()

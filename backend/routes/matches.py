@@ -24,6 +24,7 @@ def get_item_with_details(item_id):
 @match_bp.route('/api/matches/<int:item_id>', methods=['GET'])
 def get_matches(item_id):
     try:
+        # 1. ดึงข้อมูล my_item ออกมาเป็น Dictionary
         my_item = get_item_with_details(item_id)
         
         if not my_item:
@@ -31,7 +32,7 @@ def get_matches(item_id):
             
         desired_text = my_item.get('DesiredItem')
         
-        # ตรวจสอบหากผู้ใช้ไม่ได้ระบุสิ่งของที่ต้องการแลกเปลี่ยน
+        # 2. ตรวจสอบหากผู้ใช้ไม่ได้ระบุสิ่งของที่ต้องการแลกเปลี่ยน
         if not desired_text or not desired_text.strip():
             return jsonify({
                 "status": "success",
@@ -42,10 +43,11 @@ def get_matches(item_id):
             
         current_member_id = my_item['MemberID']
         
-        # ดึงผลลัพธ์จาก AI
-        matches = semantic_search(desired_text, current_item_id=item_id, top_n=10)
+        # 🚀 3. แก้ตรงนี้! โยน my_item (Dictionary) เข้าไปทั้งก้อนเลย 
+        # ไม่ต้องแยก desired_text กับ current_item_id แล้ว
+        matches = semantic_search(my_item, top_n=10)
         
-        # กรองรายการที่เป็นของตนเองออก
+        # 4. กรองรายการที่เป็นของตนเองออก
         filtered_matches = [m for m in matches if m.get('MemberID') != current_member_id]
         
         return jsonify({
@@ -55,4 +57,6 @@ def get_matches(item_id):
         }), 200
         
     except Exception as e:
+        # เพิ่มการ print error ลง console backend เผื่อไว้ดูบั๊กอื่นด้วย
+        print(f"❌ Error in get_matches: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500

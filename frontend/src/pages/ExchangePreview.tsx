@@ -45,7 +45,6 @@ export default function ExchangePreview() {
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [selectedMyPostId, setSelectedMyPostId] = useState<string | number>("");
 
-  // 1. โหลดข้อมูลสิ่งของและ User ปัจจุบันจากระบบ DB
   useEffect(() => {
     const loadRealData = async () => {
       try {
@@ -70,7 +69,6 @@ export default function ExchangePreview() {
     loadRealData();
   }, []);
 
-  // 2. แปลง Path รูปภาพ
   const getCorrectImagePath = (imageName: string | undefined) => {
     if (!imageName || imageName.trim() === "undefined" || imageName === "null") return "/placeholder.jpg";
     try {
@@ -89,13 +87,11 @@ export default function ExchangePreview() {
     }
   };
 
-  // ดึงคลังสิ่งของของเราจาก DB
   const myInventory = useMemo(() => {
     if (!currentUserId) return [];
     return dbItems.filter(item => String(item.MemberID) === currentUserId);
   }, [dbItems, currentUserId]);
 
-  // แกะ ID จาก URL (match- หรือ post-)
   const { targetId, preSelectedMyId } = useMemo(() => {
     if (!matchId) return { targetId: "", preSelectedMyId: "" };
     if (matchId.startsWith("match-")) {
@@ -119,7 +115,6 @@ export default function ExchangePreview() {
   const isFromMatchResults = matchId?.startsWith("match-");
   const isFromPostDetails = matchId?.startsWith("post-");
 
-  // 3. ผูกข้อมูลสิ่งของจริงจาก DB เข้ากับฝั่งของเราและฝั่งคู่แลก
   const match = useMemo(() => {
     const theirPost = dbItems.find(p => String(p.ItemID) === String(targetId));
     const mySelectedPost = myInventory.find(p => String(p.ItemID) === String(selectedMyPostId)) || myInventory[0];
@@ -166,7 +161,6 @@ export default function ExchangePreview() {
     };
   }, [matchId, selectedMyPostId, dbItems, myInventory, location.state, targetId]);
 
-  // 4. ส่งคำขอแลกเปลี่ยน
   const handleConfirm = async () => {
     if (!phone || phone.replace(/-/g, "").length < 10) {
       toast({
@@ -248,7 +242,7 @@ export default function ExchangePreview() {
     return (
       <AppLayout>
         <div className="px-4 py-12 text-center text-muted-foreground animate-pulse flex flex-col items-center gap-3 h-[60vh] justify-center">
-           <Loader2 className="h-10 w-10 animate-spin text-emerald-600" />
+           <Loader2 className="h-10 w-10 animate-spin text-primary" />
            กำลังดึงข้อมูลเตรียมการแลกเปลี่ยน...
         </div>
       </AppLayout>
@@ -257,33 +251,33 @@ export default function ExchangePreview() {
 
   return (
     <AppLayout>
-      <section className="py-8 sm:py-12 bg-slate-50/50 min-h-screen">
+      <section className="py-8 sm:py-12">
         <div className="mx-auto max-w-3xl px-4 sm:px-6 space-y-6">
           
           {/* Header */}
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="rounded-full">
+            <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="-ml-2">
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
               <div className="flex items-center gap-2">
-                <ShieldCheck className="h-6 w-6 text-emerald-600" />
-                <h1 className="text-xl sm:text-2xl font-bold text-slate-800">ยืนยันการแลกเปลี่ยน</h1>
+                <ShieldCheck className="h-6 w-6 text-primary" />
+                <h1 className="text-xl sm:text-2xl font-bold">ยืนยันการแลกเปลี่ยน</h1>
               </div>
-              <p className="text-xs text-slate-500 mt-0.5">ตรวจสอบรายละเอียดสินค้าและสถานที่ก่อนส่งคำขอ</p>
+              <p className="text-xs text-muted-foreground mt-0.5">ตรวจสอบรายละเอียดสินค้าและสถานที่ก่อนส่งคำขอ</p>
             </div>
           </div>
 
           {/* 1. เลือกสิ่งของของตัวเอง (แสดงเมื่อเข้าผ่านหน้า Post Detail) */}
           {isFromPostDetails && (
-            <Card className="border-emerald-200/80 shadow-sm bg-white">
+            <Card className="glass-card border-primary/20 hover:shadow-md transition-shadow">
               <CardHeader className="pb-3 pt-4 px-5">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-semibold flex items-center gap-2 text-slate-800">
-                    <Box className="h-4 w-4 text-emerald-600" />
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <Box className="h-4 w-4 text-primary" />
                     เลือกสิ่งของของคุณที่จะนำไปแลก
                   </CardTitle>
-                  <Badge variant="secondary" className="bg-emerald-50 text-emerald-700">
+                  <Badge variant="secondary" className="bg-primary/10 text-primary">
                     มี {myInventory.length} ชิ้น
                   </Badge>
                 </div>
@@ -291,7 +285,7 @@ export default function ExchangePreview() {
               <CardContent className="px-5 pb-5 pt-0">
                 <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
                   {myInventory.length === 0 ? (
-                    <p className="text-xs text-center py-6 text-slate-400">คุณยังไม่มีโพสต์สิ่งของ สามารถไปเพิ่มโพสต์ก่อนเสนอแลกได้ครับ</p>
+                    <p className="text-xs text-center py-6 text-muted-foreground">คุณยังไม่มีโพสต์สิ่งของ สามารถไปเพิ่มโพสต์ก่อนเสนอแลกได้ครับ</p>
                   ) : (
                     myInventory.map((post) => {
                       const isSelected = String(selectedMyPostId) === String(post.ItemID);
@@ -301,30 +295,30 @@ export default function ExchangePreview() {
                           onClick={() => setSelectedMyPostId(post.ItemID)}
                           className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer select-none
                             ${isSelected
-                              ? "border-emerald-500 bg-emerald-50/40 shadow-sm"
-                              : "border-slate-200 bg-slate-50/50 hover:bg-slate-100/80"
+                              ? "border-primary bg-primary/5 shadow-sm"
+                              : "border-border bg-background hover:bg-muted/50"
                             }`}
                         >
                           <img 
                             src={getCorrectImagePath(post.ItemImage)} 
                             alt={post.ItemName} 
-                            className="w-14 h-14 rounded-lg object-cover shadow-sm shrink-0 bg-slate-200" 
+                            className="w-14 h-14 rounded-lg object-cover shadow-sm shrink-0 bg-muted" 
                             onError={(e) => {
                               const target = e.target as HTMLImageElement;
                               if (target.src !== window.location.origin + "/placeholder.jpg") target.src = "/placeholder.jpg";
                             }}
                           />
                           <div className="flex-1 min-w-0">
-                            <p className={`text-sm font-semibold truncate ${isSelected ? "text-emerald-800" : "text-slate-700"}`}>
+                            <p className={`text-sm font-semibold truncate ${isSelected ? "text-primary" : "text-foreground"}`}>
                               {post.ItemName}
                             </p>
-                            <p className="text-xs text-slate-500 truncate">{post.CategoryName || "ทั่วไป"}</p>
+                            <p className="text-xs text-muted-foreground truncate">{post.CategoryName || "ทั่วไป"}</p>
                           </div>
                           <div className="shrink-0 pl-2">
                             {isSelected ? (
-                              <CheckCircle2 className="w-5 h-5 text-emerald-600 fill-emerald-100" />
+                              <CheckCircle2 className="w-5 h-5 text-primary fill-primary/20" />
                             ) : (
-                              <Circle className="w-5 h-5 text-slate-300" />
+                              <Circle className="w-5 h-5 text-muted-foreground/30" />
                             )}
                           </div>
                         </div>
@@ -337,11 +331,11 @@ export default function ExchangePreview() {
           )}
 
           {/* 2. Match Comparison Display */}
-          <Card className="border-slate-200 shadow-sm bg-white overflow-hidden">
+          <Card className="glass-card border-primary/20 overflow-hidden">
             {match.score && isFromMatchResults && (
-              <div className="bg-emerald-700 px-4 py-2.5 flex items-center justify-center gap-2">
-                <Sparkles className="h-4 w-4 text-emerald-200" />
-                <span className="text-sm font-semibold text-white">
+              <div className="bg-primary px-4 py-2.5 flex items-center justify-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary-foreground" />
+                <span className="text-sm font-semibold text-primary-foreground">
                   คะแนนความเหมาะสมจาก AI: {match.score}%
                 </span>
               </div>
@@ -352,10 +346,10 @@ export default function ExchangePreview() {
                 
                 {/* สิ่งของของคุณ */}
                 {match.myPost ? (
-                  <div className="space-y-3 p-4 rounded-xl bg-slate-50/80 border border-slate-200/80 flex flex-col justify-between">
+                  <div className="space-y-3 p-4 rounded-xl bg-secondary/10 border border-primary/10 flex flex-col justify-between">
                     <div>
                       <div className="flex items-center justify-between mb-2">
-                        <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200 font-semibold">
+                        <Badge variant="outline" className="text-[10px] bg-primary/10 text-primary border-primary/20 font-semibold">
                           ของคุณ
                         </Badge>
                         <Badge variant="secondary" className="text-[10px]">
@@ -365,39 +359,39 @@ export default function ExchangePreview() {
                       <img
                         src={match.myPost.image}
                         alt={match.myPost.title}
-                        className="w-full h-48 rounded-lg object-cover border border-slate-200 mb-3 bg-white"
+                        className="w-full h-48 rounded-lg object-cover border border-border mb-3 bg-background"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
                           if (target.src !== window.location.origin + "/placeholder.jpg") target.src = "/placeholder.jpg";
                         }}
                       />
-                      <h3 className="text-base font-bold text-slate-800 line-clamp-1">{match.myPost.title}</h3>
+                      <h3 className="text-base font-bold text-foreground line-clamp-1">{match.myPost.title}</h3>
                       
-                      <div className="mt-2 text-xs text-slate-600 space-y-1">
+                      <div className="mt-2 text-xs text-muted-foreground space-y-1">
                         <div className="flex items-start gap-1.5">
-                          <FileText className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                          <FileText className="w-3.5 h-3.5 shrink-0 mt-0.5 text-primary/70" />
                           <p className="line-clamp-3 leading-relaxed">{match.myPost.description}</p>
                         </div>
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <div className="p-8 text-center text-xs text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200 flex items-center justify-center">
+                  <div className="p-8 text-center text-xs text-muted-foreground bg-muted/30 rounded-xl border border-dashed border-border flex items-center justify-center">
                     กรุณาเลือกสิ่งของของคุณ
                   </div>
                 )}
 
-                {/* ปุ่มลูกศรตรงกลาง */}
-                <div className="hidden md:flex absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-emerald-600 text-white items-center justify-center shadow-md border-2 border-white z-10">
+                {/* ปุ่มลูกศรตรงกลาง (ปรับตามธีมหน้า Detail) */}
+                <div className="hidden md:flex absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-primary text-primary-foreground items-center justify-center shadow-md border-2 border-background z-10 transition-transform hover:scale-110">
                   <ArrowRightLeft className="h-5 w-5" />
                 </div>
 
                 {/* สิ่งของคู่แลกเปลี่ยน */}
                 {match.theirPost ? (
-                  <div className="space-y-3 p-4 rounded-xl bg-slate-50/80 border border-slate-200/80 flex flex-col justify-between">
+                  <div className="space-y-3 p-4 rounded-xl bg-secondary/10 border border-primary/10 flex flex-col justify-between">
                     <div>
                       <div className="flex items-center justify-between mb-2">
-                        <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 font-semibold truncate max-w-[140px]">
+                        <Badge variant="outline" className="text-[10px] bg-muted text-foreground border-border font-semibold truncate max-w-[140px]">
                           {match.theirPost.authorName}
                         </Badge>
                         <Badge variant="secondary" className="text-[10px]">
@@ -407,24 +401,24 @@ export default function ExchangePreview() {
                       <img
                         src={match.theirPost.image}
                         alt={match.theirPost.title}
-                        className="w-full h-48 rounded-lg object-cover border border-slate-200 mb-3 bg-white"
+                        className="w-full h-48 rounded-lg object-cover border border-border mb-3 bg-background"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
                           if (target.src !== window.location.origin + "/placeholder.jpg") target.src = "/placeholder.jpg";
                         }}
                       />
-                      <h3 className="text-base font-bold text-slate-800 line-clamp-1">{match.theirPost.title}</h3>
+                      <h3 className="text-base font-bold text-foreground line-clamp-1">{match.theirPost.title}</h3>
                       
-                      <div className="mt-2 text-xs text-slate-600 space-y-1">
+                      <div className="mt-2 text-xs text-muted-foreground space-y-1">
                         <div className="flex items-start gap-1.5">
-                          <FileText className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                          <FileText className="w-3.5 h-3.5 shrink-0 mt-0.5 text-primary/70" />
                           <p className="line-clamp-3 leading-relaxed">{match.theirPost.description}</p>
                         </div>
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <div className="p-8 text-center text-xs text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200 flex items-center justify-center">
+                  <div className="p-8 text-center text-xs text-muted-foreground bg-muted/30 rounded-xl border border-dashed border-border flex items-center justify-center">
                     ไม่พบข้อมูลสิ่งของคู่แลกเปลี่ยน
                   </div>
                 )}
@@ -434,37 +428,37 @@ export default function ExchangePreview() {
           </Card>
 
           {/* 3. สถานที่นัดรับ */}
-          <Card className="border-slate-200 shadow-sm bg-white">
+          <Card className="glass-card border-primary/20">
             <CardHeader className="pb-3 pt-4 px-5">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2 text-slate-800">
-                <MapPin className="h-4 w-4 text-emerald-600" />
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-primary" />
                 สถานที่นัดรับ
               </CardTitle>
             </CardHeader>
             <CardContent className="px-5 pb-5 pt-0">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="bg-slate-50 border border-slate-200/60 rounded-lg p-3">
-                  <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block mb-1">ของคุณ</span>
-                  <p className="text-xs text-slate-800 font-medium">{match.myPost?.location || "นัดเจอตามตกลง"}</p>
+                <div className="bg-secondary/10 border border-primary/10 rounded-lg p-3">
+                  <span className="text-[10px] font-bold text-primary uppercase tracking-wider block mb-1">ของคุณ</span>
+                  <p className="text-xs text-foreground font-medium">{match.myPost?.location || "นัดเจอตามตกลง"}</p>
                 </div>
-                <div className="bg-slate-50 border border-slate-200/60 rounded-lg p-3">
-                  <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider block mb-1">คู่แลกเปลี่ยน</span>
-                  <p className="text-xs text-slate-800 font-medium">{match.theirPost?.location || "นัดเจอตามตกลง"}</p>
+                <div className="bg-secondary/10 border border-primary/10 rounded-lg p-3">
+                  <span className="text-[10px] font-bold text-foreground uppercase tracking-wider block mb-1">คู่แลกเปลี่ยน</span>
+                  <p className="text-xs text-foreground font-medium">{match.theirPost?.location || "นัดเจอตามตกลง"}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* 4. หมายเลขโทรศัพท์ (ย้ายลงมา) */}
-          <Card className="border-slate-200 shadow-sm bg-white">
+          {/* 4. หมายเลขโทรศัพท์ */}
+          <Card className="glass-card border-primary/20">
             <CardHeader className="pb-2 pt-4 px-5">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2 text-slate-800">
-                <Phone className="h-4 w-4 text-emerald-600" />
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <Phone className="h-4 w-4 text-primary" />
                 หมายเลขโทรศัพท์ของคุณ
               </CardTitle>
             </CardHeader>
             <CardContent className="px-5 pb-5 pt-0 space-y-3">
-              <p className="text-xs text-slate-500 leading-relaxed">
+              <p className="text-xs text-muted-foreground leading-relaxed">
                 เบอร์นี้จะแสดงให้คู่แลกเห็นเมื่อยืนยันรหัสความปลอดภัย OTP เท่านั้น
               </p>
               <Input
@@ -473,23 +467,23 @@ export default function ExchangePreview() {
                 value={phone}
                 onChange={(e) => setPhone(e.target.value.replace(/[^0-9-]/g, ""))}
                 maxLength={12}
-                className="h-11 text-sm font-medium"
+                className="h-11 text-sm font-medium focus-visible:ring-primary"
               />
             </CardContent>
           </Card>
 
-          {/* 5. คำแนะนำความปลอดภัย (ย้ายลงมา) */}
-          <div className="p-3.5 rounded-xl bg-amber-50/90 border border-amber-200/80 flex items-start gap-2.5">
-            <Info className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-            <p className="text-[11px] text-amber-800 leading-normal">
+          {/* 5. คำแนะนำความปลอดภัย */}
+          <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-2.5">
+            <Info className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+            <p className="text-[11px] text-amber-700/80 dark:text-amber-500/90 leading-normal font-medium">
               ตรวจสอบสภาพสินค้าจริง ณ วันนัดพบ และสามารถยกเลิกการแลกเปลี่ยนได้หากสินค้าไม่ตรงตามรายละเอียดที่ระบุ
             </p>
           </div>
 
-          {/* 6. Action Buttons (ย้ายลงมาไว้ล่างสุด) */}
-          <div className="space-y-2 pt-2">
+          {/* 6. Action Buttons */}
+          <div className="space-y-3 pt-2">
             <Button
-              className="w-full text-white h-12 bg-emerald-700 hover:bg-emerald-800 shadow-sm transition-all font-semibold"
+              className="w-full h-12 eco-gradient text-primary-foreground shadow-sm transition-all font-semibold"
               onClick={handleConfirm}
               disabled={submitting}
             >
@@ -501,9 +495,11 @@ export default function ExchangePreview() {
                 "ยืนยันส่งคำขอแลกเปลี่ยน"
               )}
             </Button>
+            
+            {/* ปุ่มยกเลิก แบบลูกศรย้อนกลับ+สีแดง */}
             <Button
-              variant="outline"
-              className="w-full h-11 text-slate-600 hover:bg-slate-100 transition-colors"
+              variant="ghost"
+              className="w-full h-11 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors font-semibold"
               onClick={() => navigate(-1)}
               disabled={submitting}
             >

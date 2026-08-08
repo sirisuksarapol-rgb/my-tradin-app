@@ -53,9 +53,14 @@ export default function ReviewExchange() {
     <AppLayout>
       <div className="px-4 py-4 max-w-lg mx-auto space-y-5">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+          <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate(-1)}
+                className="-ml-2"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
           <Star className="h-5 w-5 text-primary" />
           <h1 className="text-xl font-bold">ให้คะแนนและรีวิว</h1>
         </div>

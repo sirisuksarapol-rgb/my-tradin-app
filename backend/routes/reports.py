@@ -1,16 +1,16 @@
 from flask import Blueprint, request, jsonify
 from db import get_connection
 
-# สร้าง Blueprint สำหรับจัดการ API ที่เกี่ยวกับการรายงานปัญหา (Report)
+# Blueprint สำหรับจัดการ API รายงานปัญหา (Report System)
 report_bp = Blueprint("report_bp", __name__)
 
-# ===========================
-# 1. ส่งรายงานปัญหา (Create)
-# ===========================
+# ========================================================
+# 1. ส่งรายงานปัญหา (Create Report)
+# ========================================================
 @report_bp.route("/api/reports", methods=["POST"])
 def create_report():
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
 
         item_id = data.get("ItemID")
         member_id = data.get("MemberID")
@@ -18,15 +18,24 @@ def create_report():
         problem_type = data.get("ProblemType")
         help_center = data.get("HelpCenterData")
 
-        # ตรวจสอบว่ามีผู้แจ้งรายงานหรือไม่
+        # 1. ตรวจสอบข้อมูลผู้แจ้ง
         if not member_id:
             return jsonify({
                 "success": False,
-                "message": "ไม่พบ MemberID"
+                "message": "ไม่พบข้อมูลผู้แจ้ง กรุณาเข้าสู่ระบบก่อนทำรายการ"
             }), 400
 
-        # ต้องมีอย่างน้อยอย่างใดอย่างหนึ่ง (รายงานสิ่งของ หรือ รายงานบุคคล)
-        if not item_id and not reported_member_id:
+        # 2. ตรวจสอบเนื้อหารายงาน
+        if not help_center or not str(help_center).strip():
+            return jsonify({
+                "success": False,
+                "message": "กรุณาระบุรายละเอียดปัญหาหรือข้อเสนอแนะ"
+            }), 400
+
+        # 3. Validation ตามประเภทปัญหา
+        # ถ้าไม่ใช่ประเภทแจ้งปัญหาระบบ/ข้อเสนอแนะ ต้องระบุ Target (Item หรือ Member) อย่างใดอย่างหนึ่ง
+        system_report_types = ["bug", "suggestion", "other", "แจ้งปัญหาระบบ", "ข้อเสนอแนะ", "อื่น ๆ"]
+        if problem_type not in system_report_types and not item_id and not reported_member_id:
             return jsonify({
                 "success": False,
                 "message": "กรุณาระบุสิ่งของหรือสมาชิกที่ต้องการรายงาน"
@@ -48,11 +57,15 @@ def create_report():
             VALUES (%s, %s, %s, 'รอดำเนินการ', %s, NOW(), %s)
         """
 
+        # ปรับค่าให้อยู่ในรูปแบบ NULL ของ SQL หากไม่ได้ระบุไอดี
+        clean_item_id = int(item_id) if item_id else None
+        clean_reported_member_id = int(reported_member_id) if reported_member_id else None
+
         cursor.execute(sql, (
-            item_id,
-            member_id,
-            reported_member_id,
-            help_center,
+            clean_item_id,
+            int(member_id),
+            clean_reported_member_id,
+            help_center.strip(),
             problem_type
         ))
 
@@ -65,115 +78,114 @@ def create_report():
         return jsonify({
             "success": True,
             "ProblemID": problem_id,
-            "message": "ส่งรายงานสำเร็จ"
+            "message": "ส่งรายงานสำเร็จเรียบร้อยแล้ว"
         }), 201
 
     except Exception as e:
         print("Create Report Error:", e)
         return jsonify({
             "success": False,
-            "message": str(e)
+            "message": f"เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์: {str(e)}"
         }), 500
 
 
-# ===========================
-# 2. ดึงข้อมูลรายงานทั้งหมด (Read All)
-# ===========================
+# ========================================================
+# 2. ดึงข้อมูลรายงานทั้งหมดสำหรับ Admin (Read All)
+# ========================================================
 @report_bp.route("/api/reports", methods=["GET"])
 def get_reports():
-    conn = get_connection()
-    
-    # 🟢 1. เอา dictionary=True ออก เพื่อจัดการชื่อคอลัมน์ด้วยตัวเอง
-    cursor = conn.cursor()
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
 
-    sql = """
-        SELECT
-            p.ProblemID, p.ItemID, p.MemberID, p.ReportedMemberID,
-            p.ReportStatus, p.ReportDate, p.ResolveDate, p.ProblemType, p.HelpCenterData,
-            i.ItemName, i.ItemImage,
-            reporter.DisplayName AS ReporterName,
-            reported.DisplayName AS ReportedMemberName,
-            a.AdminName
-        FROM problem p
-        LEFT JOIN item i ON p.ItemID = i.ItemID
-        LEFT JOIN member reporter ON p.MemberID = reporter.MemberID
-        LEFT JOIN member reported ON p.ReportedMemberID = reported.MemberID
-        LEFT JOIN admin a ON p.AdminID = a.AdminID
-        ORDER BY p.ReportDate DESC
-    """
+        sql = """
+            SELECT
+                p.ProblemID, p.ItemID, p.MemberID, p.ReportedMemberID,
+                p.ReportStatus, p.ReportDate, p.ResolveDate, p.ProblemType, p.HelpCenterData,
+                i.ItemName, i.ItemImage,
+                reporter.DisplayName AS ReporterName,
+                reported.DisplayName AS ReportedMemberName,
+                a.AdminName
+            FROM problem p
+            LEFT JOIN item i ON p.ItemID = i.ItemID
+            LEFT JOIN member reporter ON p.MemberID = reporter.MemberID
+            LEFT JOIN member reported ON p.ReportedMemberID = reported.MemberID
+            LEFT JOIN admin a ON p.AdminID = a.AdminID
+            ORDER BY p.ReportDate DESC
+        """
 
-    cursor.execute(sql)
+        cursor.execute(sql)
+        columns = [col[0] for col in cursor.description]
+        reports = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
-    # 🟢 2. ใช้ zip เพื่อบังคับให้ Python จับคู่ชื่อคอลัมน์ (AS) ให้ถูกต้อง
-    columns = [col[0] for col in cursor.description]
-    reports = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        cursor.close()
+        conn.close()
 
-    cursor.close()
-    conn.close()
+        return jsonify({"success": True, "data": reports}), 200
 
-    return jsonify(reports), 200
+    except Exception as e:
+        print("Get Reports Error:", e)
+        return jsonify({"success": False, "message": str(e)}), 500
 
 
-# ===========================
+# ========================================================
 # 3. ดูข้อมูลรายงานแบบเจาะจง (Read One)
-# ===========================
+# ========================================================
 @report_bp.route("/api/reports/<int:id>", methods=["GET"])
 def get_report(id):
-    conn = get_connection()
-    
-    # 🟢 1. ใช้ Cursor ธรรมดา
-    cursor = conn.cursor()
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
 
-    sql = """
-        SELECT
-            p.*,
-            i.ItemName,
-            i.ItemImage,
-            reporter.DisplayName AS ReporterName,
-            reported.DisplayName AS ReportedMemberName,
-            a.AdminName
-        FROM problem p
-        LEFT JOIN item i ON p.ItemID = i.ItemID
-        LEFT JOIN member reporter ON p.MemberID = reporter.MemberID
-        LEFT JOIN member reported ON p.ReportedMemberID = reported.MemberID
-        LEFT JOIN admin a ON p.AdminID = a.AdminID
-        WHERE p.ProblemID = %s
-    """
+        sql = """
+            SELECT
+                p.*,
+                i.ItemName,
+                i.ItemImage,
+                reporter.DisplayName AS ReporterName,
+                reported.DisplayName AS ReportedMemberName,
+                a.AdminName
+            FROM problem p
+            LEFT JOIN item i ON p.ItemID = i.ItemID
+            LEFT JOIN member reporter ON p.MemberID = reporter.MemberID
+            LEFT JOIN member reported ON p.ReportedMemberID = reported.MemberID
+            LEFT JOIN admin a ON p.AdminID = a.AdminID
+            WHERE p.ProblemID = %s
+        """
 
-    cursor.execute(sql, (id,))
-    row = cursor.fetchone()
+        cursor.execute(sql, (id,))
+        row = cursor.fetchone()
 
-    # 🟢 2. แปลงข้อมูลแบบเดียวกับด้านบน
-    if row:
-        columns = [col[0] for col in cursor.description]
-        report = dict(zip(columns, row))
-    else:
-        report = None
+        if row:
+            columns = [col[0] for col in cursor.description]
+            report = dict(zip(columns, row))
+            cursor.close()
+            conn.close()
+            return jsonify({"success": True, "data": report}), 200
 
-    cursor.close()
-    conn.close()
+        cursor.close()
+        conn.close()
+        return jsonify({"success": False, "message": "ไม่พบข้อมูลรายงานที่ต้องการ"}), 404
 
-    # ถ้าไม่พบข้อมูลให้แจ้งกลับเป็น 404
-    if report is None:
-        return jsonify({"message": "ไม่พบข้อมูลรายงาน"}), 404
-
-    return jsonify(report), 200
+    except Exception as e:
+        print("Get Report By ID Error:", e)
+        return jsonify({"success": False, "message": str(e)}), 500
 
 
-# ===========================
-# 4. อัปเดตสถานะการรายงาน (Update)
-# ===========================
+# ========================================================
+# 4. อัปเดตสถานะการรายงาน (Update Report Status)
+# ========================================================
 @report_bp.route("/api/reports/<int:id>", methods=["PUT"])
 def update_report(id):
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
         status = data.get("ReportStatus")
         admin_id = data.get("AdminID")
 
         if not status or not admin_id:
             return jsonify({
                 "success": False,
-                "message": "ข้อมูลไม่ครบถ้วน (ต้องการ ReportStatus และ AdminID)"
+                "message": "ข้อมูลไม่ครบถ้วน (ระบุ ReportStatus และ AdminID)"
             }), 400
 
         conn = get_connection()
@@ -194,7 +206,7 @@ def update_report(id):
         cursor.close()
         conn.close()
 
-        return jsonify({"success": True}), 200
+        return jsonify({"success": True, "message": "อัปเดตสถานะการจัดการเรียบร้อยแล้ว"}), 200
 
     except Exception as e:
         print("Update Report Error:", e)

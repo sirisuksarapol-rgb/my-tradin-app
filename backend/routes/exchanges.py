@@ -2,6 +2,7 @@ import random
 from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify
 from db import get_connection
+from services.notification_service import notify_user
 from services.email_service import send_exchange_verify_email
 
 exchanges_bp = Blueprint('exchanges', __name__)
@@ -24,58 +25,32 @@ def get_exchanges():
     try:
         if target_member_id and not member_id:
             where_clause = "WHERE e.TargetMemberID = %s"
-            query_params = (current_user_id,) * 7 
+            query_params = (current_user_id,) * 12
         else:
             where_clause = "WHERE e.MemberID = %s OR e.TargetMemberID = %s"
-            query_params = (current_user_id,) * 8 
+            query_params = (current_user_id,) * 13
 
         sql = f"""
             SELECT 
-                e.ExchangeID, 
-                e.ExchangeStatus, 
-                e.ExchangeLocation, 
-                IFNULL(e.Score, 95) AS Score, 
-                e.MemberID,
-                e.TargetMemberID,
-                e.MyItemID,
-                e.TargetItemID,
-                e.PhoneNumber,
-                e.TargetPhoneNumber,
-                e.StartDate,
-                e.IsMemberVerified,        
-                e.IsTargetMemberVerified,  
+                e.ExchangeID, e.ExchangeStatus, e.ExchangeLocation, 
+                IFNULL(e.Score, 95) AS Score, e.MemberID, e.TargetMemberID,
+                e.MyItemID, e.TargetItemID, e.PhoneNumber, e.TargetPhoneNumber,
+                e.StartDate, e.SuccessDate, e.CancelDate, e.CancelReason,
+                e.IsMemberVerified, e.IsTargetMemberVerified,  
+                e.IsMemberReceived, e.IsTargetMemberReceived,
+                e.PartnerScore, e.PartnerComment, e.Comment,
                 
-                CASE 
-                    WHEN e.MemberID = %s THEN IFNULL(e.TargetPhoneNumber, 'รออีกฝ่ายระบุเบอร์')
-                    ELSE IFNULL(e.PhoneNumber, 'รออีกฝ่ายระบุเบอร์')
-                END AS partnerPhone,
-                
-                CASE 
-                    WHEN e.MemberID = %s THEN IFNULL(my_item.ItemImage, '')
-                    ELSE IFNULL(their_item.ItemImage, '')
-                END AS myPostImage,
-
-                CASE 
-                    WHEN e.MemberID = %s THEN IFNULL(their_item.ItemImage, '')
-                    ELSE IFNULL(my_item.ItemImage, '')
-                END AS theirPostImage,
-                
-                CASE 
-                    WHEN e.MemberID = %s THEN IFNULL(my_item.ItemName, 'ไม่มีชื่อสิ่งของ')
-                    ELSE IFNULL(their_item.ItemName, 'ไม่มีชื่อสิ่งของ')
-                END AS myPostTitle,
-                
-                CASE 
-                    WHEN e.MemberID = %s THEN IFNULL(their_item.ItemName, 'ไม่มีชื่อสิ่งของ')
-                    ELSE IFNULL(my_item.ItemName, 'ไม่มีชื่อสิ่งของ')
-                END AS theirPostTitle,
-
-                IFNULL(
-                    CASE 
-                        WHEN e.MemberID = %s THEN target_member.DisplayName
-                        ELSE requester_member.DisplayName
-                    END, 'ผู้ใช้งานระบบ'
-                ) AS theirAuthorName
+                CASE WHEN e.MemberID = %s THEN IFNULL(e.TargetPhoneNumber, 'รออีกฝ่ายระบุเบอร์') ELSE IFNULL(e.PhoneNumber, 'รออีกฝ่ายระบุเบอร์') END AS partnerPhone,
+                CASE WHEN e.MemberID = %s THEN IFNULL(my_item.ItemImage, '') ELSE IFNULL(their_item.ItemImage, '') END AS myPostImage,
+                CASE WHEN e.MemberID = %s THEN IFNULL(their_item.ItemImage, '') ELSE IFNULL(my_item.ItemImage, '') END AS theirPostImage,
+                CASE WHEN e.MemberID = %s THEN IFNULL(my_item.ItemName, 'ไม่มีชื่อสิ่งของ') ELSE IFNULL(their_item.ItemName, 'ไม่มีชื่อสิ่งของ') END AS myPostTitle,
+                CASE WHEN e.MemberID = %s THEN IFNULL(their_item.ItemName, 'ไม่มีชื่อสิ่งของ') ELSE IFNULL(my_item.ItemName, 'ไม่มีชื่อสิ่งของ') END AS theirPostTitle,
+                IFNULL(CASE WHEN e.MemberID = %s THEN target_member.DisplayName ELSE requester_member.DisplayName END, 'ผู้ใช้งานระบบ') AS theirAuthorName,
+                CASE WHEN e.MemberID = %s THEN target_member.ProfileImage ELSE requester_member.ProfileImage END AS theirProfileImage,
+                CASE WHEN e.MemberID = %s THEN IFNULL(my_item.ItemDescription, '') ELSE IFNULL(their_item.ItemDescription, '') END AS myPostDescription,
+                CASE WHEN e.MemberID = %s THEN IFNULL(their_item.ItemDescription, '') ELSE IFNULL(my_item.ItemDescription, '') END AS theirPostDescription,
+                CASE WHEN e.MemberID = %s THEN IFNULL(my_item.MeetingLocation, '') ELSE IFNULL(their_item.MeetingLocation, '') END AS myMeetingLocation,
+                CASE WHEN e.MemberID = %s THEN IFNULL(their_item.MeetingLocation, '') ELSE IFNULL(my_item.MeetingLocation, '') END AS theirMeetingLocation
 
             FROM exchange e
             LEFT JOIN item my_item ON e.MyItemID = my_item.ItemID
@@ -108,7 +83,6 @@ def get_exchanges():
         return jsonify({"success": True, "data": exchanges}), 200
         
     except Exception as e:
-        print(f"Error fetching exchanges: {str(e)}")
         return jsonify({"success": False, "message": f"เกิดข้อผิดพลาดภายในระบบ: {str(e)}"}), 500
     finally:
         cursor.close()
@@ -120,7 +94,6 @@ def get_exchanges():
 @exchanges_bp.route('/api/exchanges', methods=['POST'])
 def create_exchange():
     data = request.json or {}
-    
     member_id = data.get('member_id')
     target_member_id = data.get('target_member_id')
     my_item_id = data.get('my_item_id')
@@ -129,10 +102,7 @@ def create_exchange():
     phone_number = data.get('phone_number') or ''
 
     if not all([member_id, target_member_id, my_item_id, their_item_id]):
-        return jsonify({
-            "success": False, 
-            "message": "ข้อมูลไม่ครบถ้วน (ต้องการ member_id, target_member_id, my_item_id, their_item_id)"
-        }), 400
+        return jsonify({"success": False, "message": "ข้อมูลไม่ครบถ้วน"}), 400
 
     try:
         member_id = int(member_id)
@@ -141,7 +111,7 @@ def create_exchange():
         their_item_id = int(their_item_id)
     except (ValueError, TypeError) as e:
         return jsonify({"success": False, "message": f"ID ต้องเป็นตัวเลขเท่านั้น: {str(e)}"}), 400
-        
+
     conn = get_connection()
     cursor = conn.cursor(dictionary=True) 
     
@@ -157,39 +127,33 @@ def create_exchange():
         exchange_id = cursor.lastrowid
 
         sender_name, sender_item_name, receiver_item_name = "ผู้ใช้งานระบบ", "สิ่งของชิ้นใหม่", "สิ่งของของคุณ"
-        try:
-            cursor.execute("SELECT DisplayName FROM member WHERE MemberID = %s", (member_id,))
-            m_res = cursor.fetchone()
-            if m_res: sender_name = m_res['DisplayName']
-            
-            cursor.execute("SELECT ItemName FROM item WHERE ItemID = %s", (my_item_id,))
-            i_res1 = cursor.fetchone()
-            if i_res1: sender_item_name = i_res1['ItemName']
-            
-            cursor.execute("SELECT ItemName FROM item WHERE ItemID = %s", (their_item_id,))
-            i_res2 = cursor.fetchone()
-            if i_res2: receiver_item_name = i_res2['ItemName']
-        except Exception as fetch_err:
-            print(f"⚠️ ดึงข้อมูลมาต่อประโยคแจ้งเตือนไม่สำเร็จ: {str(fetch_err)}")
+        cursor.execute("SELECT DisplayName FROM member WHERE MemberID = %s", (member_id,))
+        m_res = cursor.fetchone()
+        if m_res: sender_name = m_res['DisplayName']
+        
+        cursor.execute("SELECT ItemName FROM item WHERE ItemID = %s", (my_item_id,))
+        i_res1 = cursor.fetchone()
+        if i_res1: sender_item_name = i_res1['ItemName']
+        
+        cursor.execute("SELECT ItemName FROM item WHERE ItemID = %s", (their_item_id,))
+        i_res2 = cursor.fetchone()
+        if i_res2: receiver_item_name = i_res2['ItemName']
 
-        custom_message = f"คุณได้รับคำเสนอแลกเปลี่ยนสิ่งของชิ้นใหม่! จาก {sender_name} ต้องการแลก {sender_item_name} กับ {receiver_item_name}"
-        
-        try:
-            sql_notif = """
-                INSERT INTO notification (MemberID, Message, Link, IsRead, CreateDate)
-                VALUES (%s, %s, %s, 0, NOW())
-            """
-            target_link = f"/incoming-requests?id={exchange_id}" 
-            cursor.execute(sql_notif, (target_member_id, custom_message, target_link))
-        except Exception as err:
-            print(f"❌ Notification Insert Error: {str(err)}")
-        
         conn.commit()
+
+        # 🔔 แจ้งเตือน: มีคนเสนอขอแลกเปลี่ยน
+        msg = f"คุณได้รับคำเสนอแลกเปลี่ยนสิ่งของชิ้นใหม่! จาก {sender_name} ต้องการแลก {sender_item_name} กับ {receiver_item_name}"
+        notify_user(
+            member_id=target_member_id,
+            title="มีคำขอแลกเปลี่ยนใหม่เข้ามา!",
+            message=msg,
+            link=f"/incoming-requests?id={exchange_id}"
+        )
+
         return jsonify({"success": True, "message": "ส่งคำขอแลกเปลี่ยนสำเร็จเรียบร้อยแล้ว!"}), 201
         
     except Exception as e:
         conn.rollback()
-        print(f"Error Database INSERT: {str(e)}")
         return jsonify({"success": False, "message": f"ฐานข้อมูลขัดข้อง: {str(e)}"}), 500
     finally:
         cursor.close()
@@ -219,21 +183,30 @@ def update_exchange_status(exchange_id):
             
         if new_status == 'accepted':
             if not phone_number:
-                return jsonify({"success": False, "message": "กรุณาระบุเบอร์โทรศัพท์ของคุณเพื่อยืนยันการตอบรับ"}), 400
+                return jsonify({"success": False, "message": "กรุณาระบุเบอร์โทรศัพท์เพื่อยืนยัน"}), 400
             
             sql_update = "UPDATE exchange SET ExchangeStatus = %s, SuccessDate = NOW(), TargetPhoneNumber = %s WHERE ExchangeID = %s"
             cursor.execute(sql_update, (new_status, phone_number, exchange_id))
+            conn.commit()
+
+            # 🔔 แจ้งเตือน: ตอบรับ
+            notify_user(
+                member_id=exchange['MemberID'],
+                title="คำขอแลกเปลี่ยนได้รับการตอบรับ!",
+                message="คำขอแลกเปลี่ยนของคุณได้รับการ 'ตอบรับ' แล้ว! 🎉 กรุณาเข้าสู่ระบบเพื่อยืนยันตัวตนแลกเปลี่ยนข้อมูลติดต่อ",
+            )
         else:
             sql_update = "UPDATE exchange SET ExchangeStatus = %s, CancelDate = NOW() WHERE ExchangeID = %s"
             cursor.execute(sql_update, (new_status, exchange_id))
-        
-        msg = "คำขอแลกเปลี่ยนของคุณได้รับการ 'ตอบรับ' แล้ว! 🎉" if action == 'accept' else "คำขอแลกเปลี่ยนของคุณถูก 'ปฏิเสธ' แล้ว ❌"
-        cursor.execute("""
-            INSERT INTO notification (MemberID, Message, Link, IsRead, CreateDate) 
-            VALUES (%s, %s, '/notifications', 0, NOW())
-        """, (exchange['MemberID'], msg))
-            
-        conn.commit()
+            conn.commit()
+
+            # 🔔 แจ้งเตือน: ปฏิเสธ
+            notify_user(
+                member_id=exchange['MemberID'],
+                title="คำขอแลกเปลี่ยนถูกปฏิเสธ",
+                message="คำขอแลกเปลี่ยนของคุณถูก 'ปฏิเสธ' แล้ว ❌",
+            )
+
         return jsonify({"success": True, "message": f"ทำการ {action} คำขอเรียบร้อยแล้ว"}), 200
         
     except Exception as e:
@@ -243,66 +216,35 @@ def update_exchange_status(exchange_id):
         cursor.close()
         conn.close()
 
-# ========================================================
-# 4. API: ดึงรายการแจ้งเตือนทั้งหมด (GET)
-# ========================================================
-@exchanges_bp.route('/api/notifications', methods=['GET'])
-def get_notifications():
-    member_id = request.args.get('member_id')
-    if not member_id:
-        return jsonify({"success": False, "message": "กรุณาระบุ member_id ใน Query Parameter"}), 400
+# ==========================================
+# 4. API: ยกเลิกการแลกเปลี่ยน (PUT)
+# ==========================================
+@exchanges_bp.route('/api/exchanges/<int:exchange_id>/cancel', methods=['PUT'])
+def cancel_exchange(exchange_id):
+    data = request.json or {}
+    reason = data.get('reason', 'ไม่ระบุเหตุผล')
+    user_id = data.get('user_id')
 
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        sql = "SELECT * FROM notification WHERE MemberID = %s ORDER BY CreateDate DESC"
-        cursor.execute(sql, (member_id,))
-        notifications = cursor.fetchall()
-        
-        for n in notifications:
-            if n.get('CreateDate'):
-                n['CreateDate'] = n['CreateDate'].strftime('%Y-%m-%d %H:%M:%S')
+        cursor.execute("SELECT MemberID, TargetMemberID FROM exchange WHERE ExchangeID = %s", (exchange_id,))
+        ex_data = cursor.fetchone()
 
-        return jsonify({"success": True, "data": notifications}), 200
-    except Exception as e:
-        return jsonify({"success": False, "message": f"เกิดข้อผิดพลาด: {str(e)}"}), 500
-    finally:
-        cursor.close()
-        conn.close()
-
-# ========================================================
-# 5. API: นับจำนวนแจ้งเตือนที่ยังไม่ได้อ่าน (GET)
-# ========================================================
-@exchanges_bp.route('/api/notifications/unread-count', methods=['GET'])
-def get_unread_notification_count():
-    member_id = request.args.get('member_id')
-    if not member_id:
-        return jsonify({"success": False, "message": "กรุณาระบุ member_id"}), 400
-
-    conn = get_connection()
-    cursor = conn.cursor(dictionary=True)
-    try:
-        sql = "SELECT COUNT(*) as unreadCount FROM notification WHERE MemberID = %s AND IsRead = 0"
-        cursor.execute(sql, (member_id,))
-        result = cursor.fetchone()
-        return jsonify({"success": True, "count": result['unreadCount'] if result else 0}), 200
-    except Exception as e:
-        return jsonify({"success": False, "message": f"เกิดข้อผิดพลาด: {str(e)}"}), 500
-    finally:
-        cursor.close()
-        conn.close()
-
-# ========================================================
-# 6. API: อัปเดตแจ้งเตือนเป็น "อ่านแล้ว" (PUT)
-# ========================================================
-@exchanges_bp.route('/api/notifications/<int:notification_id>/read', methods=['PUT'])
-def mark_notification_as_read(notification_id):
-    conn = get_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("UPDATE notification SET IsRead = 1 WHERE NotificationID = %s", (notification_id,))
+        sql = "UPDATE exchange SET ExchangeStatus = 'failed', CancelDate = NOW(), CancelReason = %s WHERE ExchangeID = %s"
+        cursor.execute(sql, (reason, exchange_id))
         conn.commit()
-        return jsonify({"success": True, "message": "อัปเดตสถานะการอ่านเรียบร้อยแล้ว"}), 200
+
+        # 🔔 แจ้งเตือนคู่แลกเปลี่ยนว่ารายการถูกยกเลิก
+        if ex_data and user_id:
+            partner_id = ex_data['TargetMemberID'] if str(user_id) == str(ex_data['MemberID']) else ex_data['MemberID']
+            notify_user(
+                member_id=partner_id,
+                title="รายการแลกเปลี่ยนถูกยกเลิก",
+                message=f"รายการแลกเปลี่ยนรหัส #{exchange_id} ถูกยกเลิกแล้ว เหตุผล: {reason}",
+            )
+
+        return jsonify({"success": True, "message": "ยกเลิกการแลกเปลี่ยนสำเร็จ"}), 200
     except Exception as e:
         conn.rollback()
         return jsonify({"success": False, "message": f"เกิดข้อผิดพลาด: {str(e)}"}), 500
@@ -310,70 +252,76 @@ def mark_notification_as_read(notification_id):
         cursor.close()
         conn.close()
 
-# ========================================================
-# 7. API: ดึงสถิติและรีวิวผู้ใช้งาน (GET)
-# ========================================================
-@exchanges_bp.route('/api/users/<int:user_id>/stats', methods=['GET'])
-def get_user_stats(user_id):
+# ==========================================
+# 5. API: ยืนยันได้รับสิ่งของ (PUT)
+# ==========================================
+@exchanges_bp.route('/api/exchanges/<int:exchange_id>/complete', methods=['PUT'])
+def complete_exchange(exchange_id):
+    data = request.json or {}
+    score = data.get('score')
+    comment = data.get('comment', '')
+    user_id = data.get('user_id') 
+
+    if not user_id:
+        return jsonify({"success": False, "message": "ไม่พบข้อมูลผู้ใช้งาน (กรุณาแนบ user_id)"}), 400
+
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
+    
     try:
-        sql_count = """
-            SELECT COUNT(*) AS total_success
-            FROM exchange
-            WHERE (MemberID = %s OR TargetMemberID = %s)
-            AND ExchangeStatus IN ('accepted', 'completed')
-        """
-        cursor.execute(sql_count, (user_id, user_id))
-        count_res = cursor.fetchone()
-        successful_exchanges = count_res['total_success'] if count_res else 0
+        cursor.execute("SELECT MemberID, TargetMemberID, IsMemberReceived, IsTargetMemberReceived, MyItemID, TargetItemID FROM exchange WHERE ExchangeID = %s", (exchange_id,))
+        ex_data = cursor.fetchone()
+        if not ex_data:
+            return jsonify({"success": False, "message": "ไม่พบรายการแลกเปลี่ยนนี้"}), 404
+            
+        if int(user_id) == ex_data['MemberID']:
+            cursor.execute("UPDATE exchange SET IsMemberReceived = 1, Score = %s, Comment = %s WHERE ExchangeID = %s", (score, comment, exchange_id))
+            is_member_rec = 1
+            is_target_rec = ex_data['IsTargetMemberReceived']
+            partner_id = ex_data['TargetMemberID']
+        elif int(user_id) == ex_data['TargetMemberID']:
+            cursor.execute("UPDATE exchange SET IsTargetMemberReceived = 1, PartnerScore = %s, PartnerComment = %s WHERE ExchangeID = %s", (score, comment, exchange_id))
+            is_member_rec = ex_data['IsMemberReceived']
+            is_target_rec = 1
+            partner_id = ex_data['MemberID']
+        else:
+            return jsonify({"success": False, "message": "คุณไม่มีสิทธิ์ทำรายการนี้"}), 403
 
-        sql_reviews = """
-            SELECT
-                e.ExchangeID,
-                e.SuccessDate AS ReviewDate,
-                CASE WHEN e.MemberID = %s THEN e.PartnerScore ELSE e.Score END AS Rating,
-                CASE WHEN e.MemberID = %s THEN e.PartnerComment ELSE e.Comment END AS Comment,
-                CASE 
-                    WHEN e.MemberID = %s THEN COALESCE(target_member.DisplayName, 'ผู้ใช้งานทั่วไป')
-                    ELSE COALESCE(requester_member.DisplayName, 'ผู้ใช้งานทั่วไป')
-                END AS ReviewerName
-            FROM exchange e
-            LEFT JOIN member requester_member ON e.MemberID = requester_member.MemberID
-            LEFT JOIN member target_member ON e.TargetMemberID = target_member.MemberID
-            WHERE ((e.MemberID = %s AND e.PartnerScore IS NOT NULL) OR (e.TargetMemberID = %s AND e.Score IS NOT NULL))
-              AND e.ExchangeStatus IN ('accepted', 'completed')
-            ORDER BY e.SuccessDate DESC
-        """
-        cursor.execute(sql_reviews, (user_id, user_id, user_id, user_id, user_id))
-        reviews_raw = cursor.fetchall()
+        # ตรวจสอบว่ายืนยันครบทั้งคู่หรือยัง
+        if is_member_rec == 1 and is_target_rec == 1:
+            cursor.execute("UPDATE exchange SET ExchangeStatus = 'completed', SuccessDate = NOW() WHERE ExchangeID = %s", (exchange_id,))
+            cursor.execute("UPDATE item SET ItemStatus = 'exchanged' WHERE ItemID IN (%s, %s)", (ex_data['MyItemID'], ex_data['TargetItemID']))
+            conn.commit()
 
-        total_score = 0
-        valid_reviews = []
-        for rev in reviews_raw:
-            rev['ReviewDate'] = rev['ReviewDate'].strftime('%d/%m/%Y %H:%M') if rev['ReviewDate'] else 'ไม่มีระบุวันที่'
-            if rev['Rating'] is not None:
-                total_score += float(rev['Rating'])
-                valid_reviews.append(rev)
+            # 🔔 แจ้งเตือนทั้ง 2 ฝ่าย: การแลกเปลี่ยนเสร็จสมบูรณ์
+            success_msg = f"การแลกเปลี่ยนรหัส #{exchange_id} เสร็จสมบูรณ์แล้ว! ขอบคุณที่ร่วมแลกเปลี่ยนสิ่งของ"
+            notify_user(ex_data['MemberID'], "การแลกเปลี่ยนเสร็จสมบูรณ์! 🎉", success_msg)
+            notify_user(ex_data['TargetMemberID'], "การแลกเปลี่ยนเสร็จสมบูรณ์! 🎉", success_msg)
 
-        review_score = f"{(total_score / len(valid_reviews)):.1f}" if valid_reviews else "0.0"
+            msg = "ทำรายการสำเร็จ! การแลกเปลี่ยนเสร็จสมบูรณ์และซ่อนสิ่งของจากหน้าฟีดแล้ว"
+        else:
+            conn.commit()
 
-        return jsonify({
-            "success": True,
-            "data": {
-                "successfulExchanges": successful_exchanges,
-                "reviewScore": review_score,
-                "reviews": valid_reviews
-            }
-        }), 200
+            # 🔔 แจ้งเตือนคู่แลกเปลี่ยน: อีกฝ่ายยืนยันได้รับของแล้ว
+            notify_user(
+                member_id=partner_id,
+                title="คู่แลกเปลี่ยนยืนยันได้รับของแล้ว 📦",
+                message="คู่แลกเปลี่ยนของคุณได้กดยืนยันว่าได้รับสิ่งของแล้ว กรุณากดยืนยันการรับของเพื่อทำรายการให้เสร็จสมบูรณ์",
+            )
+
+            msg = "บันทึกรีวิวแล้ว! กรุณารอให้อีกฝ่ายกดยืนยันได้รับสิ่งของ ระบบจึงจะเปลี่ยนสถานะเป็นสำเร็จ"
+            
+        return jsonify({"success": True, "message": msg}), 200
+        
     except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 500
+        conn.rollback()
+        return jsonify({"success": False, "message": f"เกิดข้อผิดพลาดในการบันทึกข้อมูล: {str(e)}"}), 500
     finally:
         cursor.close()
         conn.close()
 
 # ==========================================
-# 8. API: ขอรหัสผ่าน OTP เพื่อดูเบอร์โทร (POST)
+# 6. API: ขอรหัสผ่าน OTP เพื่อดูเบอร์โทร (POST)
 # ==========================================
 @exchanges_bp.route('/api/exchanges/<int:match_id>/request-code', methods=['POST'])
 def request_exchange_code(match_id):
@@ -404,20 +352,17 @@ def request_exchange_code(match_id):
         expire_time = datetime.now() + timedelta(minutes=10)
 
         cursor.execute("UPDATE member SET VerifyCode = %s, VerifyExpire = %s WHERE MemberID = %s", (code, expire_time, user_id))
-        
+        conn.commit()
+
         try:
             send_exchange_verify_email(user['Email'], code)
         except Exception as e:
-            print(f"⚠️ ส่งอีเมลไม่สำเร็จ: {str(e)}")
+            print(f"⚠️ ส่งอีเมล OTP ไม่สำเร็จ: {str(e)}")
 
+        # 🔔 แจ้งเตือนรหัส OTP
         noti_message = f"รหัสยืนยันความปลอดภัยเพื่อดูข้อมูลการติดต่อคือ: {code} (รหัสมีอายุ 10 นาที)"
-        noti_link = f"/exchange-tracking/{match_id}"
-        cursor.execute("""
-            INSERT INTO notification (MemberID, Message, Link, IsRead, CreateDate)
-            VALUES (%s, %s, %s, 0, NOW())
-        """, (user_id, noti_message, noti_link))
+        notify_user(user_id, "รหัส OTP ดูข้อมูลการติดต่อ", noti_message, f"/exchange-tracking/{match_id}")
 
-        conn.commit()
         return jsonify({"success": True, "message": "ส่งรหัสยืนยันไปยังอีเมลและการแจ้งเตือนเรียบร้อยแล้ว"}), 200
         
     except Exception as e:
@@ -428,7 +373,7 @@ def request_exchange_code(match_id):
         conn.close()
 
 # ==========================================
-# 9. API: ยืนยันรหัส OTP เพื่อดูเบอร์โทร (POST)
+# 7. API: ยืนยันรหัส OTP เพื่อดูเบอร์โทร (POST)
 # ==========================================
 @exchanges_bp.route('/api/exchanges/<int:match_id>/verify-code', methods=['POST'])
 def verify_exchange_code(match_id):
@@ -487,21 +432,66 @@ def verify_exchange_code(match_id):
         cursor.close()
         conn.close()
 
-# ==========================================
-# 10. API: ยกเลิกการแลกเปลี่ยน (PUT)
-# ==========================================
-@exchanges_bp.route('/api/exchanges/<int:exchange_id>/cancel', methods=['PUT'])
-def cancel_exchange(exchange_id):
-    data = request.json or {}
-    reason = data.get('reason')
+# ========================================================
+# 8. API: ดึงรายการแจ้งเตือนทั้งหมด (GET)
+# ========================================================
+@exchanges_bp.route('/api/notifications', methods=['GET'])
+def get_notifications():
+    member_id = request.args.get('member_id')
+    if not member_id:
+        return jsonify({"success": False, "message": "กรุณาระบุ member_id ใน Query Parameter"}), 400
 
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        sql = "SELECT * FROM notification WHERE MemberID = %s ORDER BY CreateDate DESC"
+        cursor.execute(sql, (member_id,))
+        notifications = cursor.fetchall()
+        
+        for n in notifications:
+            if n.get('CreateDate'):
+                n['CreateDate'] = n['CreateDate'].strftime('%Y-%m-%d %H:%M:%S')
+
+        return jsonify({"success": True, "data": notifications}), 200
+    except Exception as e:
+        return jsonify({"success": False, "message": f"เกิดข้อผิดพลาด: {str(e)}"}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+# ========================================================
+# 9. API: นับจำนวนแจ้งเตือนที่ยังไม่ได้อ่าน (GET)
+# ========================================================
+@exchanges_bp.route('/api/notifications/unread-count', methods=['GET'])
+def get_unread_notification_count():
+    member_id = request.args.get('member_id')
+    if not member_id:
+        return jsonify({"success": False, "message": "กรุณาระบุ member_id"}), 400
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        sql = "SELECT COUNT(*) as unreadCount FROM notification WHERE MemberID = %s AND IsRead = 0"
+        cursor.execute(sql, (member_id,))
+        result = cursor.fetchone()
+        return jsonify({"success": True, "count": result['unreadCount'] if result else 0}), 200
+    except Exception as e:
+        return jsonify({"success": False, "message": f"เกิดข้อผิดพลาด: {str(e)}"}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+# ========================================================
+# 10. API: อัปเดตแจ้งเตือนเป็น "อ่านแล้ว" (PUT)
+# ========================================================
+@exchanges_bp.route('/api/notifications/<int:notification_id>/read', methods=['PUT'])
+def mark_notification_as_read(notification_id):
     conn = get_connection()
     cursor = conn.cursor()
     try:
-        sql = "UPDATE exchange SET ExchangeStatus = 'failed', CancelDate = NOW(), CancelReason = %s WHERE ExchangeID = %s"
-        cursor.execute(sql, (reason, exchange_id))
+        cursor.execute("UPDATE notification SET IsRead = 1 WHERE NotificationID = %s", (notification_id,))
         conn.commit()
-        return jsonify({"success": True, "message": "ยกเลิกการแลกเปลี่ยนสำเร็จ"}), 200
+        return jsonify({"success": True, "message": "อัปเดตสถานะการอ่านเรียบร้อยแล้ว"}), 200
     except Exception as e:
         conn.rollback()
         return jsonify({"success": False, "message": f"เกิดข้อผิดพลาด: {str(e)}"}), 500
@@ -509,52 +499,64 @@ def cancel_exchange(exchange_id):
         cursor.close()
         conn.close()
 
-# ==========================================
-# 11. API: ยืนยันได้รับสิ่งของและบันทึกรีวิว (PUT)
-# ==========================================
-@exchanges_bp.route('/api/exchanges/<int:exchange_id>/complete', methods=['PUT'])
-def complete_exchange(exchange_id):
-    data = request.json or {}
-    score = data.get('score')
-    comment = data.get('comment', '')
-    user_id = data.get('user_id') 
-
-    if not user_id:
-        return jsonify({"success": False, "message": "ไม่พบข้อมูลผู้ใช้งาน (กรุณาแนบ user_id)"}), 400
-
+# ========================================================
+# 11. API: ดึงสถิติและรีวิวผู้ใช้งาน (GET)
+# ========================================================
+@exchanges_bp.route('/api/users/<int:user_id>/stats', methods=['GET'])
+def get_user_stats(user_id):
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
-    
     try:
-        cursor.execute("SELECT MemberID, TargetMemberID, IsMemberReceived, IsTargetMemberReceived, MyItemID, TargetItemID FROM exchange WHERE ExchangeID = %s", (exchange_id,))
-        ex_data = cursor.fetchone()
-        if not ex_data:
-            return jsonify({"success": False, "message": "ไม่พบรายการแลกเปลี่ยนนี้"}), 404
-            
-        if int(user_id) == ex_data['MemberID']:
-            cursor.execute("UPDATE exchange SET IsMemberReceived = 1, Score = %s, Comment = %s WHERE ExchangeID = %s", (score, comment, exchange_id))
-            is_member_rec = 1
-            is_target_rec = ex_data['IsTargetMemberReceived']
-        elif int(user_id) == ex_data['TargetMemberID']:
-            cursor.execute("UPDATE exchange SET IsTargetMemberReceived = 1, PartnerScore = %s, PartnerComment = %s WHERE ExchangeID = %s", (score, comment, exchange_id))
-            is_member_rec = ex_data['IsMemberReceived']
-            is_target_rec = 1
-        else:
-            return jsonify({"success": False, "message": "คุณไม่มีสิทธิ์ทำรายการนี้"}), 403
+        sql_count = """
+            SELECT COUNT(*) AS total_success
+            FROM exchange
+            WHERE (MemberID = %s OR TargetMemberID = %s)
+            AND ExchangeStatus IN ('accepted', 'completed')
+        """
+        cursor.execute(sql_count, (user_id, user_id))
+        count_res = cursor.fetchone()
+        successful_exchanges = count_res['total_success'] if count_res else 0
 
-        if is_member_rec == 1 and is_target_rec == 1:
-            cursor.execute("UPDATE exchange SET ExchangeStatus = 'completed', SuccessDate = NOW() WHERE ExchangeID = %s", (exchange_id,))
-            cursor.execute("UPDATE item SET ItemStatus = 'exchanged' WHERE ItemID IN (%s, %s)", (ex_data['MyItemID'], ex_data['TargetItemID']))
-            msg = "ทำรายการสำเร็จ! การแลกเปลี่ยนเสร็จสมบูรณ์และซ่อนสิ่งของจากหน้าฟีดแล้ว"
-        else:
-            msg = "บันทึกรีวิวแล้ว! กรุณารอให้อีกฝ่ายกดยืนยันได้รับสิ่งของ ระบบจึงจะเปลี่ยนสถานะเป็นสำเร็จ"
-            
-        conn.commit()
-        return jsonify({"success": True, "message": msg}), 200
-        
+        sql_reviews = """
+            SELECT
+                e.ExchangeID,
+                e.SuccessDate AS ReviewDate,
+                CASE WHEN e.MemberID = %s THEN e.PartnerScore ELSE e.Score END AS Rating,
+                CASE WHEN e.MemberID = %s THEN e.PartnerComment ELSE e.Comment END AS Comment,
+                CASE 
+                    WHEN e.MemberID = %s THEN COALESCE(target_member.DisplayName, 'ผู้ใช้งานทั่วไป')
+                    ELSE COALESCE(requester_member.DisplayName, 'ผู้ใช้งานทั่วไป')
+                END AS ReviewerName
+            FROM exchange e
+            LEFT JOIN member requester_member ON e.MemberID = requester_member.MemberID
+            LEFT JOIN member target_member ON e.TargetMemberID = target_member.MemberID
+            WHERE ((e.MemberID = %s AND e.PartnerScore IS NOT NULL) OR (e.TargetMemberID = %s AND e.Score IS NOT NULL))
+              AND e.ExchangeStatus IN ('accepted', 'completed')
+            ORDER BY e.SuccessDate DESC
+        """
+        cursor.execute(sql_reviews, (user_id, user_id, user_id, user_id, user_id))
+        reviews_raw = cursor.fetchall()
+
+        total_score = 0
+        valid_reviews = []
+        for rev in reviews_raw:
+            rev['ReviewDate'] = rev['ReviewDate'].strftime('%d/%m/%Y %H:%M') if rev['ReviewDate'] else 'ไม่มีระบุวันที่'
+            if rev['Rating'] is not None:
+                total_score += float(rev['Rating'])
+                valid_reviews.append(rev)
+
+        review_score = f"{(total_score / len(valid_reviews)):.1f}" if valid_reviews else "0.0"
+
+        return jsonify({
+            "success": True,
+            "data": {
+                "successfulExchanges": successful_exchanges,
+                "reviewScore": review_score,
+                "reviews": valid_reviews
+            }
+        }), 200
     except Exception as e:
-        conn.rollback()
-        return jsonify({"success": False, "message": f"เกิดข้อผิดพลาดในการบันทึกข้อมูล: {str(e)}"}), 500
+        return jsonify({"success": False, "message": str(e)}), 500
     finally:
         cursor.close()
         conn.close()
