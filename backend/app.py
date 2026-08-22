@@ -20,8 +20,10 @@ from routes.admin import admin_bp
 app = Flask(__name__)
 CORS(app) 
 
+# ดึงรหัส JWT จาก .env ถ้าไม่มีให้ใช้ค่าเริ่มต้น
 app.config['SECRET_KEY'] = os.getenv('JWT_SECRET', 'supersecret123')
 
+# ตั้งค่าที่เก็บรูปภาพ
 UPLOAD_FOLDER = os.path.join(os.getcwd(), 'uploads')
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
@@ -32,6 +34,7 @@ if not os.path.exists(UPLOAD_FOLDER):
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
+# นำเข้า Routes ต่างๆ
 app.register_blueprint(login_bp)
 app.register_blueprint(verify_bp)
 app.register_blueprint(register_bp)
@@ -45,4 +48,6 @@ app.register_blueprint(admin_bp, url_prefix='/api/admin')
 app.register_blueprint(match_bp)
 
 if __name__ == "__main__":
+    # ตอนอัปขึ้น Render ระบบจะจัดการ port ให้เอง
+    # พอร์ต 5000 มีไว้สำหรับเทสในเครื่อง
     app.run(host="0.0.0.0", port=5000, debug=True)
