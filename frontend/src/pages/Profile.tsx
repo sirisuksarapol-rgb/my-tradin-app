@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import AppLayout from "@/components/AppLayout";
-import { getUserStats, getItems } from "@/api/api";
+import { getUserStats, getItems, IMAGE_BASE_URL } from "@/api/api";
 
 interface ProfileUser {
   MemberID: number;
@@ -89,8 +89,7 @@ export default function Profile() {
 
       try {
         const parsedUser: ProfileUser = JSON.parse(savedUser);
-        const BACKEND_URL = "http://localhost:5000/uploads/";
-
+        const BACKEND_URL = `${IMAGE_BASE_URL}/uploads/`;
         let imageUrl = "";
         if (parsedUser.ProfileImage) {
           imageUrl = parsedUser.ProfileImage.startsWith("http")

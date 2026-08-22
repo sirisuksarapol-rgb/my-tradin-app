@@ -235,10 +235,19 @@ export default function EditPost() {
   return (
     <AppLayout>
       {/* Hero */}
-      <section className="border-b border-border/50 bg-muted/20">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 py-8 sm:py-10">
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">แก้ไขโพสต์</h1>
-          <p className="text-sm text-muted-foreground mt-1">แก้ไขข้อมูลสิ่งของที่ต้องการแลกเปลี่ยน</p>
+      <section className="border-b border-border/50 bg-muted/30 w-screen relative left-1/2 -translate-x-1/2 -mt-6 px-4 sm:px-6">
+        <div className="mx-auto max-w-5xl py-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight font-heading">แก้ไขโพสต์</h1>
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">แก้ไขข้อมูลสิ่งของที่ต้องการแลกเปลี่ยน</p>
+            </div>
+            <Button variant="ghost" size="icon" onClick={() => navigate("/my-posts")} className="rounded-full">
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
         </div>
       </section>
 

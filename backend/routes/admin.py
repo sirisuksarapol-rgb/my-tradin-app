@@ -206,17 +206,41 @@ def resolve_report(problem_id):
 # ======================================
 @admin_bp.route("/users/<int:member_id>/suspend", methods=["PUT"])
 def suspend_user(member_id):
+    data = request.json or {}
+    suspend_type = data.get("type", "permanent")
+    days = data.get("days", 0)
+    reason = data.get("reason", "ละเมิดเงื่อนไขข้อตกลงของระบบ")
+
+    # คำนวณเวลาสิ้นสุดการแบน
+    suspended_until = None
+    if suspend_type == "temporary" and days:
+        suspended_until = datetime.datetime.now() + datetime.timedelta(days=int(days))
+
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        cursor.execute("UPDATE member SET MemberStatus = 'Suspended' WHERE MemberID = %s", (member_id,))
+        # อัปเดตสถานะและข้อมูลการแบนลงฐานข้อมูล
+        cursor.execute("""
+            UPDATE member 
+            SET MemberStatus = 'Suspended', 
+                SuspendedUntil = %s, 
+                SuspendReason = %s 
+            WHERE MemberID = %s
+        """, (suspended_until, reason, member_id))
         conn.commit()
 
-        # แจ้งเตือนผู้ใช้ผ่านอีเมลและระบบ
+        # สร้างข้อความแจ้งเตือนที่ชัดเจน
+        message = f"บัญชีของคุณถูกระงับเนื่องจาก: {reason}"
+        if suspended_until:
+            message += f"\nจะสามารถใช้งานได้อีกครั้งในวันที่ {suspended_until.strftime('%d/%m/%Y %H:%M น.')}"
+        else:
+            message += "\n(ระงับแบบถาวร)"
+
+        # แจ้งเตือนผู้ใช้
         notify_user(
             member_id=member_id,
             title="แจ้งเตือนการระงับสิทธิ์ใช้งาน",
-            message="บัญชีของคุณถูกระงับการใช้งานเนื่องจากละเมิดเงื่อนไขข้อตกลงของระบบ หากมีข้อสงสัยโปรดติดต่อผู้ดูแลระบบ",
+            message=message,
             link="/contact"
         )
 
@@ -237,7 +261,14 @@ def unsuspend_user(member_id):
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        cursor.execute("UPDATE member SET MemberStatus = 'Active' WHERE MemberID = %s", (member_id,))
+        # ปรับสถานะเป็น Active และล้างข้อมูลการแบนทิ้ง
+        cursor.execute("""
+            UPDATE member 
+            SET MemberStatus = 'Active', 
+                SuspendedUntil = NULL, 
+                SuspendReason = NULL 
+            WHERE MemberID = %s
+        """, (member_id,))
         conn.commit()
 
         notify_user(
@@ -255,7 +286,7 @@ def unsuspend_user(member_id):
     finally:
         cursor.close()
         conn.close()
-
+        
 # ======================================
 # 8. ลบโพสต์โดยแอดมิน (DELETE)
 # ======================================

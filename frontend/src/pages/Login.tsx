@@ -1,183 +1,254 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import axios from "axios"; // ✅ เพิ่ม axios เพื่อใช้ทำ Type Guard
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent } from "@/components/ui/card";
-import { Leaf, ArrowRight, Eye, EyeOff, Mail, Lock } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Mail, Lock, Sparkles, AlertTriangle } from "lucide-react";
 import logo from "@/assets/logo.png";
 import { useToast } from "@/hooks/use-toast";
 import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
-import { login as loginApi } from "@/api/api"; // แก้ path ให้ตรงกับที่อยู่ของไฟล์ api.js
+import { login as loginApi } from "@/api/api"; 
 
 export default function Login() {
-  const navigate = useNavigate();
-  const { toast } = useToast();
+  const navigate = useNavigate(); 
+  const { toast } = useToast(); 
 
-  const [formData, setFormData] = useState({ email: "", password: "" });
-  const [errors, setErrors] = useState<Partial<typeof formData>>({});
-  const [showPassword, setShowPassword] = useState(false);
+  const [formData, setFormData] = useState({ email: "", password: "" }); 
+  const [errors, setErrors] = useState<Partial<typeof formData>>({}); 
+  const [showPassword, setShowPassword] = useState(false); 
+  const [isLoading, setIsLoading] = useState(false);
+  
+  const [suspendData, setSuspendData] = useState<{reason: string, until: string} | null>(null);
 
-  const updateField = (field: keyof typeof formData, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-    if (errors[field]) setErrors((prev) => ({ ...prev, [field]: "" }));
+  const updateField = (field: keyof typeof formData, value: string) => { 
+    setFormData((prev) => ({ ...prev, [field]: value })); 
+    if (errors[field]) setErrors((prev) => ({ ...prev, [field]: "" })); 
   };
 
-  const validateForm = () => {
-    const newErrors: Partial<typeof formData> = {};
-    if (!formData.email.includes("@")) newErrors.email = "อีเมลไม่ถูกต้องต้องมี @";
-    if (formData.password.length < 8) newErrors.password = "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร";
+  const validateForm = () => { 
+    const newErrors: Partial<typeof formData> = {}; 
+    if (!formData.email.includes("@")) newErrors.email = "รูปแบบอีเมลไม่ถูกต้อง"; 
+    if (formData.password.length < 8) newErrors.password = "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร"; 
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    setErrors(newErrors); 
+    return Object.keys(newErrors).length === 0; 
   };
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleLogin = async (e: React.FormEvent) => { 
+    e.preventDefault(); 
 
-    if (!validateForm()) return;
+    if (!validateForm()) return; 
+    setIsLoading(true);
+    setSuspendData(null); 
 
     try {
+      const response = await loginApi(formData); 
 
-        const response = await loginApi(formData);
+      if (response.data.success) { 
+        localStorage.setItem("user", JSON.stringify(response.data.user)); 
+        localStorage.setItem("token", response.data.token); 
+        localStorage.setItem("role", response.data.role); 
 
-        if (response.data.success) {
-
-            localStorage.setItem(
-                "user",
-                JSON.stringify(response.data.user)
-            );
-
-            localStorage.setItem(
-                "token",
-                response.data.token
-            );
-
-            localStorage.setItem(
-                "role",
-                response.data.role
-            );
-
-            if (response.data.role === "admin") {
-
-                navigate("/admin");
-
-            } else {
-
-                navigate("/feed");
-
-            }
-
+        if (response.data.role === "admin") { 
+          navigate("/admin"); 
         } else {
-
-            toast({
-                title: "อีเมลหรือรหัสผ่านไม่ถูกต้อง",
-                variant: "destructive"
-            });
-
+          navigate("/feed"); 
         }
+      }
+    }  catch (error) { 
+      console.error(error);
+      
+      if (axios.isAxiosError(error)) {
+        const status = error.response?.status;
+        const data = error.response?.data;
 
-    } catch (error) {
-
-        console.log(error);
-
-        toast({
-            title: "เกิดข้อผิดพลาดในการเข้าสู่ระบบ",
-            variant: "destructive"
-        });
-
+        if (status === 403 && data) {
+          // ✅ เก็บข้อมูลแยกเป็นเหตุผลและเวลา
+          setSuspendData({
+            reason: data.reason || data.message || "ละเมิดเงื่อนไขการใช้งาน",
+            until: data.suspended_until || "ถาวร"
+          });
+          setIsLoading(false);
+          return;
+        } 
+        
+        if (status === 401) {
+          toast({
+            title: "เข้าสู่ระบบไม่สำเร็จ",
+            description: data?.message || "อีเมลหรือรหัสผ่านไม่ถูกต้อง โปรดลองอีกครั้ง", 
+            variant: "destructive" 
+          });
+          setIsLoading(false);
+          return;
+        }
+      }
+      
+      toast({
+        title: "ระบบขัดข้อง",
+        description: "เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์", 
+        variant: "destructive" 
+      });
+    } finally {
+      setIsLoading(false);
     }
-
-};
+  };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col select-none">
-      <Navbar />
+    <div className="min-h-screen bg-[#FDFDFD] dark:bg-zinc-950 flex flex-col font-sans selection:bg-primary/20">
+      <Navbar /> 
 
-      <main className="flex-1 flex items-center justify-center py-12 sm:py-16 px-4">
-        <div className="w-full max-w-6xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
-          {/* Left: Branding panel (desktop) */}
-          <div className="hidden lg:flex flex-col items-center justify-center space-y-8 p-12 bg-muted/30 rounded-3xl border border-border/50">
-            <img src={logo} alt="Tradin Logo" className="w-24 h-auto" />
-            <h2 className="text-3xl font-extrabold tracking-tight text-center">
-              ยินดีต้อนรับกลับสู่ <br />Tradin<span className="text-primary">.</span>
-            </h2>
-            <p className="text-muted-foreground text-center max-w-sm leading-relaxed">
-              เข้าสู่ระบบเพื่อเริ่มต้นแลกเปลี่ยนสิ่งของ และเป็นส่วนหนึ่งของชุมชนที่ยั่งยืน
-            </p>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Leaf className="h-4 w-4 text-primary" />
-              <span>ร่วมสร้างโลกที่ยั่งยืนไปด้วยกัน</span>
-            </div>
-          </div>
+      <main className="flex-1 flex items-center justify-center relative overflow-hidden p-4 sm:p-8">
+        
+        <div className="absolute top-1/4 left-1/4 w-[400px] sm:w-[600px] h-[400px] sm:h-[600px] bg-primary/10 dark:bg-primary/20 rounded-full blur-[100px] sm:blur-[150px] mix-blend-multiply dark:mix-blend-screen pointer-events-none animate-pulse duration-10000" />
+        <div className="absolute bottom-1/4 right-1/4 w-[300px] sm:w-[500px] h-[300px] sm:h-[500px] bg-emerald-400/10 dark:bg-emerald-500/20 rounded-full blur-[100px] sm:blur-[150px] mix-blend-multiply dark:mix-blend-screen pointer-events-none" />
 
-          {/* Right: Login Form */}
-          <div className="w-full max-w-md mx-auto space-y-6">
-            {/* Mobile logo */}
-            <div className="lg:hidden text-center space-y-4">
-              <img src={logo} alt="Tradin Logo" className="w-16 sm:w-20 h-auto mx-auto" />
-              <span className="text-xl sm:text-2xl font-extrabold tracking-tight block">
-                Tradin<span className="text-primary">.</span>
-              </span>
+        <div className="w-full max-w-[440px] relative z-10 animate-in fade-in zoom-in-[0.98] duration-700">
+          <div className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-2xl border border-white/60 dark:border-zinc-800/60 shadow-[0_8px_40px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_40px_rgb(0,0,0,0.4)] rounded-[2.5rem] p-8 sm:p-10">
+            
+            <div className="text-center space-y-6 mb-10">
+              <div className="inline-flex justify-center items-center w-16 h-16 rounded-2xl bg-white dark:bg-zinc-800 border border-black/5 dark:border-white/5 shadow-sm mb-2">
+                <img src={logo} alt="Tradin Logo" className="w-10 h-10 object-contain drop-shadow-sm" />
+              </div>
+              <div className="space-y-2">
+                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
+                  เข้าสู่ระบบ
+                </h1>
+                <p className="text-sm font-medium text-muted-foreground flex items-center justify-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-primary" />
+                  ยินดีต้อนรับกลับสู่พื้นที่แลกเปลี่ยน
+                </p>
+              </div>
             </div>
 
-            <Card className="glass-card border-border/50 shadow-xl">
-              <CardContent className="p-6 sm:p-8">
-                <div className="text-center space-y-1 mb-6">
-                  <h2 className="text-xl font-bold">เข้าสู่ระบบ</h2>
-                  <p className="text-sm text-muted-foreground">ยินดีต้อนรับกลับสู่สังคมแห่งการแบ่งปัน</p>
-                </div>
-
-                <form onSubmit={handleLogin} className="space-y-4">
-                  {[
-                    { id: "email", label: "อีเมล", type: "email", ph: "mail@example.com", icon: <Mail className="h-4 w-4" /> },
-                    { id: "password", label: "รหัสผ่าน", type: "password", ph: "••••••••", icon: <Lock className="h-4 w-4" /> },
-                  ].map((f) => (
-                    <div key={f.id} className="space-y-1.5">
-                      <Label htmlFor={f.id} className={`text-xs font-semibold ${errors[f.id as keyof typeof formData] ? "text-red-500" : ""}`}>
-                        {f.label}
-                      </Label>
-                      <div className="relative group">
-                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors">
-                          {f.icon}
-                        </div>
-                        <Input
-                          id={f.id}
-                          type={f.id === "password" && showPassword ? "text" : f.type}
-                          placeholder={f.ph}
-                          value={formData[f.id as keyof typeof formData]}
-                          onChange={(e) => updateField(f.id as keyof typeof formData, e.target.value)}
-                          className={`pl-10 pr-10 h-11 transition-all ${errors[f.id as keyof typeof formData] ? "border-red-500 focus-visible:ring-red-500" : "focus-visible:ring-primary"}`}
-                        />
-                        {f.id === "password" && (
-                          <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1">
-                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </button>
-                        )}
+            <form onSubmit={handleLogin} className="space-y-5"> 
+              
+              {[
+                { id: "email", label: "อีเมล", type: "email", ph: "hello@example.com", icon: <Mail className="w-5 h-5" /> }, 
+                { id: "password", label: "รหัสผ่าน", type: "password", ph: "••••••••", icon: <Lock className="w-5 h-5" /> }, 
+              ].map((f) => {
+                const hasError = !!errors[f.id as keyof typeof formData]; 
+                return (
+                  <div key={f.id} className="space-y-1.5 group">
+                    <Label htmlFor={f.id} className={`text-xs font-bold uppercase tracking-wider ml-1 transition-colors ${hasError ? "text-red-500" : "text-muted-foreground group-focus-within:text-foreground"}`}>
+                      {f.label} 
+                    </Label>
+                    
+                    <div className="relative">
+                      <div className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${hasError ? "text-red-400" : "text-muted-foreground/60 group-focus-within:text-primary"}`}>
+                        {f.icon}
                       </div>
-                      {errors[f.id as keyof typeof formData] && (
-                        <p className="text-[10px] text-red-500 font-medium ml-1">{errors[f.id as keyof typeof formData]}</p>
+                      
+                      <Input
+                        id={f.id} 
+                        type={f.id === "password" && showPassword ? "text" : f.type} 
+                        placeholder={f.ph} 
+                        value={formData[f.id as keyof typeof formData]} 
+                        onChange={(e) => updateField(f.id as keyof typeof formData, e.target.value)} 
+                        className={`pl-12 h-14 bg-white/50 dark:bg-black/20 border-black/5 dark:border-white/5 hover:bg-white dark:hover:bg-black/40 focus-visible:bg-white dark:focus-visible:bg-black/50 focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10 rounded-[1.25rem] text-base transition-all duration-300 ${hasError ? "border-red-500/50 focus-visible:border-red-500 focus-visible:ring-red-500/20 bg-red-50/50 dark:bg-red-950/10" : ""}`}
+                      />
+                      
+                      {f.id === "password" && ( 
+                        <button 
+                          type="button" 
+                          onClick={() => setShowPassword(!showPassword)} 
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground/60 hover:text-foreground transition-colors p-1"
+                        >
+                          {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />} 
+                        </button>
                       )}
                     </div>
-                  ))}
+                    
+                    <div className={`overflow-hidden transition-all duration-300 ${hasError ? "max-h-6 opacity-100 mt-1" : "max-h-0 opacity-0"}`}>
+                      <p className="text-[11px] text-red-500 font-bold ml-2">
+                        {errors[f.id as keyof typeof formData]} 
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
 
-                  <Button type="submit" className="w-full eco-gradient h-12 mt-4 font-bold shadow-lg shadow-primary/20">
-                    เข้าสู่ระบบ <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </form>
+              <Button 
+                type="submit" 
+                disabled={isLoading}
+                className="w-full h-14 mt-4 rounded-[1.25rem] text-base font-bold shadow-[0_8px_20px_-8px_rgba(var(--primary),0.5)] hover:shadow-[0_8px_25px_-5px_rgba(var(--primary),0.6)] hover:-translate-y-0.5 transition-all duration-300 group"
+              >
+                {isLoading ? (
+                  <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <>
+                    เข้าสู่ระบบ
+                    <ArrowRight className="ml-2 h-5 w-5 opacity-70 group-hover:opacity-100 group-hover:translate-x-1 transition-all" /> 
+                  </>
+                )}
+              </Button>
+            </form>
+          </div>
 
-                <p className="text-center text-sm mt-6">
-                  ยังไม่มีบัญชี?{" "}
-                  <Link to="/register" className="text-primary font-bold hover:underline">สมัครสมาชิก</Link>
-                </p>
-              </CardContent>
-            </Card>
+          <div className="mt-8 text-center">
+            <p className="text-sm font-medium text-muted-foreground">
+              ยังไม่มีบัญชีผู้ใช้?{" "} 
+              <Link to="/register" className="text-foreground font-bold hover:text-primary transition-colors underline decoration-2 underline-offset-4 decoration-border hover:decoration-primary">
+                สมัครสมาชิกฟรี 
+              </Link>
+            </p>
           </div>
         </div>
-      </main>
 
-      <Footer />
+        {/* 🚨 Suspension Modal Overlay */}
+        {/* 🚨 Suspension Modal Overlay */}
+        {suspendData && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm z-[100] p-4 animate-in fade-in duration-300">
+            <div className="bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl max-w-[420px] w-full p-6 sm:p-8 text-center animate-in zoom-in-95 duration-300 border border-zinc-200 dark:border-zinc-800">
+              
+              <div className="mx-auto flex items-center justify-center h-20 w-20 rounded-full bg-red-100 dark:bg-red-900/20 mb-6">
+                <AlertTriangle className="h-10 w-10 text-red-600 dark:text-red-500" />
+              </div>
+              
+              <h2 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-white mb-4">
+                บัญชีถูกระงับการใช้งาน
+              </h2>
+              
+              {/* ✅ กล่องแสดงรายละเอียดแบบแบ่งสัดส่วน */}
+              <div className="bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800/80 rounded-2xl p-4 sm:p-5 text-sm text-left mb-6 shadow-sm space-y-4">
+                
+                {/* ส่วนที่ 1: สาเหตุ */}
+                <div>
+                  <span className="block font-bold text-red-600 dark:text-red-400 mb-1">สาเหตุที่ถูกระงับ:</span>
+                  <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed whitespace-pre-wrap">
+                    {suspendData.reason}
+                  </p>
+                </div>
+                
+                <div className="h-px w-full bg-zinc-200 dark:bg-zinc-700/50"></div>
+                
+                {/* ส่วนที่ 2: ระยะเวลา */}
+                <div>
+                  <span className="block font-bold text-zinc-900 dark:text-white mb-1">ระงับการใช้งานถึงวันที่:</span>
+                  <p className="text-zinc-700 dark:text-zinc-300 font-medium">
+                    {suspendData.until}
+                  </p>
+                </div>
+
+              </div>
+              
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-8">
+                หากคุณคิดว่านี่คือข้อผิดพลาด สามารถติดต่อทีมงานได้
+              </p>
+              
+              <div className="flex flex-col gap-3">
+                <Button
+                  className="w-full h-12 rounded-xl text-base font-bold bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200 transition-all shadow-md"
+                  onClick={() => setSuspendData(null)}
+                >
+                  รับทราบและปิดหน้าต่าง
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </main>
     </div>
   );
 }

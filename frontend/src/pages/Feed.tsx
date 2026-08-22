@@ -11,7 +11,9 @@ import {
   Flame,
   ChevronLeft,
   ChevronRight,
-  ArrowUpRight
+  ArrowUpRight,
+  icons,
+  LucideIcon
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,11 +23,11 @@ import {
   getItems as fetchItemsAPI, 
   IMAGE_BASE_URL 
 } from "@/api/api";
-import { CATEGORY_ICONS } from "@/lib/categories_data";
 
 interface DBCategory {
   CategoryID: number;
   CategoryName: string;
+  IconName?: string;
 }
 
 interface DBItem {
@@ -66,10 +68,7 @@ const FeaturedCarousel = ({ items }: { items: FormattedPost[] }) => {
   const featuredItems = useMemo(() => {
     if (!items || items.length === 0) return [];
     
-    // คัดลอก Array ออกมาเพื่อไม่ให้กระทบข้อมูลหลัก แล้วทำการ Random Shuffle
     const shuffled = [...items].sort(() => 0.5 - Math.random());
-    
-    // ดึงมาแสดงผลสูงสุด 5 รายการ
     return shuffled.slice(0, 5);
   }, [items]);
 
@@ -363,7 +362,7 @@ export default function Feed() {
 
   return (
     <AppLayout>
-      <div className="max-w-[1400px] mx-auto space-y-8 pb-16">
+      <div className="max-w-[1400px] mx-auto space-y-8 pb-16 font-sans">
         
         {/* Header & Search Section */}
         <section className="space-y-4 pt-2">
@@ -413,7 +412,7 @@ export default function Feed() {
           </div>
         </section>
 
-        {/* 🌟 FEATURED CAROUSEL SECTION (เพิ่มเข้ามาใหม่เพื่อลดความโล่ง) */}
+        {/* 🌟 FEATURED CAROUSEL SECTION */}
         {!isLoading && itemsWithUrls.length > 0 && !search && selectedCategory === "ทั้งหมด" && (
           <section className="pt-2">
             <FeaturedCarousel items={itemsWithUrls} />
@@ -439,8 +438,13 @@ export default function Feed() {
               const isAll = catObj === "ทั้งหมด";
               const catName = isAll ? "ทั้งหมด" : (catObj as DBCategory).CategoryName;
               const catId = isAll ? "ทั้งหมด" : (catObj as DBCategory).CategoryID;
+              const iconName = isAll ? "" : (catObj as DBCategory).IconName;
               const isActive = selectedCategory === String(catId);
-              const Icon = isAll ? SlidersHorizontal : (CATEGORY_ICONS[catName as keyof typeof CATEGORY_ICONS] || Sparkles);
+
+              // 🌟 ดึงไอคอนจาก lucide-react แบบ Dynamic ตรงกับ IconName ใน Database
+              const IconComponent = isAll
+                ? SlidersHorizontal
+                : ((icons[iconName as keyof typeof icons] as LucideIcon) || Sparkles);
 
               return (
                 <button
@@ -452,7 +456,7 @@ export default function Feed() {
                       : "bg-card border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   }`}
                 >
-                  <Icon className="w-3.5 h-3.5" />
+                  <IconComponent className="w-3.5 h-3.5" />
                   <span>{catName}</span>
                 </button>
               );

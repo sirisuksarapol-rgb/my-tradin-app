@@ -190,7 +190,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="relative min-h-screen bg-background selection:bg-primary/20 selection:text-primary font-sans antialiased overflow-x-hidden">
+    <div className="relative flex flex-col min-h-screen bg-background selection:bg-primary/20 selection:text-primary font-sans antialiased overflow-x-hidden">
       {/* 🌟 Background Ambient Lighting (เพิ่มฟีลพรีเมียม ไฮเทค) */}
       <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
         <div className="absolute -top-40 left-1/2 -translate-x-1/2 h-[350px] w-[600px] bg-gradient-to-b from-primary/10 via-primary/5 to-transparent blur-3xl opacity-60 dark:opacity-30 rounded-full" />

@@ -3,10 +3,23 @@ import axios from 'axios';
 // ========================================================
 // 📌 CONFIGURATION & CONSTANTS
 // ========================================================
-const BASE_URL = `http://${window.location.hostname}:5000`;
+const getBaseUrl = () => {
+  const { hostname, protocol } = window.location;
+
+  // หากรันผ่าน VS Code DevTunnels
+  if (hostname.includes('devtunnels.ms')) {
+    // แปลง -8080 ในชื่อโดเมนให้กลายเป็น -5000 อัตโนมัติ และบังคับใช้ https://
+    const backendHostname = hostname.replace(/-\d+\./, '-5000.');
+    return `https://${backendHostname}`;
+  }
+
+  // หากรันแบบ Localhost หรือ IP ในวง Wi-Fi
+  return `${protocol}//${hostname}:5000`;
+};
+
+const BASE_URL = getBaseUrl();
 export const IMAGE_BASE_URL = BASE_URL;
 export const API_BASE_URL = `${BASE_URL}/api`;
-
 /**
  * Helper ฟังก์ชันสำหรับดึง Member ID จาก localStorage (ลดการเขียนโค้ดซ้ำ)
  */
@@ -26,12 +39,17 @@ export const login = (data) => axios.post(`${API_BASE_URL}/login`, data);
 export const register = (data) => axios.post(`${API_BASE_URL}/register`, data);
 
 // ========================================================
-// 📦 2. CATEGORIES & ITEMS API (จัดการสิ่งของ)
+// 📦 2. CATEGORIES & ITEMS API (จัดการหมวดหมู่และสิ่งของ)
 // ========================================================
+// หมวดหมู่ (Categories)
 export const getCategories = () => axios.get(`${API_BASE_URL}/categories`);
+export const createCategory = (data) => axios.post(`${API_BASE_URL}/categories`, data);
+export const updateCategory = (id, data) => axios.put(`${API_BASE_URL}/categories/${id}`, data);
+export const deleteCategory = (id) => axios.delete(`${API_BASE_URL}/categories/${id}`);
+
+// สิ่งของ (Items)
 export const getItems = () => axios.get(`${API_BASE_URL}/items`);
 export const getItemById = (id) => axios.get(`${API_BASE_URL}/items/${id}`);
-
 export const createItem = (formData) => axios.post(`${API_BASE_URL}/items`, formData);
 export const updateItem = (id, formData) => axios.put(`${API_BASE_URL}/items/${id}`, formData);
 export const deleteItem = (id) => axios.delete(`${API_BASE_URL}/items/${id}`);
@@ -79,7 +97,7 @@ export const getAIRecommendations = (itemId) => axios.get(`${API_BASE_URL}/match
  */
 export const requestExchangeCode = async (exchangeId) => {
   try {
-    const memberId = getStoredMemberId(); // ใช้ฟังก์ชัน Helper ที่คุณสร้างไว้ดึง ID ได้เลย
+    const memberId = getStoredMemberId(); 
     const response = await axios.post(`${API_BASE_URL}/exchanges/${exchangeId}/request-code`, {
       user_id: memberId
     });
@@ -124,16 +142,13 @@ export const cancelExchange = async (exchangeId, reason) => {
 
 export const completeExchange = async (exchangeId, reviewData) => {
   try {
-    // 🌟 ดึง ID ของคนที่กำลังใช้งานอยู่ ณ ตอนนี้
     const memberId = getStoredMemberId(); 
     
-    // 🌟 ใช้ API_BASE_URL แทนพาร์ทดิบ เพื่อให้เชื่อมโยงได้ถูกต้อง
     const response = await fetch(`${API_BASE_URL}/exchanges/${exchangeId}/complete`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
       },
-      // 🌟 แนบ user_id รวมเข้าไปกับข้อมูลคะแนน (score, comment)
       body: JSON.stringify({ ...reviewData, user_id: memberId }), 
     });
     
@@ -194,7 +209,6 @@ export const getUserStats = async (userId) => {
 
 export const updateUserProfile = async (memberId, formData) => {
   try {
-    // 🌟 เปลี่ยนจาก /members/ เป็น /users/ ให้ตรงกับที่ Backend เปิดรับ
     const response = await axios.put(`${API_BASE_URL}/users/${memberId}`, formData, {
       headers: {
         "Content-Type": "multipart/form-data",
@@ -238,9 +252,10 @@ export const getAdminUsers = () => axios.get(`${API_BASE_URL}/admin/users`);
 export const getAdminItems = () => axios.get(`${API_BASE_URL}/admin/items`);
 export const getAdminReports = () => axios.get(`${API_BASE_URL}/admin/reports`);
 
-export const suspendMember = (memberId) => axios.put(`${API_BASE_URL}/admin/users/${memberId}/suspend`);
+export const suspendMember = (memberId, payload) => axios.put(`${API_BASE_URL}/admin/users/${memberId}/suspend`, payload);
 export const unsuspendMember = (memberId) => axios.put(`${API_BASE_URL}/admin/users/${memberId}/unsuspend`);
 export const adminDeleteItem = (itemId) => axios.delete(`${API_BASE_URL}/admin/items/${itemId}`);
 export const resolveReport = (problemId) => axios.put(`${API_BASE_URL}/admin/reports/${problemId}`);
+
 
 export default API_BASE_URL;

@@ -1,17 +1,56 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Users, FileWarning, Trash2, Ban, CheckCircle, Flag, MessageSquare, Bug, Lightbulb, HelpCircle, Search, ExternalLink, FileText, AlertTriangle, ShieldAlert, Settings, Menu, ChevronLeft, LogOut, LayoutDashboard, UserX, AlertCircle, CheckCircle2
+import {
+  Users,
+  FileWarning,
+  Trash2,
+  Ban,
+  CheckCircle,
+  Flag,
+  MessageSquare,
+  Bug,
+  Lightbulb,
+  HelpCircle,
+  Search,
+  ExternalLink,
+  FileText,
+  AlertTriangle,
+  ShieldAlert,
+  Menu,
+  ChevronLeft,
+  LogOut,
+  LayoutDashboard,
+  UserX,
+  AlertCircle,
+  CheckCircle2,
+  LucideIcon,
+  Layers,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { StatCard } from "@/components/StatCard";
-import { getAdminUsers, getAdminItems, getReports, resolveReport, suspendMember, unsuspendMember, adminDeleteItem } from "@/api/api";
-import { LucideIcon } from "lucide-react";
+import {
+  getAdminUsers,
+  getAdminItems,
+  getReports,
+  resolveReport,
+  suspendMember,
+  unsuspendMember,
+  adminDeleteItem,
+} from "@/api/api";
+import { CategoryManagement } from "@/components/CategoryManagement";
 import React from "react";
 
 // --- Interfaces ---
@@ -51,6 +90,11 @@ interface DashboardUser {
   joinedAt: string;
   suspended: boolean;
   postCount: number;
+  suspendDetails?: {
+    type: "temporary" | "permanent";
+    untilDate?: string;
+    reason?: string;
+  };
 }
 interface DashboardPost {
   id: string;
@@ -94,11 +138,6 @@ const feedbackCategoryLabel: Record<string, string> = {
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const currentDate = new Date().toLocaleDateString("th-TH", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
 
   // States ข้อมูล
   const [users, setUsers] = useState<DashboardUser[]>([]);
@@ -114,6 +153,113 @@ export default function AdminDashboard() {
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
   const [searchInput, setSearchInput] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState<string>("");
+
+  // States สำหรับ Modals ระงับ / คืนสิทธิ์
+  const [suspendModal, setSuspendModal] = useState({
+    isOpen: false,
+    userId: "",
+    userName: "",
+    reportIdToResolve: "",
+  });
+  const [unsuspendModal, setUnsuspendModal] = useState({
+    isOpen: false,
+    userId: "",
+    userName: "",
+  });
+  const [suspendForm, setSuspendForm] = useState({
+    type: "temporary",
+    days: "7",
+    reason: "",
+  });
+  const [unsuspendReason, setUnsuspendReason] = useState("");
+
+  // --- Handlers ประมวลผล ระงับ / คืนสิทธิ์ ---
+  const handleConfirmSuspend = async () => {
+    try {
+      const daysNum = Number(suspendForm.days) || 7;
+      const untilDate = new Date();
+      untilDate.setDate(untilDate.getDate() + daysNum);
+
+      const payload = {
+        type: suspendForm.type,
+        days: suspendForm.type === "temporary" ? daysNum : undefined,
+        reason: suspendForm.reason,
+      };
+
+      await suspendMember(suspendModal.userId, payload);
+
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === suspendModal.userId
+            ? {
+                ...u,
+                suspended: true,
+                suspendDetails: {
+                  type: suspendForm.type as "temporary" | "permanent",
+                  untilDate:
+                    suspendForm.type === "temporary"
+                      ? untilDate.toLocaleDateString("th-TH", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })
+                      : undefined,
+                  reason: suspendForm.reason,
+                },
+              }
+            : u
+        )
+      );
+
+      if (suspendModal.reportIdToResolve) {
+        await handleResolveUserReport(suspendModal.reportIdToResolve);
+      }
+
+      toast({
+        title: "ระงับสิทธิ์ผู้ใช้งานเรียบร้อยแล้ว",
+        description: `เหตุผล: ${suspendForm.reason}`,
+        variant: "destructive",
+      });
+
+      setSuspendModal((prev) => ({ ...prev, isOpen: false }));
+    } catch (error: unknown) {
+      console.error("Error suspending user:", error);
+      toast({
+        title: "เกิดข้อผิดพลาด",
+        description: "ไม่สามารถระงับสิทธิ์ได้",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleConfirmUnsuspend = async () => {
+    try {
+      await unsuspendMember(unsuspendModal.userId, { reason: unsuspendReason });
+
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === unsuspendModal.userId
+            ? { ...u, suspended: false, suspendDetails: undefined }
+            : u
+        )
+      );
+
+      toast({
+        title: "คืนสิทธิ์การใช้งานเรียบร้อยแล้ว",
+        description: `ปลดการระงับสำเร็จ: ${unsuspendReason || "ไม่มีระบุ"}`,
+      });
+
+      setUnsuspendModal({ isOpen: false, userId: "", userName: "" });
+      setUnsuspendReason("");
+    } catch (error: unknown) {
+      console.error("Error unsuspending user:", error);
+      toast({
+        title: "เกิดข้อผิดพลาด",
+        description: "ไม่สามารถยกเลิกระงับสิทธิ์ได้",
+        variant: "destructive",
+      });
+    }
+  };
 
   // --- ดึงข้อมูลเข้า Dashboard ---
   const fetchDashboardData = async (): Promise<void> => {
@@ -139,7 +285,7 @@ export default function AdminDashboard() {
             : "ไม่ระบุ",
           suspended: (u.MemberStatus || "").toLowerCase() === "suspended",
           postCount: u.PostCount || 0,
-        })),
+        }))
       );
 
       setPosts(
@@ -154,7 +300,7 @@ export default function AdminDashboard() {
             id: String(p.MemberID),
             name: p.DisplayName || "ไม่ระบุชื่อ",
           },
-        })),
+        }))
       );
 
       const formattedReports: PostReport[] = [];
@@ -254,18 +400,17 @@ export default function AdminDashboard() {
   const pendingFeedbacks = feedbacks.filter((f) => f.status === "pending");
   const totalIssues = pendingReports.length + pendingUserReports.length;
 
-  // ปิดเคสรายงานโพสต์
   const handleResolveReport = async (id: string): Promise<void> => {
     try {
       await resolveReport(id);
       setReports((prev) =>
         prev.map((r) =>
-          r.id === id ? { ...r, status: "resolved" as const } : r,
-        ),
+          r.id === id ? { ...r, status: "resolved" as const } : r
+        )
       );
       toast({
         title: "จัดการรายงานเรียบร้อย",
-        description: "ระบบได้ส่งแจ้งเตือนและอีเมลไปยังผู้แจ้งปัญหาแล้ว",
+        description: "ระบบได้บันทึกการตรวจสอบเรียบร้อยแล้ว",
       });
     } catch (error: unknown) {
       console.error("Error resolving report:", error);
@@ -277,14 +422,13 @@ export default function AdminDashboard() {
     }
   };
 
-  // ปิดเคสรายงานผู้ใช้งาน
   const handleResolveUserReport = async (id: string): Promise<void> => {
     try {
       await resolveReport(id);
       setUserReports((prev) =>
         prev.map((r) =>
-          r.id === id ? { ...r, status: "resolved" as const } : r,
-        ),
+          r.id === id ? { ...r, status: "resolved" as const } : r
+        )
       );
       toast({ title: "ปิดเคสรายงานผู้ใช้แล้ว" });
     } catch (error: unknown) {
@@ -297,14 +441,13 @@ export default function AdminDashboard() {
     }
   };
 
-  // ปิดเคสข้อเสนอแนะ
   const handleResolveFeedback = async (id: string): Promise<void> => {
     try {
       await resolveReport(id);
       setFeedbacks((prev) =>
         prev.map((f) =>
-          f.id === id ? { ...f, status: "resolved" as const } : f,
-        ),
+          f.id === id ? { ...f, status: "resolved" as const } : f
+        )
       );
       toast({ title: "บันทึกสถานะเรียบร้อย" });
     } catch (error: unknown) {
@@ -317,7 +460,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // ลบโพสต์
   const handleDeletePost = async (id: string): Promise<void> => {
     if (!window.confirm("คุณแน่ใจหรือไม่ว่าต้องการลบโพสต์นี้?")) return;
     try {
@@ -329,42 +471,6 @@ export default function AdminDashboard() {
       toast({
         title: "เกิดข้อผิดพลาด",
         description: "ไม่สามารถลบโพสต์ได้",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // ระงับผู้ใช้งาน (แบน)
-  const handleSuspendUser = async (id: string): Promise<void> => {
-    try {
-      await suspendMember(id);
-      setUsers((prev) =>
-        prev.map((u) => (u.id === id ? { ...u, suspended: true } : u)),
-      );
-      toast({ title: "ระงับสิทธิ์ผู้ใช้งานแล้ว", variant: "destructive" });
-    } catch (error: unknown) {
-      console.error("Error suspending user:", error);
-      toast({
-        title: "เกิดข้อผิดพลาด",
-        description: "ไม่สามารถระงับสิทธิ์ได้",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // คืนสิทธิ์ผู้ใช้งาน (ยกเลิกแบน)
-  const handleUnsuspendUser = async (id: string): Promise<void> => {
-    try {
-      await unsuspendMember(id);
-      setUsers((prev) =>
-        prev.map((u) => (u.id === id ? { ...u, suspended: false } : u)),
-      );
-      toast({ title: "ยกเลิกระงับสิทธิ์เรียบร้อย" });
-    } catch (error: unknown) {
-      console.error("Error unsuspending user:", error);
-      toast({
-        title: "เกิดข้อผิดพลาด",
-        description: "ไม่สามารถยกเลิกระงับสิทธิ์ได้",
         variant: "destructive",
       });
     }
@@ -382,17 +488,18 @@ export default function AdminDashboard() {
     (u) =>
       !searchTerm ||
       (u.name && u.name.toLowerCase().includes(searchTerm)) ||
-      (u.email && u.email.toLowerCase().includes(searchTerm)),
+      (u.email && u.email.toLowerCase().includes(searchTerm))
   );
   const filteredPosts = posts.filter(
     (p) =>
       !searchTerm ||
       (p.title && p.title.toLowerCase().includes(searchTerm)) ||
-      (p.author?.name && p.author.name.toLowerCase().includes(searchTerm)),
+      (p.author?.name && p.author.name.toLowerCase().includes(searchTerm))
   );
 
   const menuItems = [
     { id: "dashboard", label: "ภาพรวมระบบ", icon: LayoutDashboard },
+    { id: "categories", label: "จัดการหมวดหมู่", icon: Layers },
     { id: "users", label: "จัดการผู้ใช้งาน", icon: Users },
     { id: "posts", label: "จัดการโพสต์", icon: FileText },
     {
@@ -421,11 +528,15 @@ export default function AdminDashboard() {
     <div className="flex h-screen bg-secondary/20 overflow-hidden font-sans">
       {/* 🗂️ 1. Sidebar */}
       <aside
-        className={`relative flex flex-col bg-card border-r border-border/50 shadow-sm transition-all duration-300 ease-in-out z-20 ${isSidebarOpen ? "w-64" : "w-20"}`}
+        className={`relative flex flex-col bg-card border-r border-border/50 shadow-sm transition-all duration-300 ease-in-out z-20 ${
+          isSidebarOpen ? "w-64" : "w-20"
+        }`}
       >
         <div className="h-16 flex items-center justify-between px-4 border-b border-border/50">
           <div
-            className={`flex items-center gap-2 overflow-hidden transition-opacity duration-300 ${isSidebarOpen ? "opacity-100" : "opacity-0 w-0"}`}
+            className={`flex items-center gap-2 overflow-hidden transition-opacity duration-300 ${
+              isSidebarOpen ? "opacity-100" : "opacity-0 w-0"
+            }`}
           >
             <div className="p-1.5 bg-primary/10 rounded-lg text-primary">
               <ShieldAlert className="w-5 h-5" />
@@ -456,12 +567,20 @@ export default function AdminDashboard() {
               <button
                 key={item.id}
                 onClick={() => setActiveMenu(item.id)}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-200 group ${isActive ? "bg-primary text-primary-foreground shadow-md shadow-primary/20" : "text-muted-foreground hover:bg-secondary/80 hover:text-foreground"}`}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-200 group ${
+                  isActive
+                    ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
+                    : "text-muted-foreground hover:bg-secondary/80 hover:text-foreground"
+                }`}
                 title={!isSidebarOpen ? item.label : ""}
               >
                 <div className="flex items-center gap-3">
                   <Icon
-                    className={`w-5 h-5 shrink-0 ${isActive ? "text-primary-foreground" : "group-hover:text-primary transition-colors"}`}
+                    className={`w-5 h-5 shrink-0 ${
+                      isActive
+                        ? "text-primary-foreground"
+                        : "group-hover:text-primary transition-colors"
+                    }`}
                   />
                   {isSidebarOpen && (
                     <span className="font-medium text-sm whitespace-nowrap">
@@ -472,7 +591,9 @@ export default function AdminDashboard() {
                 {item.badge && (
                   <Badge
                     variant="destructive"
-                    className={`px-1.5 py-0 text-[10px] h-5 min-w-5 flex items-center justify-center rounded-full transition-all ${!isSidebarOpen ? "absolute right-2 top-2" : ""} ${isActive ? "bg-background text-primary" : ""}`}
+                    className={`px-1.5 py-0 text-[10px] h-5 min-w-5 flex items-center justify-center rounded-full transition-all ${
+                      !isSidebarOpen ? "absolute right-2 top-2" : ""
+                    } ${isActive ? "bg-background text-primary" : ""}`}
                   >
                     {item.badge}
                   </Badge>
@@ -485,7 +606,9 @@ export default function AdminDashboard() {
         <div className="p-4 border-t border-border/50">
           <button
             onClick={() => setShowLogoutConfirm(true)}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors group ${!isSidebarOpen ? "justify-center" : ""}`}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors group ${
+              !isSidebarOpen ? "justify-center" : ""
+            }`}
           >
             <LogOut className="w-5 h-5 shrink-0 group-hover:scale-110 transition-transform" />
             {isSidebarOpen && (
@@ -501,7 +624,6 @@ export default function AdminDashboard() {
           <h2 className="text-lg font-semibold text-foreground capitalize flex items-center gap-2">
             {menuItems.find((m) => m.id === activeMenu)?.label}
           </h2>
-
         </header>
 
         <div className="flex-1 overflow-y-auto p-6 scroll-smooth">
@@ -535,83 +657,123 @@ export default function AdminDashboard() {
                   />
                 </div>
                 <div className="bg-background relative overflow-hidden p-6 rounded-2xl border border-border/60 shadow-sm">
-  {/* Header */}
-  <div className="flex items-center gap-3 mb-6">
-    <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
-      <ShieldAlert className="w-5 h-5" />
-    </div>
-    <div>
-      <h3 className="text-base font-bold text-foreground">สถานะระบบภาพรวม</h3>
-      <p className="text-xs text-muted-foreground mt-0.5">
-        สรุปข้อมูลผู้ใช้งานและรายงานที่รอการตรวจสอบ
-      </p>
-    </div>
-  </div>
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
+                      <ShieldAlert className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-foreground">
+                        สถานะระบบภาพรวม
+                      </h3>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        สรุปข้อมูลผู้ใช้งานและรายงานที่รอการตรวจสอบ
+                      </p>
+                    </div>
+                  </div>
 
-  {/* Content Grid */}
-  <div className="space-y-4">
-    {/* สถิติผู้ใช้งาน */}
-    <div className="grid grid-cols-2 gap-3">
-      <div className="flex flex-col justify-center p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-        <div className="flex items-center gap-2 mb-1.5">
-          <Users className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-          <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">บัญชีปกติ</span>
-        </div>
-        <div className="text-xl font-black text-emerald-700 dark:text-emerald-400">
-          {users.filter((u) => !u.suspended).length} <span className="text-xs font-medium opacity-70">ราย</span>
-        </div>
-      </div>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex flex-col justify-center p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <Users className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                          <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                            บัญชีปกติ
+                          </span>
+                        </div>
+                        <div className="text-xl font-black text-emerald-700 dark:text-emerald-400">
+                          {users.filter((u) => !u.suspended).length}{" "}
+                          <span className="text-xs font-medium opacity-70">
+                            ราย
+                          </span>
+                        </div>
+                      </div>
 
-      <div className="flex flex-col justify-center p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20">
-        <div className="flex items-center gap-2 mb-1.5">
-          <UserX className="w-4 h-4 text-rose-600 dark:text-rose-400" />
-          <span className="text-xs font-semibold text-rose-700 dark:text-rose-400">ถูกระงับ</span>
-        </div>
-        <div className="text-xl font-black text-rose-700 dark:text-rose-400">
-          {users.filter((u) => u.suspended).length} <span className="text-xs font-medium opacity-70">ราย</span>
-        </div>
-      </div>
-    </div>
+                      <div className="flex flex-col justify-center p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <UserX className="w-4 h-4 text-rose-600 dark:text-rose-400" />
+                          <span className="text-xs font-semibold text-rose-700 dark:text-rose-400">
+                            ถูกระงับ
+                          </span>
+                        </div>
+                        <div className="text-xl font-black text-rose-700 dark:text-rose-400">
+                          {users.filter((u) => u.suspended).length}{" "}
+                          <span className="text-xs font-medium opacity-70">
+                            ราย
+                          </span>
+                        </div>
+                      </div>
+                    </div>
 
-    {/* กล่องแจ้งเตือน */}
-    <div className={`flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border transition-colors ${
-      totalIssues > 0 
-        ? "bg-amber-500/10 border-amber-500/20" 
-        : "bg-muted/30 border-border/50"
-    }`}>
-      <div className="flex items-start gap-3">
-        <div className={`p-2 rounded-full shrink-0 ${
-          totalIssues > 0 ? "bg-amber-500/20 text-amber-600" : "bg-muted text-muted-foreground"
-        }`}>
-          {totalIssues > 0 ? <AlertCircle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
-        </div>
-        <div>
-          <p className={`text-sm font-bold ${
-            totalIssues > 0 ? "text-amber-700 dark:text-amber-500" : "text-foreground"
-          }`}>
-            {totalIssues > 0 ? "มีรายการรอตรวจสอบ" : "ไม่มีรายงานปัญหาใหม่"}
-          </p>
-          <p className={`text-xs mt-0.5 ${
-            totalIssues > 0 ? "text-amber-600/80 dark:text-amber-400/80" : "text-muted-foreground"
-          }`}>
-            {totalIssues > 0 
-              ? "พบพฤติกรรมหรือโพสต์ที่ต้องตรวจสอบในเมนูรายงาน" 
-              : "ระบบทำงานปกติ ไม่มีรายงานที่ต้องดำเนินการ"}
-          </p>
-        </div>
-      </div>
-      
-      <div className="mt-3 sm:mt-0 ml-11 sm:ml-0 flex items-end gap-1.5 shrink-0">
-        <span className={`text-2xl font-black leading-none ${
-          totalIssues > 0 ? "text-amber-600 dark:text-amber-500" : "text-muted-foreground"
-        }`}>
-          {totalIssues}
-        </span>
-        <span className="text-xs font-medium text-muted-foreground mb-0.5">รายการ</span>
-      </div>
-    </div>
-  </div>
-</div>
+                    <div
+                      className={`flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border transition-colors ${
+                        totalIssues > 0
+                          ? "bg-amber-500/10 border-amber-500/20"
+                          : "bg-muted/30 border-border/50"
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div
+                          className={`p-2 rounded-full shrink-0 ${
+                            totalIssues > 0
+                              ? "bg-amber-500/20 text-amber-600"
+                              : "bg-muted text-muted-foreground"
+                          }`}
+                        >
+                          {totalIssues > 0 ? (
+                            <AlertCircle className="w-4 h-4" />
+                          ) : (
+                            <CheckCircle2 className="w-4 h-4" />
+                          )}
+                        </div>
+                        <div>
+                          <p
+                            className={`text-sm font-bold ${
+                              totalIssues > 0
+                                ? "text-amber-700 dark:text-amber-500"
+                                : "text-foreground"
+                            }`}
+                          >
+                            {totalIssues > 0
+                              ? "มีรายการรอตรวจสอบ"
+                              : "ไม่มีรายงานปัญหาใหม่"}
+                          </p>
+                          <p
+                            className={`text-xs mt-0.5 ${
+                              totalIssues > 0
+                                ? "text-amber-600/80 dark:text-amber-400/80"
+                                : "text-muted-foreground"
+                            }`}
+                          >
+                            {totalIssues > 0
+                              ? "พบพฤติกรรมหรือโพสต์ที่ต้องตรวจสอบในเมนูรายงาน"
+                              : "ระบบทำงานปกติ ไม่มีรายงานที่ต้องดำเนินการ"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 sm:mt-0 ml-11 sm:ml-0 flex items-end gap-1.5 shrink-0">
+                        <span
+                          className={`text-2xl font-black leading-none ${
+                            totalIssues > 0
+                              ? "text-amber-600 dark:text-amber-500"
+                              : "text-muted-foreground"
+                          }`}
+                        >
+                          {totalIssues}
+                        </span>
+                        <span className="text-xs font-medium text-muted-foreground mb-0.5">
+                          รายการ
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeMenu === "categories" && (
+              <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <CategoryManagement />
               </div>
             )}
 
@@ -666,7 +828,11 @@ export default function AdminDashboard() {
                             <td className="px-5 py-3">
                               <div className="flex items-center gap-3">
                                 <div
-                                  className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm ${user.suspended ? "bg-destructive/15 text-destructive" : "bg-primary/15 text-primary"}`}
+                                  className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm ${
+                                    user.suspended
+                                      ? "bg-destructive/15 text-destructive"
+                                      : "bg-primary/15 text-primary"
+                                  }`}
                                 >
                                   {user.name.charAt(0)}
                                 </div>
@@ -687,18 +853,30 @@ export default function AdminDashboard() {
                               {user.joinedAt}
                             </td>
                             <td className="px-5 py-3 text-center">
-                              <Badge
-                                variant={
-                                  user.suspended ? "destructive" : "secondary"
-                                }
-                                className={
-                                  !user.suspended
-                                    ? "bg-primary/10 text-primary hover:bg-primary/20 border-0"
-                                    : ""
-                                }
-                              >
-                                {user.suspended ? "ระงับ" : "ปกติ"}
-                              </Badge>
+                              {user.suspended ? (
+                                <div className="flex flex-col items-center gap-0.5">
+                                  <Badge
+                                    variant="destructive"
+                                    className="px-2 py-0 text-[10px]"
+                                  >
+                                    ถูกระงับ
+                                  </Badge>
+                                  <span className="text-[10px] text-destructive/80 font-medium">
+                                    {user.suspendDetails?.type === "permanent"
+                                      ? "ถาวร"
+                                      : user.suspendDetails?.untilDate
+                                      ? `ถึง ${user.suspendDetails.untilDate}`
+                                      : "ระงับชั่วคราว"}
+                                  </span>
+                                </div>
+                              ) : (
+                                <Badge
+                                  variant="secondary"
+                                  className="bg-primary/10 text-primary border-0"
+                                >
+                                  ปกติ
+                                </Badge>
+                              )}
                             </td>
                             <td className="px-5 py-3 text-right">
                               <Dialog>
@@ -708,7 +886,7 @@ export default function AdminDashboard() {
                                     size="sm"
                                     className="hover:bg-primary/10 hover:text-primary"
                                   >
-                                    <Settings className="w-4 h-4 mr-2" /> จัดการ
+                                    <Ban className="w-4 h-4 mr-2" /> จัดการ
                                   </Button>
                                 </DialogTrigger>
                                 <DialogContent className="rounded-2xl">
@@ -738,19 +916,34 @@ export default function AdminDashboard() {
                                       <Button
                                         variant="destructive"
                                         className="w-full justify-start"
-                                        onClick={() =>
-                                          handleSuspendUser(user.id)
-                                        }
+                                        onClick={() => {
+                                          setSuspendModal({
+                                            isOpen: true,
+                                            userId: user.id,
+                                            userName: user.name,
+                                            reportIdToResolve: "",
+                                          });
+                                          setSuspendForm({
+                                            type: "temporary",
+                                            days: "7",
+                                            reason: "",
+                                          });
+                                        }}
                                       >
                                         <Ban className="w-4 h-4 mr-2" />{" "}
                                         ระงับสิทธิ์บัญชี
                                       </Button>
                                     ) : (
                                       <Button
-                                        className="w-full justify-start bg-primary text-primary-foreground hover:bg-primary/90"
-                                        onClick={() =>
-                                          handleUnsuspendUser(user.id)
-                                        }
+                                        className="w-full justify-start bg-emerald-600 hover:bg-emerald-700 text-white"
+                                        onClick={() => {
+                                          setUnsuspendModal({
+                                            isOpen: true,
+                                            userId: user.id,
+                                            userName: user.name,
+                                          });
+                                          setUnsuspendReason("");
+                                        }}
                                       >
                                         <CheckCircle className="w-4 h-4 mr-2" />{" "}
                                         คืนสิทธิ์การใช้งาน
@@ -831,7 +1024,11 @@ export default function AdminDashboard() {
                       {reports.map((report) => (
                         <Card
                           key={report.id}
-                          className={`border-l-4 ${report.status === "pending" ? "border-l-warning shadow-sm" : "border-l-muted opacity-60"}`}
+                          className={`border-l-4 ${
+                            report.status === "pending"
+                              ? "border-l-warning shadow-sm"
+                              : "border-l-muted opacity-60"
+                          }`}
                         >
                           <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
                             <div className="flex-1 min-w-0">
@@ -898,10 +1095,14 @@ export default function AdminDashboard() {
                       {userReports.map((report) => (
                         <Card
                           key={report.id}
-                          className={`border-l-4 ${report.status === "pending" ? "border-l-destructive shadow-sm" : "border-l-muted opacity-60"}`}
+                          className={`border-l-4 ${
+                            report.status === "pending"
+                              ? "border-l-destructive shadow-sm"
+                              : "border-l-muted opacity-60"
+                          }`}
                         >
-                          <CardContent className="p-4 flex flex-col sm:flex-row items-start justify-between gap-4">
-                            <div className="flex-1 min-w-0">
+                          <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                            <div className="flex-1 min-w-0 w-full">
                               <p className="text-sm font-bold text-destructive mb-2">
                                 เป้าหมาย: {report.reportedUserName}
                               </p>
@@ -917,17 +1118,28 @@ export default function AdminDashboard() {
                                 แจ้งโดย: {report.reporter} • {report.createdAt}
                               </p>
                             </div>
-                            <div className="flex gap-2 w-full sm:w-auto">
+
+                            <div className="flex gap-2 w-full sm:w-auto justify-end sm:justify-start mt-2 sm:mt-0">
                               {report.status === "pending" && (
                                 <>
                                   <Button
                                     variant="destructive"
                                     size="sm"
-                                    onClick={() =>
-                                      handleSuspendUser(report.reportedUserId)
-                                    }
+                                    onClick={() => {
+                                      setSuspendModal({
+                                        isOpen: true,
+                                        userId: report.reportedUserId,
+                                        userName: report.reportedUserName,
+                                        reportIdToResolve: report.id,
+                                      });
+                                      setSuspendForm({
+                                        type: "temporary",
+                                        days: "7",
+                                        reason: "",
+                                      });
+                                    }}
                                   >
-                                    <Ban className="w-4 h-4 mr-2" /> แบนผู้ใช้
+                                    <Ban className="w-4 h-4 mr-2" /> ระงับบัญชี
                                   </Button>
                                   <Button
                                     variant="outline"
@@ -961,7 +1173,11 @@ export default function AdminDashboard() {
                   feedbacks.map((fb) => (
                     <Card
                       key={fb.id}
-                      className={`transition-all ${fb.status === "pending" ? "border-primary/40 shadow-sm" : "opacity-60 bg-muted/10"}`}
+                      className={`transition-all ${
+                        fb.status === "pending"
+                          ? "border-primary/40 shadow-sm"
+                          : "opacity-60 bg-muted/10"
+                      }`}
                     >
                       <CardContent className="p-5 flex gap-4">
                         <div className="w-12 h-12 rounded-2xl bg-secondary flex items-center justify-center shrink-0">
@@ -1007,7 +1223,8 @@ export default function AdminDashboard() {
           </div>
         </div>
       </main>
-      {/* 📌 Modal ยืนยันการออกจากระบบสำหรับหน้า AdminDashboard */}
+
+      {/* 📌 Modal ยืนยันการออกจากระบบ */}
       {showLogoutConfirm && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
           <div
@@ -1046,6 +1263,159 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+
+      {/* 🚨 Modal 1: ระงับบัญชีผู้ใช้งาน */}
+      <Dialog
+        open={suspendModal.isOpen}
+        onOpenChange={(open) =>
+          !open && setSuspendModal((prev) => ({ ...prev, isOpen: false }))
+        }
+      >
+        <DialogContent className="sm:max-w-[450px] rounded-3xl p-0 overflow-hidden border-border/80">
+          <div className="bg-destructive/10 p-6 flex flex-col items-center text-center border-b border-destructive/10">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white dark:bg-zinc-900 text-destructive shadow-sm mb-3">
+              <Ban className="h-6 w-6" />
+            </div>
+            <DialogTitle className="text-lg font-bold text-destructive">
+              ระงับสิทธิ์ใช้งานบัญชี
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground mt-1">
+              กำลังดำเนินการระงับบัญชีของ{" "}
+              <span className="font-bold text-foreground">
+                {suspendModal.userName}
+              </span>
+            </DialogDescription>
+          </div>
+
+          <div className="p-6 space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-foreground">
+                ประเภทการระงับ
+              </label>
+              <select
+                className="flex h-10 w-full rounded-xl border border-input bg-background px-3 text-xs focus:ring-2 focus:ring-destructive focus:outline-none"
+                value={suspendForm.type}
+                onChange={(e) =>
+                  setSuspendForm((prev) => ({ ...prev, type: e.target.value }))
+                }
+              >
+                <option value="temporary">ระงับชั่วคราว (กำหนดจำนวนวัน)</option>
+                <option value="permanent">ระงับถาวร (ไม่มีกำหนด)</option>
+              </select>
+            </div>
+
+            {suspendForm.type === "temporary" && (
+              <div className="space-y-1.5 animate-in fade-in duration-200">
+                <label className="text-xs font-bold text-foreground">
+                  จำนวนวันระงับ
+                </label>
+                <Input
+                  type="number"
+                  min="1"
+                  className="h-10 rounded-xl bg-muted/30 text-xs"
+                  value={suspendForm.days}
+                  onChange={(e) =>
+                    setSuspendForm((prev) => ({ ...prev, days: e.target.value }))
+                  }
+                  placeholder="ระบุจำนวนวัน เช่น 3, 7, 30"
+                />
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-destructive">
+                เหตุผลที่ระงับ *
+              </label>
+              <textarea
+                className="flex min-h-[80px] w-full rounded-xl border border-input bg-muted/30 p-3 text-xs focus:outline-none focus:ring-2 focus:ring-destructive resize-none"
+                placeholder="ระบุเหตุผลในการระงับสิทธิ์ (ผู้ใช้จะได้รับการแจ้งเตือนนี้)"
+                value={suspendForm.reason}
+                onChange={(e) =>
+                  setSuspendForm((prev) => ({ ...prev, reason: e.target.value }))
+                }
+              />
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button
+                variant="outline"
+                className="flex-1 rounded-xl h-10 text-xs font-bold"
+                onClick={() =>
+                  setSuspendModal((prev) => ({ ...prev, isOpen: false }))
+                }
+              >
+                ยกเลิก
+              </Button>
+              <Button
+                variant="destructive"
+                className="flex-1 rounded-xl h-10 text-xs font-bold shadow-md shadow-destructive/20"
+                disabled={!suspendForm.reason.trim()}
+                onClick={handleConfirmSuspend}
+              >
+                ยืนยันการระงับสิทธิ์
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ✅ Modal 2: ยกเลิกการระงับบัญชี */}
+      <Dialog
+        open={unsuspendModal.isOpen}
+        onOpenChange={(open) =>
+          !open &&
+          setUnsuspendModal({ isOpen: false, userId: "", userName: "" })
+        }
+      >
+        <DialogContent className="sm:max-w-[420px] rounded-3xl p-0 overflow-hidden border-border/80">
+          <div className="bg-emerald-500/10 p-6 flex flex-col items-center text-center border-b border-emerald-500/10">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white dark:bg-zinc-900 text-emerald-600 shadow-sm mb-3">
+              <CheckCircle className="h-6 w-6" />
+            </div>
+            <DialogTitle className="text-lg font-bold text-emerald-600">
+              ยกเลิกการระงับบัญชี
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground mt-1">
+              กำลังคืนสิทธิ์ใช้งานให้แก่{" "}
+              <span className="font-bold text-foreground">
+                {unsuspendModal.userName}
+              </span>
+            </DialogDescription>
+          </div>
+
+          <div className="p-6 space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-foreground">
+                เหตุผลในการคืนสิทธิ์ (Optional)
+              </label>
+              <textarea
+                className="flex min-h-[80px] w-full rounded-xl border border-input bg-muted/30 p-3 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
+                placeholder="เช่น ครบกำหนดระยะเวลาตักเตือน, ยื่นอุทธรณ์สำเร็จ..."
+                value={unsuspendReason}
+                onChange={(e) => setUnsuspendReason(e.target.value)}
+              />
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button
+                variant="outline"
+                className="flex-1 rounded-xl h-10 text-xs font-bold"
+                onClick={() =>
+                  setUnsuspendModal({ isOpen: false, userId: "", userName: "" })
+                }
+              >
+                ยกเลิก
+              </Button>
+              <Button
+                className="flex-1 rounded-xl h-10 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/20"
+                onClick={handleConfirmUnsuspend}
+              >
+                ยืนยันการคืนสิทธิ์
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
