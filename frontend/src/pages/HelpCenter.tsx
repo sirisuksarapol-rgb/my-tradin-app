@@ -57,6 +57,9 @@ const categories: CategoryItem[] = [
    },
 ];
 
+// =========================================================================
+// COMPONENT: HelpCenter (หน้าจอศูนย์ช่วยเหลือสำหรับแจ้งปัญหาการใช้งาน ส่งข้อเสนอแนะ หรือติดต่อสอบถาม)
+// =========================================================================
 export default function HelpCenter() {
    const [category, setCategory] = useState<ProblemCategory>("bug");
    const [message, setMessage] = useState<string>("");
@@ -66,6 +69,11 @@ export default function HelpCenter() {
    const { toast } = useToast();
    const navigate = useNavigate();
 
+   /**
+   * ฟังก์ชัน: submit
+   * มีไว้สำหรับ: ตรวจสอบข้อมูลผู้ใช้ ตรวจสอบข้อความรายละเอียดปัญหา จัดเตรียม Payload 
+   * และส่งข้อมูลรายงานปัญหาไปยัง API พร้อมจัดการแสดงผลแจ้งเตือนสถานะสำเร็จหรือข้อผิดพลาด
+   */
    const submit = async (): Promise<void> => {
       if (!message.trim()) return;
       
@@ -85,7 +93,6 @@ export default function HelpCenter() {
              return;
          }
 
-         // แก้ไข Payload: กำหนด ReportedMemberID เป็น null เพื่อไม่ให้เป็นการรีพอร์ตตัวเอง
          const payload = {
              MemberID: Number(memberId),
              ProblemType: category,
@@ -126,21 +133,20 @@ export default function HelpCenter() {
    return (
       <AppLayout>
          <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-            {/* Navigation Header */}
+            
             <div className="flex items-center gap-2 mb-6">
                <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => navigate(-1)}
-                className="-ml-2"
+                className="-ml-2 hover:bg-slate-200/60 dark:hover:bg-zinc-800/60 text-foreground transition-all"
               >
-                <ArrowLeft className="h-5 w-5" />
+                <ArrowLeft className="h-5 w-5 text-foreground" />
               </Button>
                <FileText className="h-5 w-5 text-primary" />
                <h1 className="text-lg font-semibold">ศูนย์ช่วยเหลือ</h1>
             </div>
 
-            {/* Banner Header */}
             <div className="text-center mb-8 space-y-2">
                <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-primary/10 mb-2">
                   <MessageCircle className="w-6 h-6 text-primary" />
@@ -151,7 +157,6 @@ export default function HelpCenter() {
                </p>
             </div>
 
-            {/* Category Selector */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
                {categories.map((cat) => {
                   const Icon = cat.icon;
@@ -182,7 +187,6 @@ export default function HelpCenter() {
                })}
             </div>
 
-            {/* Form Card */}
             <Card className="border-border shadow-sm">
                <CardContent className="p-6 space-y-4">
                   <div>

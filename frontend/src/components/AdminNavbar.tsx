@@ -1,28 +1,40 @@
 import React, { useState } from "react";
 import { LogOut, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import logo from "@/assets/logo.png"; // Import โลโก้โปรเจกต์
+import logo from "@/assets/logo.png";
 
+// =========================================================================
+// INTERFACE: โครงสร้างข้อมูล Props ของคอมโพเนนต์ AdminNavbar
+// =========================================================================
 interface AdminNavbarProps {
   onLogout: () => void;
 }
 
+// =========================================================================
+// COMPONENT: AdminNavbar (แถบเมนูด้านบนสำหรับผู้ดูแลระบบ)
+// =========================================================================
 export function AdminNavbar({ onLogout }: AdminNavbarProps) {
-  // State สำหรับเปิด/ปิด Modal แจ้งเตือนการออกจากระบบ
+  
+  // State สำหรับควบคุมการเปิด/ปิด Modal ยืนยันการออกจากระบบ (เริ่มต้นเป็น false คือซ่อน Modal)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState<boolean>(false);
 
-  // ฟังก์ชันยืนยันออกจากระบบ
+  // =====================================================================
+  // ฟังก์ชัน: จัดการเมื่อผู้ใช้กดยืนยันการออกจากระบบ (HANDLE CONFIRM LOGOUT)
+  // =====================================================================
   const handleConfirmLogout = () => {
-    setShowLogoutConfirm(false);
-    onLogout();
+    setShowLogoutConfirm(false); // ปิดหน้าต่าง Modal แจ้งเตือน
+    onLogout(); // เรียกใช้งานฟังก์ชัน onLogout ที่รับเข้ามาผ่าน Props เพื่อดำเนินการล้างเซสชันและเปลี่ยนหน้า
   };
 
   return (
     <>
+      {/* ===================================================================== */}
+      {/* 1. ส่วนแสดงผลแถบ Navbar ด้านบนสุดของระบบ (Sticky Header)                 */}
+      {/* ===================================================================== */}
       <header className="sticky top-0 z-50 w-full border-b border-border/60 bg-card/80 backdrop-blur-xl">
         <div className="container mx-auto px-4 flex h-14 items-center justify-between">
           
-          {/* 📌 ส่วนแสดงผล โลโก้ และ ชื่อระบบ */}
+          {/* ส่วนแสดงผล โลโก้ และ ชื่อระบุสถานะ Admin */}
           <div className="flex items-center gap-2.5">
             <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-primary/10 overflow-hidden p-1 border border-primary/20 shadow-xs">
               <img 
@@ -39,7 +51,7 @@ export function AdminNavbar({ onLogout }: AdminNavbarProps) {
             </div>
           </div>
 
-          {/* 📌 ปุ่มกดออกจากระบบ (กดแล้วจะเปิด Modal) */}
+          {/* ปุ่มกดสำหรับเรียกใช้งานออกจากระบบ (คลิกแล้วจะเปลี่ยน state เพื่อเปิด Modal) */}
           <Button 
             variant="ghost" 
             size="sm" 
@@ -52,17 +64,22 @@ export function AdminNavbar({ onLogout }: AdminNavbarProps) {
         </div>
       </header>
 
-      {/* 📌 Modal ยืนยันการออกจากระบบ */}
+      {/* ===================================================================== */}
+      {/* 2. ส่วนแสดงผล Modal ยืนยันการออกจากระบบ (แสดงเฉพาะเมื่อ state เป็น true)   */}
+      {/* ===================================================================== */}
       {showLogoutConfirm && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-          {/* พื้นหลังมืดจางแบบ Backdrop Blur */}
+          
+          {/* พื้นหลังมืดจางแบบ Backdrop Blur พร้อมระบบคลิกเพื่อปิด Modal */}
           <div 
             className="absolute inset-0 bg-background/80 backdrop-blur-md transition-opacity animate-in fade-in duration-200" 
             onClick={() => setShowLogoutConfirm(false)} 
           />
 
-          {/* การ์ดกล่องข้อความเตือน */}
+          {/* การ์ดกล่องข้อความเตือน (Confirmation Dialog Box) */}
           <div className="relative bg-background rounded-2xl p-6 w-full max-w-sm shadow-2xl border border-border/80 space-y-5 animate-in zoom-in-95 duration-200">
+            
+            {/* ส่วนแสดงไอคอนเตือนและข้อความอธิบายการออกจากระบบ */}
             <div className="flex flex-col items-center text-center space-y-3">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/20 shadow-inner">
                 <AlertTriangle className="h-7 w-7 animate-bounce" />
@@ -73,7 +90,7 @@ export function AdminNavbar({ onLogout }: AdminNavbarProps) {
               </div>
             </div>
 
-            {/* ปุ่มกดยืนยัน / ยกเลิก */}
+            {/* ส่วนปุ่มควบคุมการทำงาน: ปุ่มยกเลิก (ปิด Modal) หรือ ปุ่มยืนยันออกจากระบบ */}
             <div className="flex gap-2.5 w-full pt-1">
               <Button 
                 variant="outline" 

@@ -1,11 +1,12 @@
-/* 1. ย้าย @import มาไว้บนสุดเสมอ */
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
-
-/* 2. ตามด้วย Tailwind directives */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-/* --- การตั้งค่าธีมสไตล์สำหรับ Tailwind v4 --- */
+
+/**
+ * การตั้งค่าระบบธีมและโทเค็น (Theme Tokens) สำหรับ Tailwind CSS v4
+ * กำหนดฟอนต์หลักและตัวแปรสีระบบ (Design System) ที่เชื่อมโยงกับค่า HSL ตัวแปร CSS ภายนอก
+ */
 @theme {
   --font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
   
@@ -39,7 +40,10 @@
 
   --radius-md: var(--radius);
 
-  /* Custom Greenloop tokens */
+  /**
+   * โทเค็นสีเฉพาะสำหรับโครงการ (Custom Greenloop Tokens) 
+   * ใช้กำหนดสถานะต่างๆ เช่น Success, Warning, Info และ Surface
+   */
   --color-success: hsl(var(--success));
   --color-success-foreground: hsl(var(--success-foreground));
   --color-warning: hsl(var(--warning));
@@ -50,7 +54,10 @@
   --color-surface-foreground: hsl(var(--surface-foreground));
 }
 
-/* --- กำหนดตัวแปรตัวเลขสี (Variables Base) --- */
+/**
+ * การกำหนดค่าตัวแปรสีพื้นฐาน (CSS Custom Properties) สำหรับโหมดปกติ (:root) และโหมดมืด (.dark)
+ * ควบคุมโทนสีของแอปพลิเคชันทั้งหมดผ่านระบบพิกัดสี HSL เพื่อให้สลับธีมได้อย่างราบรื่น
+ */
 @layer base {
   :root {
     --background: 40 33% 97%;
@@ -133,7 +140,10 @@
   }
 }
 
-/* --- ควบคุมสไตล์ของ Element เริ่มต้น --- */
+/**
+ * การกำหนดค่าสไตล์เริ่มต้นระดับ Element ทั่วทั้งระบบ (Global Base Styles)
+ * ควบคุมสีขอบเส้นแบ่งทุกตัวให้ตรงกับค่าตัวแปร border และกำหนดพื้นหลัง สีตัวอักษร ฟอนต์ของหน้าเว็บ
+ */
 @layer base {
   * {
     @apply border-border;
@@ -143,17 +153,27 @@
   }
 }
 
-
+/**
+ * การสร้าง Utility Classes เพิ่มเติมสำหรับใช้งานคอมโพเนนต์เฉพาะทาง
+ * เช่น คลาส .glass-card สำหรับทำเอฟเฟกต์กระจกฝ้า (Glassmorphism)
+ */
 @layer utilities {
   .glass-card {
     @apply bg-card/80 backdrop-blur-md border border-border/50 shadow-sm;
   }
 }
 
+/**
+ * การสร้าง Custom Utility แบบสไตล์ดั้งเดิมสำหรับ Tailwind v4 (@utility)
+ * สร้างคลาส eco-gradient สำหรับพื้นหลังไล่ระดับสีที่เป็นเอกลักษณ์
+ */
 @utility eco-gradient {
   background: linear-gradient(135deg, hsl(var(--primary)), hsl(152 45% 38%));
 }
 
+/**
+ * การสร้าง Custom Utility สำหรับทำตัวอักษรไล่ระดับสี (Gradient Text)
+ */
 @utility eco-gradient-text {
   background: linear-gradient(135deg, hsl(var(--primary)), hsl(140 40% 35%));
   -webkit-background-clip: text;

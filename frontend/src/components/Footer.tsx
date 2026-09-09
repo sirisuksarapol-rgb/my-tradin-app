@@ -4,18 +4,18 @@ import logo from "@/assets/logo.png";
 
 export default function Footer() {
   return (
-    <footer className="mt-auto border-t border-border bg-muted/30">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        {/* Main footer content */}
-        <div className="grid grid-cols-1 gap-8 py-12 md:grid-cols-4">
-          {/* Brand */}
+    <footer className="mt-auto border-t border-border/60 bg-muted/20 backdrop-blur-sm">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 py-12 md:py-16">
+        <div className="grid grid-cols-1 gap-10 md:grid-cols-4 lg:gap-12">
+          
           <div className="space-y-4 md:col-span-1">
-            <div className="flex items-center gap-2">
-              <img src={logo} alt="Tradin" className="h-8 w-8 rounded-full" />
-              <span className="text-xl font-extrabold tracking-tight">
-                Tradin<span className="text-primary">.</span>
-              </span>
-            </div>
+            <Link to="/" className="inline-block outline-none group">
+              <img 
+                src={logo} 
+                alt="Tradin Logo" 
+                className="h-10 w-auto object-contain transition-transform duration-300 group-hover:scale-105" 
+              />
+            </Link>
             <p className="text-sm leading-relaxed text-muted-foreground">
               แพลตฟอร์มแลกเปลี่ยนสิ่งของออนไลน์ ที่ช่วยลดขยะและสร้างคุณค่าใหม่ให้กับชุมชน
             </p>
@@ -25,10 +25,9 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* Quick Links */}
           <div className="space-y-4">
-            <h4 className="text-sm font-bold">เมนูหลัก</h4>
-            <ul className="space-y-2">
+            <h4 className="text-sm font-bold tracking-wider text-foreground uppercase">เมนูหลัก</h4>
+            <ul className="space-y-2.5">
               {[
                 { to: "/", label: "หน้าแรก" },
                 { to: "/about", label: "ภาพรวมระบบ" },
@@ -46,10 +45,9 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Account */}
           <div className="space-y-4">
-            <h4 className="text-sm font-bold">บัญชีผู้ใช้</h4>
-            <ul className="space-y-2">
+            <h4 className="text-sm font-bold tracking-wider text-foreground uppercase">บัญชีผู้ใช้</h4>
+            <ul className="space-y-2.5">
               {[
                 { to: "/login", label: "เข้าสู่ระบบ" },
                 { to: "/register", label: "สมัครสมาชิก" },
@@ -66,15 +64,14 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Contact */}
           <div className="space-y-4">
-            <h4 className="text-sm font-bold">ติดต่อเรา</h4>
+            <h4 className="text-sm font-bold tracking-wider text-foreground uppercase">ติดต่อเรา</h4>
             <ul className="space-y-3">
-              <li className="flex items-center gap-2 text-sm text-muted-foreground">
+              <li className="flex items-center gap-2.5 text-sm text-muted-foreground">
                 <Mail className="h-4 w-4 shrink-0 text-primary" />
                 <span>support@tradin.com</span>
               </li>
-              <li className="flex items-center gap-2 text-sm text-muted-foreground">
+              <li className="flex items-center gap-2.5 text-sm text-muted-foreground">
                 <MapPin className="h-4 w-4 shrink-0 text-primary" />
                 <span>กรุงเทพมหานคร, ประเทศไทย</span>
               </li>
@@ -82,14 +79,13 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* Bottom bar */}
-        <div className="flex flex-col items-center justify-between gap-4 border-t border-border py-6 md:flex-row">
+        <div className="flex flex-col items-center justify-between gap-4 border-t border-border/60 pt-8 mt-12 md:flex-row">
           <p className="text-xs text-muted-foreground">
-            © {new Date().getFullYear()} Tradin. สงวนลิขสิทธิ์ทุกประการ
+            &copy; {new Date().getFullYear()} Tradin. สงวนลิขสิทธิ์ทุกประการ
           </p>
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <span>สร้างด้วย</span>
-            <Heart className="h-3 w-3 fill-primary text-primary" />
+            <Heart className="h-3.5 w-3.5 fill-primary text-primary" />
             <span>เพื่อสิ่งแวดล้อมที่ดีกว่า</span>
           </div>
         </div>

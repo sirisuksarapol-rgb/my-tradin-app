@@ -8,6 +8,7 @@ import {
   Eye,
   Loader2,
   Phone,
+  X,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import axios, { AxiosError } from "axios";
@@ -36,29 +37,22 @@ interface ExchangeRequest {
   TargetItemID: number;
   PhoneNumber: string;
   StartDate: string | null;
-
-  // ของเรา (ผู้รับคำขอ)
   myPostTitle?: string;
   my_post_title?: string;
   TargetItemName?: string;
   target_item_name?: string;
-
   myPostImage?: string;
   my_post_image?: string;
   TargetItemImage?: string;
   target_item_image?: string;
-
-  // ของเขา (ผู้ส่งคำขอ)
   theirPostTitle?: string;
   their_post_title?: string;
   MyItemName?: string;
   my_item_name?: string;
-
   theirPostImage?: string;
   their_post_image?: string;
   MyItemImage?: string;
   my_item_image?: string;
-
   theirAuthorName?: string;
   sender_name?: string;
   MemberName?: string;
@@ -87,7 +81,6 @@ export default function IncomingRequests() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // 🌟 State ควบคุมหน้าต่างกรอกเบอร์โทรศัพท์
   const [isPhoneModalOpen, setIsPhoneModalOpen] = useState(false);
   const [phoneInput, setPhoneInput] = useState("");
   const [selectedRequest, setSelectedRequest] =
@@ -97,20 +90,17 @@ export default function IncomingRequests() {
   const [requests, setRequests] = useState<ExchangeRequest[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // 1. ดึง ID รายการที่เคยเปิดดูแล้วจาก localStorage
   const [seenIds, setSeenIds] = useState<number[]>(() => {
     const saved = localStorage.getItem("seen_exchange_ids");
     return saved ? JSON.parse(saved) : [];
   });
 
-  // 2. ฟังก์ชันคำนวณจำนวนวัน (วันนี้ / X วันที่แล้ว)
   const getRequestAgeText = (startDateStr: string | null): string => {
     if (!startDateStr) return "เมื่อเร็วๆ นี้";
 
     const createdDate = new Date(startDateStr);
     const now = new Date();
 
-    // ปรับเป็นระดับวันที่ (ตัดเวลา HH:mm:ss ออกเพื่อเปรียบเทียบข้ามวัน)
     const createdZero = new Date(
       createdDate.getFullYear(),
       createdDate.getMonth(),
@@ -135,34 +125,30 @@ export default function IncomingRequests() {
     const currentUserId = user?.id || user?.MemberID;
 
     if (!currentUserId) {
-      console.error("ไม่พบข้อมูล User ID หรือ MemberID ใน localStorage:", user);
       setLoading(false);
       return;
     }
 
     try {
       setLoading(true);
-      console.log("📡 กำลังดึงข้อมูลสำหรับ User ID:", currentUserId);
-
       const response = await axios.get<ApiResponse<ExchangeRequest[]>>(
         `${API_BASE_URL}?member_id=${currentUserId}`,
       );
 
       if (response.data.success) {
-        console.log("📦 ข้อมูลดิบจาก Backend:", response.data.data);
         const dataList = response.data.data || [];
 
-        const incoming = dataList.filter(
-          (req) =>
-            req.ExchangeStatus === "pending" &&
-            String(req.TargetMemberID) === String(currentUserId),
-        );
+        const incoming = dataList.filter((req) => {
+          const status = (req.ExchangeStatus || "").toLowerCase();
+          // ให้แสดงเฉพาะรายการที่ยังอยู่ในสถานะรอตอบรับจริงๆ เท่านั้น
+          return (
+            status === "pending" &&
+            String(req.TargetMemberID) === String(currentUserId)
+          );
+        });
 
-        console.log("🎯 ข้อมูลคำขอเข้าที่กรองเสร็จแล้ว:", incoming);
         setRequests(incoming);
 
-        // 🌟 ส่วนที่เพิ่มเข้ามา: บันทึก ExchangeID ทั้งหมดลง localStorage
-        // เพื่อให้ระบบรู้ว่า "เคยเห็นคำขอเหล่านี้แล้ว" ในการเปิดดูครั้งถัดไป
         const currentSeen: number[] = JSON.parse(
           localStorage.getItem("seen_exchange_ids") || "[]",
         );
@@ -189,18 +175,15 @@ export default function IncomingRequests() {
     fetchIncomingRequests();
   }, []);
 
-  // 🌟 ฟังก์ชันนี้แค่เปิด Modal ขึ้นมาเฉยๆ ยังไม่ยิง API
   const handleAccept = (req: ExchangeRequest) => {
     setSelectedRequest(req);
     setPhoneInput("");
     setIsPhoneModalOpen(true);
   };
 
-  // 🌟 ฟังก์ชันนี้จะทำงานเมื่อกด "ยืนยัน" ใน Modal
   const confirmAccept = async () => {
     if (!selectedRequest) return;
 
-    // ตรวจสอบว่ากรอกเบอร์หรือยัง
     if (!phoneInput || phoneInput.trim().length < 9) {
       toast({
         title: "ข้อมูลไม่ครบถ้วน",
@@ -228,7 +211,6 @@ export default function IncomingRequests() {
           description: "กำลังส่งรหัส OTP ให้คุณและคู่แลกเปลี่ยน...",
         });
 
-        // ยิง OTP ให้ทั้ง 2 ฝ่าย
         try {
           await axios.post(`${API_BASE_URL}/${req.ExchangeID}/request-code`, {
             user_id: req.MemberID,
@@ -240,20 +222,8 @@ export default function IncomingRequests() {
           console.error("แจ้งเตือน: ไม่สามารถส่ง OTP อัตโนมัติได้", otpError);
         }
 
-        const matchData = {
-          id: req.ExchangeID,
-          status: "accepted",
-          myPost: { title: req.myPostTitle, images: [req.myPostImage] },
-          theirPost: {
-            title: req.theirPostTitle,
-            images: [req.theirPostImage],
-          },
-        };
-
-        // ปิด Modal และพาไปหน้า Tracking
         setIsPhoneModalOpen(false);
         setTimeout(() => {
-          // 🌟 เปลี่ยนชื่อคีย์ state เป็น newStatus หน้า Tracking ถึงจะรู้ตัวและอัปเดตสถานะให้ทันที
           navigate(`/exchange-tracking/${req.ExchangeID}`, {
             state: { newStatus: "accepted" },
           });
@@ -301,7 +271,6 @@ export default function IncomingRequests() {
     }
   };
 
-  // 💡 ปรับปรุงฟังก์ชัน `getImageUrl` ให้ล้าง path และเพิ่ม onError handler ที่ดีขึ้น
   const getImageUrl = (imagePath: string | null | undefined): string => {
     if (
       !imagePath ||
@@ -312,9 +281,8 @@ export default function IncomingRequests() {
       return "/placeholder.jpg";
     if (imagePath.startsWith("http")) return imagePath;
 
-    // คลีน path จากวงเล็บเหลี่ยมและเครื่องหมายคำพูด (cite syntax)
     let cleanPath = imagePath.trim().replace(/\|"|'/g, "");
-    cleanPath = cleanPath.split(",")[0]; // เลือกรูปแรกกรณี Joint มาหลายรูป
+    cleanPath = cleanPath.split(",")[0];
 
     return `${IMAGE_BASE_URL}${cleanPath}`;
   };
@@ -323,8 +291,13 @@ export default function IncomingRequests() {
     <AppLayout>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-6">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-5 w-5" />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate(-1)}
+            className="-ml-2 hover:bg-slate-200/60 dark:hover:bg-zinc-800/60 text-foreground transition-all"
+          >
+            <ArrowLeft className="h-5 w-5 text-foreground" />
           </Button>
           <Inbox className="h-5 w-5 text-primary" />
           <h1 className="text-2xl sm:text-3xl font-bold">
@@ -353,13 +326,11 @@ export default function IncomingRequests() {
               >
                 <CardContent className="p-4 space-y-3">
                   <div className="flex items-center gap-2">
-                    {/* เช็กว่าถ้ายังไม่เคยเห็น ID นี้มาก่อน ให้ขึ้นป้าย "คำขอใหม่" */}
                     {!seenIds.includes(req.ExchangeID) ? (
                       <Badge className="bg-warning/10 text-warning border-0 text-xs font-medium">
                         คำขอใหม่
                       </Badge>
                     ) : (
-                      /* ถ้าเคยเปิดเข้ามาดูแล้ว ให้เปลี่ยนเป็น "วันนี้" หรือ "X วันที่แล้ว" */
                       <Badge
                         variant="outline"
                         className="text-muted-foreground border-muted text-xs font-normal"
@@ -376,7 +347,6 @@ export default function IncomingRequests() {
                   </div>
 
                   <div className="flex items-center gap-3">
-                    {/* ของของเขา (ผู้ส่ง) */}
                     <div className="flex-1 text-center space-y-1 min-w-0">
                       <img
                         src={getImageUrl(
@@ -419,7 +389,6 @@ export default function IncomingRequests() {
 
                     <ArrowRightLeft className="h-4 w-4 text-primary shrink-0" />
 
-                    {/* ของของเรา (ผู้รับ) */}
                     <div className="flex-1 text-center space-y-1 min-w-0">
                       <img
                         src={getImageUrl(
@@ -459,16 +428,14 @@ export default function IncomingRequests() {
                   </div>
 
                   <div className="space-y-2 pt-2 border-t border-border/50 mt-3">
-                    {/* ✅ แก้ไข: เปลี่ยน ID สินค้าเป็น MyItemID เพื่อดูรายละเอียดสินค้าของคนอื่น (ผู้ส่ง) */}
-                    {/* บรรทัดที่ประมาณ 185: ปรับปรุงโค้ดปุ่มดูรายละเอียดเพื่อแนบ state ข้ามหน้า */}
                     <Button
                       variant="secondary"
                       className="w-full text-xs h-8"
                       onClick={() =>
                         navigate(`/post/${req.MyItemID}`, {
                           state: {
-                            fromPage: "incoming", // แจ้งหน้าปลายทางว่ามาจากหน้า incoming
-                            fromIncomingRequest: true, // แนบเผื่อไว้สำหรับตัวแปรเช็กคีย์อื่นๆ
+                            fromPage: "incoming",
+                            fromIncomingRequest: true,
                           },
                         })
                       }
@@ -487,11 +454,12 @@ export default function IncomingRequests() {
                       </Button>
                       <Button
                         variant="outline"
-                        className="flex-1"
+                        className="flex-1 border-border/60 text-foreground hover:bg-slate-200/60 dark:hover:bg-zinc-800/60 hover:text-foreground transition-all"
                         size="sm"
                         onClick={() => handleReject(req)}
                       >
-                        <XCircle className="h-4 w-4 mr-1" /> ปฏิเสธ
+                        <XCircle className="h-4 w-4 mr-1 text-muted-foreground" />{" "}
+                        ปฏิเสธ
                       </Button>
                     </div>
                   </div>
@@ -501,36 +469,62 @@ export default function IncomingRequests() {
           </div>
         )}
       </div>
-      {/* 🌟 Modal สำหรับกรอกเบอร์โทรศัพท์ */}
-      <AlertDialog open={isPhoneModalOpen} onOpenChange={setIsPhoneModalOpen}>
-        <AlertDialogContent className="rounded-2xl max-w-sm">
-          <AlertDialogHeader>
-            <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-2">
-              <Phone className="h-6 w-6 text-primary" />
-            </div>
-            <AlertDialogTitle className="text-center text-xl font-bold">
-              ระบุข้อมูลการติดต่อ
-            </AlertDialogTitle>
-            <p className="text-center text-sm text-muted-foreground mt-2">
-              กรุณากรอกเบอร์โทรศัพท์ของคุณเพื่อใช้ในการติดต่อกับ{" "}
-              <strong>{selectedRequest?.theirAuthorName}</strong>
-            </p>
-          </AlertDialogHeader>
 
-          <div className="my-4">
-            <input
-              type="tel"
-              maxLength={10}
-              value={phoneInput}
-              onChange={(e) => setPhoneInput(e.target.value.replace(/\D/g, ""))}
-              placeholder="08X-XXX-XXXX"
-              className="w-full text-center tracking-widest font-bold text-xl h-14 border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-background shadow-inner transition-all"
-            />
+      <AlertDialog open={isPhoneModalOpen} onOpenChange={setIsPhoneModalOpen}>
+        <AlertDialogContent className="rounded-3xl max-w-md p-6 sm:p-8 shadow-2xl border border-border/50 bg-card backdrop-blur-xl space-y-4">
+          <div className="flex items-center justify-end">
+            <button
+              onClick={() => {
+                setPhoneInput("");
+                setSelectedRequest(null);
+                setIsPhoneModalOpen(false);
+              }}
+              className="p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
 
-          <AlertDialogFooter className="flex flex-row gap-3 mt-2">
+          <div className="flex flex-col items-center text-center space-y-3 -mt-2">
+            <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center text-primary shadow-inner border border-primary/25">
+              <Phone className="h-6 w-6" />
+            </div>
+            <AlertDialogTitle className="text-xl font-bold tracking-tight text-foreground">
+              ข้อมูลการติดต่อผู้แลกเปลี่ยน
+            </AlertDialogTitle>
+            <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed px-2">
+              กรอกเบอร์โทรศัพท์มือถือของคุณ เพื่อให้{" "}
+              <strong className="text-foreground">
+                {selectedRequest?.theirAuthorName}
+              </strong>{" "}
+              สามารถติดต่อประสานงานนัดรับสินค้าได้สะดวกยิ่งขึ้น
+            </p>
+          </div>
+
+          <div className="space-y-2 py-2">
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-semibold text-sm">
+                +66
+              </span>
+              <input
+                type="tel"
+                maxLength={10}
+                value={phoneInput}
+                onChange={(e) =>
+                  setPhoneInput(e.target.value.replace(/\D/g, ""))
+                }
+                placeholder="8XXXXXXXX"
+                className="w-full text-center tracking-widest font-bold text-lg h-14 pl-12 pr-4 border rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/40 bg-background/50 shadow-inner transition-all text-foreground placeholder:text-muted-foreground/50"
+              />
+            </div>
+            <p className="text-[11px] text-center text-muted-foreground">
+              ระบุเบอร์โทรศัพท์ 10 หลัก (เช่น 0812345678)
+            </p>
+          </div>
+
+          <AlertDialogFooter className="flex flex-col sm:flex-row gap-2.5 pt-2">
             <AlertDialogCancel
-              className="flex-1 mt-0 rounded-xl h-12"
+              className="w-full sm:flex-1 rounded-2xl h-11 text-xs font-semibold border-border/60 bg-card text-foreground hover:bg-slate-100 dark:hover:bg-zinc-800 hover:text-foreground transition-all mt-0 shadow-xs"
               onClick={() => {
                 setPhoneInput("");
                 setSelectedRequest(null);
@@ -542,15 +536,15 @@ export default function IncomingRequests() {
             <Button
               onClick={confirmAccept}
               disabled={phoneInput.length < 9 || isAccepting}
-              className="flex-1 rounded-xl h-12 bg-primary hover:bg-primary/90 text-primary-foreground shadow-md transition-all"
+              className="w-full sm:flex-1 rounded-2xl h-11 text-xs font-semibold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 transition-all active:scale-95 disabled:opacity-50"
             >
               {isAccepting ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />{" "}
-                  กำลังบันทึก...
+                  กำลังประมวลผล...
                 </>
               ) : (
-                "ยืนยันการตอบรับ"
+                "ยืนยันและดำเนินการต่อ"
               )}
             </Button>
           </AlertDialogFooter>

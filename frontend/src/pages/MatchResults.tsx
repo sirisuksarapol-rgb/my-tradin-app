@@ -14,9 +14,6 @@ import { Button } from "@/components/ui/button";
 import AppLayout from "@/components/AppLayout";
 import { getAIRecommendations, IMAGE_BASE_URL } from "@/api/api";
 
-// ========================================================
-// 📐 TYPES & INTERFACES
-// ========================================================
 interface BackendItem {
   ItemID: number;
   ItemName: string;
@@ -42,7 +39,7 @@ interface FrontendMyItem {
   id: number;
   title: string;
   wantedItem: string;
-  images: string[]; // ปรับให้เป็น Array ตามรูปแบบ UI ของคุณ
+  images: string[];
 }
 
 interface FrontendTheirPost {
@@ -67,9 +64,9 @@ interface AIRecommendationsResponse {
   matches: BackendMatchItem[];
 }
 
-// ========================================================
-// 🖥️ COMPONENT
-// ========================================================
+// =========================================================================
+// COMPONENT: MatchResults (หน้าจอสำหรับแสดงผลการค้นหาและแนะนำคู่แมตช์สินค้าด้วยระบบ AI)
+// =========================================================================
 export default function MatchResults() {
   const { itemId } = useParams<{ itemId: string }>();
   const navigate = useNavigate();
@@ -78,11 +75,18 @@ export default function MatchResults() {
   const [bestMatches, setBestMatches] = useState<MatchResultItem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  /**
+   * ฟังก์ชัน: getFirstImageName
+   * มีไว้สำหรับ: ตัดและดึงชื่อไฟล์รูปภาพตัวแรกสุดจากสตริงรายการรูปภาพที่คั่นด้วยคอมมา
+   */
   const getFirstImageName = (imageStr: string | null): string => {
     if (!imageStr) return "";
     return imageStr.split(",")[0].trim();
   };
 
+  /**
+   * EFFECT: เรียกใช้งาน API ดึงข้อมูลคำแนะนำคู่แมตช์จากระบบ AI ตามรหัสสินค้าที่ระบุ พร้อมจัดรูปแบบข้อมูลสำหรับแสดงผล
+   */
   useEffect(() => {
     const fetchRealAIRecommendations = async () => {
       if (!itemId) return;
@@ -96,7 +100,6 @@ export default function MatchResults() {
         } = response.data as AIRecommendationsResponse;
 
         if (status === "success" && backendMyItem) {
-          // 1. จัดการรูปภาพของเรา
           const myImageName = getFirstImageName(backendMyItem.ItemImage);
           setMyItem({
             id: backendMyItem.ItemID,
@@ -109,7 +112,6 @@ export default function MatchResults() {
             ],
           });
 
-          // 2. จัดการรูปภาพของคู่แมตช์ทั้งหมด
           const formattedMatches: MatchResultItem[] = matches.map(
             (item: BackendMatchItem) => {
               const percentageScore = Math.min(
@@ -182,18 +184,17 @@ export default function MatchResults() {
       <div className="max-w-5xl mx-auto py-2 sm:py-6 space-y-8">
         <div className="flex items-center gap-2">
           <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => navigate(-1)}
-                className="-ml-2"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate(-1)}
+            className="-ml-2 hover:bg-slate-200/60 dark:hover:bg-zinc-800/60 text-foreground transition-all"
+          >
+            <ArrowLeft className="h-5 w-5 text-foreground" />
+          </Button>
           <Search className="w-5 h-5 text-muted-foreground" />
           <span className="font-bold text-2xl font-heading">ค้นหาคู่แมตช์</span>
         </div>
 
-        {/* My item */}
         <div className="relative overflow-hidden flex items-center gap-4 rounded-2xl bg-primary/5 p-5 border border-primary/10 max-w-2xl">
           <img
             src={myItem.images[0]}
@@ -216,7 +217,6 @@ export default function MatchResults() {
           </div>
         </div>
 
-        {/* Results */}
         <section>
           <div className="flex items-center gap-2 mb-6">
             <div className="bg-primary/10 p-1.5 rounded-lg">
@@ -238,12 +238,15 @@ export default function MatchResults() {
                     เหมาะสม {match.score}%
                   </div>
                   <CardContent className="p-0">
-                    {/* เพิ่ม onClick และ cursor-pointer เพื่อกดไปที่หน้า รายละเอียดโพสต์ */}
                     <div
                       className="aspect-[4/3] overflow-hidden cursor-pointer"
                       onClick={() =>
                         navigate(`/post/${match.theirPost.id}`, {
-                          state: { matchScore: match.score, fromMatch: true, matchData: match },
+                          state: {
+                            matchScore: match.score,
+                            fromMatch: true,
+                            matchData: match,
+                          },
                         })
                       }
                     >
@@ -255,12 +258,15 @@ export default function MatchResults() {
                       />
                     </div>
                     <div className="p-4 space-y-3">
-                      {/* เพิ่ม onClick ที่ชื่อเรื่องให้กดได้เช่นกัน */}
                       <h3
                         className="font-bold text-sm leading-tight line-clamp-1 cursor-pointer hover:text-primary transition-colors"
                         onClick={() =>
                           navigate(`/item/${match.theirPost.id}`, {
-                            state: { matchScore: match.score, fromMatch: true, matchData: match },
+                            state: {
+                              matchScore: match.score,
+                              fromMatch: true,
+                              matchData: match,
+                            },
                           })
                         }
                       >

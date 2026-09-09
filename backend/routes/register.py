@@ -8,18 +8,23 @@ from werkzeug.utils import secure_filename
 from db import get_connection
 from services.email_service import send_verify_email
 
-# สร้าง Blueprint กำหนดให้ API หมวดนี้ขึ้นต้นด้วย /api/register
+# ==========================================
+# REGISTER BLUEPRINT CONFIGURATION
+# ==========================================
+# สร้าง Blueprint สำหรับจัดกลุ่มเส้นทาง API ที่เกี่ยวข้องกับการสมัครสมาชิก (Registration Module)
+# กำหนด URL Prefix พื้นฐานเป็น /api/register เพื่อความสะอาดและเป็นระเบียบของสถาปัตยกรรมระบบ
 register_bp = Blueprint(
     "register",
     __name__,
     url_prefix="/api/register"
 )
 
+
+# =========================================================================
+# 1. API: สมัครสมาชิกใหม่ (POST /api/register)
+# =========================================================================
 @register_bp.route("", methods=["POST"])
 def register():
-    # ==========================================
-    # 1. รับข้อมูลจาก FormData
-    # ==========================================
     email = request.form.get("email")
     password = request.form.get("password")
     display_name = request.form.get("display_name")
@@ -28,17 +33,11 @@ def register():
     if not email or not password or not display_name:
         return jsonify({
             "success": False,
-            "message": "กรอกข้อมูลไม่ครบ"
+            "message": "กรอกข้อมูลไม่ครบถ้วน กรุณากรอกอีเมล รหัสผ่าน และชื่อที่แสดง"
         }), 400
 
-    # ==========================================
-    # 2. Hash Password (ความปลอดภัย)
-    # ==========================================
     password_hash = generate_password_hash(password)
 
-    # ==========================================
-    # 3. จัดการรูปโปรไฟล์
-    # ==========================================
     filename = "default.png"
     if file and file.filename != "":
         filename = secure_filename(file.filename)
@@ -48,49 +47,68 @@ def register():
         )
         file.save(upload_path)
 
-    # ==========================================
-    # 4. สร้างรหัสยืนยัน (OTP) และเวลาปัจจุบัน
-    # ==========================================
     verify_code = str(random.randint(100000, 999999))
     expire = datetime.now() + timedelta(minutes=30)
     current_time = datetime.now()
 
-    # ==========================================
-    # 5. บันทึกลง Database (MySQL)
-    # ==========================================
     conn = get_connection()
-    cursor = conn.cursor()
+    cursor = conn.cursor(buffered=True)  # 👈 เพิ่ม buffered=True ตรงนี้
 
     try:
-        cursor.execute("""
-            INSERT INTO member (
-                Email, Password, DisplayName, ProfileImage,
-                VerifyCode, VerifyExpire, EmailVerified, RegisterDate, MemberStatus
-            )
-            VALUES (%s, %s, %s, %s, %s, %s, 0, %s, 'Pending')
-        """, (
-            email,
-            password_hash,
-            display_name,
-            filename,
-            verify_code,
-            expire,
-            current_time
-        ))
+        cursor.execute("SELECT MemberID, EmailVerified FROM member WHERE Email = %s", (email,))
+        existing_user = cursor.fetchone()
+
+        if existing_user:
+            member_id, email_verified = existing_user
+
+            if email_verified == 1:
+                return jsonify({
+                    "success": False,
+                    "message": "อีเมลนี้ถูกใช้งานและยืนยันตัวตนในระบบแล้ว"
+                }), 400
+            
+            cursor.execute("""
+                UPDATE member 
+                SET Password = %s, DisplayName = %s, ProfileImage = %s, 
+                    VerifyCode = %s, VerifyExpire = %s, RegisterDate = %s
+                WHERE MemberID = %s
+            """, (
+                password_hash,
+                display_name,
+                filename,
+                verify_code,
+                expire,
+                current_time,
+                member_id
+            ))
+        else:
+            cursor.execute("""
+                INSERT INTO member (
+                    Email, Password, DisplayName, ProfileImage,
+                    VerifyCode, VerifyExpire, EmailVerified, RegisterDate, MemberStatus
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, 0, %s, 'Pending')
+            """, (
+                email,
+                password_hash,
+                display_name,
+                filename,
+                verify_code,
+                expire,
+                current_time
+            ))
+            
         conn.commit()
     except Exception as e:
         print("❌ Database Error:", str(e))
         return jsonify({
             "success": False,
-            "message": "อีเมลซ้ำหรือเกิดข้อผิดพลาดกับฐานข้อมูล"
+            "message": f"เกิดข้อผิดพลาดกับฐานข้อมูล: {str(e)}"
         }), 400
     finally:
         cursor.close()
         conn.close()
 
-    # ==========================================
-    # 6. ส่งอีเมลยืนยันตัวตน
-    # ==========================================
     try:
         send_verify_email(email, verify_code)
     except Exception as e:
@@ -98,5 +116,5 @@ def register():
 
     return jsonify({
         "success": True,
-        "message": "สมัครสมาชิกสำเร็จ กรุณาตรวจสอบรหัส OTP ในอีเมลของคุณ"
+        "message": "ส่งรหัสยืนยันสำเร็จ กรุณาตรวจสอบรหัส OTP ในอีเมลของคุณ"
     }), 200

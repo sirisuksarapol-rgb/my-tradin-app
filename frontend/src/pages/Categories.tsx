@@ -5,6 +5,9 @@ import { getCategories } from "@/api/api";
 import { getCategoryIcon } from "@/utils/iconMapping";
 import { Sparkles, Layers } from "lucide-react";
 
+// =========================================================================
+// INTERFACE: โครงสร้างข้อมูลสำหรับประเภทของหมวดหมู่สินค้าในฐานข้อมูล
+// =========================================================================
 interface DBCategory {
   CategoryID: number;
   CategoryName: string;
@@ -12,7 +15,9 @@ interface DBCategory {
   ItemCount?: number;
 }
 
-// โทนสีละมุน สไตล์ Minimal
+// =========================================================================
+// CONSTANTS: ชุดโทนสีสำหรับตกแต่งการ์ดหมวดหมู่ในสไตล์ Minimal ละมุนตา (วนลูปใช้ซ้ำ)
+// =========================================================================
 const CATEGORY_STYLES = [
   "bg-blue-50/60 text-blue-600 border-blue-100/60 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900/40",
   "bg-emerald-50/60 text-emerald-600 border-emerald-100/60 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/40",
@@ -22,21 +27,38 @@ const CATEGORY_STYLES = [
   "bg-cyan-50/60 text-cyan-600 border-cyan-100/60 dark:bg-cyan-950/30 dark:text-cyan-400 dark:border-cyan-900/40",
 ];
 
+// =========================================================================
+// COMPONENT: Categories (หน้าจอแสดงรายการหมวดหมู่สินค้าทั้งหมดในระบบ)
+// =========================================================================
 export default function Categories() {
+  
+  // State เก็บรายการหมวดหมู่สินค้าที่ดึงมาจากฐานข้อมูล
   const [categoriesList, setCategoriesList] = useState<DBCategory[]>([]); 
+  
+  // State ควบคุมการแสดงสถานะกำลังโหลดข้อมูล (Loading State) เพื่อแสดง Skeleton UI
   const [isLoading, setIsLoading] = useState(true);
 
+  // =====================================================================
+  // EFFECT: ดึงข้อมูลหมวดหมู่สินค้าจาก API ทันทีเมื่อคอมโพเนนต์ถูกโหลดครั้งแรก (Mounting)
+  // =====================================================================
   useEffect(() => {
     const fetchCategoriesData = async () => {
       try {
+        // เริ่มต้นเปิดสถานะกำลังโหลด
         setIsLoading(true);
+        
+        // เรียกใช้งาน API เพื่อดึงข้อมูลหมวดหมู่ทั้งหมด
         const response = await getCategories();
+        
+        // ตรวจสอบความถูกต้องของข้อมูลที่ได้รับและอัปเดตลงใน State
         if (response && response.data) {
           setCategoriesList(response.data);
         }
       } catch (error) {
+        // ดักจับและแสดงข้อผิดพลาดใน Console หากไม่สามารถเชื่อมต่อ API ได้
         console.error("Error fetching categories:", error);
       } finally {
+        // ปิดสถานะการโหลดเสมอไม่ว่าจะสำเร็จหรือเกิดข้อผิดพลาด
         setIsLoading(false);
       }
     };
@@ -45,14 +67,18 @@ export default function Categories() {
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] dark:bg-background flex flex-col font-sans text-foreground selection:bg-primary/20">
+      
+      {/* แถบนำทางด้านบน (Navbar Component) */}
       <Navbar />
       
       <main className="flex-1 relative overflow-hidden">
-        {/* Subtle Background Elements */}
+        {/* พื้นหลังตกแต่งเอฟเฟกต์เรืองแสงแบบ Subtle (Ambient Glow Background) */}
         <div className="absolute top-0 inset-x-0 h-[500px] bg-gradient-to-b from-primary/5 to-transparent pointer-events-none -z-10" />
         <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] rounded-full bg-primary/5 blur-[120px] pointer-events-none -z-10" />
 
-        {/* 🚀 Hero Section */}
+        {/* ===================================================================== */}
+        {/* HERO SECTION: ส่วนหัวข้อหลักและคำอธิบายแพลตฟอร์ม                        */}
+        {/* ===================================================================== */}
         <section className="pt-24 pb-10 md:pt-32 md:pb-16 px-4">
           <div className="mx-auto max-w-3xl text-center space-y-5 animate-in fade-in slide-in-from-bottom-6 duration-700">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white dark:bg-card border border-black/5 dark:border-white/10 shadow-sm text-xs font-semibold text-primary">
@@ -73,11 +99,13 @@ export default function Categories() {
           </div>
         </section>
 
-        {/* 🧩 Categories Grid */}
+        {/* ===================================================================== */}
+        {/* CATEGORIES GRID SECTION: ส่วนแสดงรายการหมวดหมู่สินค้าในรูปแบบตารางการ์ด */}
+        {/* ===================================================================== */}
         <section className="pb-28 px-4">
           <div className="mx-auto max-w-5xl">
             {isLoading ? (
-              // 🌟 Skeleton Loading
+              // กรณีที่ 1: แสดงโครงร่างจำลองขณะกำลังโหลดข้อมูล (Skeleton Loading State)
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3.5 sm:gap-5">
                 {[...Array(8)].map((_, i) => (
                   <div key={i} className="animate-pulse bg-white dark:bg-card/40 border border-black/5 dark:border-white/5 rounded-2xl sm:rounded-[1.75rem] p-4 sm:p-5 h-[160px] sm:h-[180px] flex flex-col items-center justify-center">
@@ -88,14 +116,14 @@ export default function Categories() {
                 ))}
               </div>
             ) : categoriesList.length === 0 ? (
-              // 📭 Empty State
+              // กรณีที่ 2: แสดงข้อความแจ้งเตือนเมื่อไม่พบข้อมูลหมวดหมู่ในระบบ (Empty State)
               <div className="text-center py-16 bg-white dark:bg-card/30 rounded-2xl border border-dashed border-border/60 max-w-xl mx-auto">
                 <Layers className="w-10 h-10 text-muted-foreground/50 mx-auto mb-3" />
                 <p className="text-base font-medium text-foreground">ยังไม่มีหมวดหมู่ในระบบ</p>
                 <p className="text-xs text-muted-foreground mt-1">กลับมาตรวจสอบใหม่ในภายหลัง</p>
               </div>
             ) : (
-              // ✨ Content Grid (Unclickable Tile)
+              // กรณีที่ 3: แสดงรายการหมวดหมู่สินค้าทั้งหมดในรูปแบบ Grid Cards
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3.5 sm:gap-5">
                 {categoriesList.map((cat, i) => {
                   const name = cat.CategoryName || "";
@@ -103,7 +131,6 @@ export default function Categories() {
                   const styleClass = CATEGORY_STYLES[i % CATEGORY_STYLES.length];
 
                   return (
-                    // เปลี่ยนจาก <Link> มาใช้ <div> พร้อมเพิ่ม select-none กันคนคลุมดำข้อความ
                     <div 
                       key={cat.CategoryID || i}
                       className="group outline-none animate-in fade-in zoom-in-95 duration-500 fill-mode-both cursor-default block h-full select-none"
@@ -111,21 +138,21 @@ export default function Categories() {
                     >
                       <div className="relative h-full bg-white dark:bg-card/40 backdrop-blur-md border border-black/5 dark:border-white/10 rounded-2xl sm:rounded-[1.75rem] p-4 sm:p-5 flex flex-col items-center text-center transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[0_12px_24px_-10px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_12px_24px_-10px_rgba(255,255,255,0.03)] hover:border-primary/30 overflow-hidden isolate">
                         
-                        {/* Light Glow Effect */}
+                        {/* เอฟเฟกต์เรืองแสงเมื่อนำเมาส์ไปชี้ (Light Glow Effect on Hover) */}
                         <div className="absolute inset-0 bg-gradient-to-b from-transparent to-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10" />
 
-                        {/* Icon Box */}
+                        {/* กล่องไอคอนหมวดหมู่ พร้อมเอฟเฟกต์ขยายและหมุนเมื่อโฮเเวอร์ */}
                         <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl flex items-center justify-center mb-3 sm:mb-4 transition-all duration-300 group-hover:scale-110 group-hover:rotate-[4deg] ${styleClass}`}>
                           <Icon className="w-6 h-6 sm:w-7 sm:h-7" strokeWidth={1.5} />
                         </div>
                         
-                        {/* Content Area */}
+                        {/* ส่วนข้อความชื่อหมวดหมู่และจำนวนไอเทมข้างใน */}
                         <div className="space-y-2 w-full mt-auto">
                           <h3 className="font-bold text-sm sm:text-base tracking-tight leading-tight text-foreground group-hover:text-primary transition-colors line-clamp-2">
                             {name}
                           </h3>
                           
-                          {/* Badge จำนวนไอเทม */}
+                          {/* ป้ายแสดงจำนวนไอเทมภายในหมวดหมู่ พร้อมรองรับเอฟเฟกต์โฮเวอรสไตล์ Interactive */}
                           <div className="inline-flex items-center justify-center px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full bg-muted/50 dark:bg-muted/20 border border-black/5 dark:border-white/5 text-[10px] sm:text-[11px] font-semibold text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary group-hover:border-primary/20 transition-all duration-300">
                             {cat.ItemCount ?? 0} ไอเทม
                           </div>
@@ -140,6 +167,8 @@ export default function Categories() {
           </div>
         </section>
       </main>
+
+      {/* ส่วนท้ายเว็บไซต์ (Footer Component) */}
       <Footer />
     </div>
   );

@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-// 💡 แก้ไข: เพิ่ม Loader2 เข้ามาใน import แล้ว
 import { Bell, ArrowRightLeft, ChevronRight, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import AppLayout from "@/components/AppLayout";
@@ -13,20 +12,22 @@ interface NotificationItem {
   Link: string;
   IsRead: number;
   CreateDate: string;
-  
-  // พร็อพเพอร์ตี้เสริมสำหรับรองรับโครงสร้าง Object ในอนาคต
   SenderName?: string;         
   SenderItemName?: string;     
   MyItemName?: string;         
 }
 
+// =========================================================================
+// COMPONENT: Notifications (หน้าจอสำหรับแสดงและจัดการรายการแจ้งเตือนของผู้ใช้งาน)
+// =========================================================================
 export default function Notifications() {
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  // 💡 แก้ไข: ลบโค้ดที่เบิ้ลซ้ำในบรรทัดเดียวกันออก
   const [processingIds, setProcessingIds] = useState<Set<number>>(new Set());
   
-  // 1. ดึงข้อมูลการแจ้งเตือนจาก API ทันทีเมื่อเปิดหน้าจอ
+  /**
+   * ฟังก์ชัน: useEffect สำหรับดึงข้อมูลรายการแจ้งเตือนทั้งหมดจาก API ทันทีเมื่อหน้าจอถูกโหลดขึ้นมาครั้งแรก (Mounting)
+   */
   useEffect(() => {
     const fetchNotifs = async () => {
       try {
@@ -41,16 +42,18 @@ export default function Notifications() {
     fetchNotifs();
   }, []);
 
-  // 2. ฟังก์ชันจัดการเมื่อผู้ใช้งานคลิกเลือกที่กล่องการแจ้งเตือน
+  /**
+   * ฟังก์ชัน: handleNotificationClick
+   * มีไว้สำหรับ: จัดการเหตุการณ์เมื่อผู้ใช้งานคลิกเลือกรายการแจ้งเตือน ป้องกันการกดซ้ำซ้อนขณะระบบกำลังประมวลผล 
+   * ทำการบันทึกสถานะการอ่านลงในระบบ อัปเดตสถานะบนหน้าจอ ส่งอีเวนต์แจ้งเตือนการอัปเดต และนำทางไปยังลิงก์ปลายทาง
+   */
   const handleNotificationClick = async (e: React.MouseEvent, clickedNotif: NotificationItem) => {
     e.stopPropagation();
     
-    // 💡 แก้ไข: ลบโค้ดที่เบิ้ลซ้ำในบรรทัดเดียวกันออก
     if (processingIds.has(clickedNotif.NotificationID)) return;
     
     try {
       if (clickedNotif.IsRead === 0) {
-        // 🔒 บันทึก ID ลงใน State ว่า "กำลังโหลดนะ ห้ามกดซ้ำ"
         setProcessingIds((prev) => new Set(prev).add(clickedNotif.NotificationID));
 
         await markNotificationAsRead(clickedNotif.NotificationID);
@@ -66,7 +69,6 @@ export default function Notifications() {
     } catch (error) {
       console.error("อัปเดตสถานะการอ่านล้มเหลว:", error);
     } finally {
-      // 🔓 ปลดล็อก ID ออกจาก State เมื่อทำงานเสร็จ (ไม่ว่าจะสำเร็จหรือพัง)
       setProcessingIds((prev) => {
         const newSet = new Set(prev);
         newSet.delete(clickedNotif.NotificationID);
@@ -79,7 +81,11 @@ export default function Notifications() {
     }
   };
 
-  // 3. ฟังก์ชันแปลงและจัดฟอร์แมตข้อความแจ้งเตือนให้เป็นตัวหนาในจุดสำคัญ
+  /**
+   * ฟังก์ชัน: formatNotificationMessage
+   * มีไว้สำหรับ: แปลงและจัดรูปแบบข้อความแจ้งเตือนที่รับมาในรูปแบบ JSON หรือสตริงเทมเพลต 
+   * ให้แสดงผลเป็นองค์ประกอบ HTML พร้อมเน้นตัวหนาและสีข้อความในส่วนสำคัญ เช่น ชื่อผู้ส่ง ชื่อสิ่งของที่ต้องการแลก
+   */
   const formatNotificationMessage = (n: NotificationItem) => {
     try {
       const jsonData = JSON.parse(n.Message);
@@ -131,7 +137,10 @@ export default function Notifications() {
     return <span>{n.Message}</span>;
   };
 
-  // ฟังก์ชันจัดรูปแบบการแสดงผลวันที่และเวลาภาษาไทย
+  /**
+   * ฟังก์ชัน: formatTime
+   * มีไว้สำหรับ: แปลงสตริงวันที่และเวลาให้อยู่ในรูปแบบมาตรฐานภาษาไทยที่อ่านง่าย (วัน เดือน ปี และเวลา ชั่วโมง:นาที)
+   */
   const formatTime = (dateString: string) => {
     return new Date(dateString).toLocaleString('th-TH', { 
       year: 'numeric', month: 'short', day: 'numeric', 

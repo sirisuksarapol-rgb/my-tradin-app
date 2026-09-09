@@ -22,28 +22,39 @@ import ExchangeTracking from "./pages/ExchangeTracking";
 import SecurityVerify from "./pages/SecurityVerify";
 import ReviewExchange from "./pages/ReviewExchange";
 import NotFound from "./pages/NotFound";
-import EditPost from "./pages/EditPost"; // ✅ ถูกต้อง
-import MatchResults from "./pages/MatchResults"; // ✅ ถูกต้อง
+import EditPost from "./pages/EditPost";
+import MatchResults from "./pages/MatchResults";
 import AdminDashboard from "./pages/AdminDashboard";
 import HelpCenter from "./pages/HelpCenter";
 import ExchangeReview from "./pages/ExchangeReview";
 import ExchangeHistory from "./pages/ExchangeHistory";
 import ExchangeDetail from "./pages/ExchangeDetail";
 import EditProfile from "./pages/EditProfile";
-
-// Import ThemeProvider มาแล้ว
 import { ThemeProvider } from "@/hooks/use-theme";
 
+/**
+ * สร้างอินสแตนซ์ของ QueryClient สำหรับจัดการสถานะ การแคช (Caching) 
+ * และการซิงโครไนซ์ข้อมูลแบบ asynchronous ด้วย React Query
+ */
 const queryClient = new QueryClient();
 
+// =========================================================================
+// COMPONENT: App (คอมโพเนนต์หลักของแอปพลิเคชัน สำหรับกำหนดโครงสร้าง Providers และระบบเส้นทาง Router)
+// =========================================================================
 const App = () => (
+  // จัดเตรียมระบบจัดการสถานะข้อมูล (React Query) ให้กับทุกคอมโพเนนต์ภายในแอปพลิเคชัน
   <QueryClientProvider client={queryClient}>
-    {/* เพิ่ม ThemeProvider เข้ามาครอบตรงนี้ครับ 👇 */}
+    {/* จัดการระบบธีม (Dark/Light Mode) สำหรับควบคุมการแสดงผลหน้าจอ */}
     <ThemeProvider>
+      {/* จัดการการแสดงผล Tooltip ทั่วทั้งแอปพลิเคชัน */}
       <TooltipProvider>
+        {/* คอมโพเนนต์แสดงผลการแจ้งเตือนแบบ Toast ทั่วไป */}
         <Toaster />
+        {/* คอมโพเนนต์แสดงผลการแจ้งเตือนแบบ Sonner */}
         <Sonner />
+        {/* ระบบจัดการเส้นทาง (Routing) ฝั่ง client-side */}
         <BrowserRouter>
+          {/* กำหนดกลุ่มเส้นทาง (Routes) สำหรับจับคู่ URL Path กับหน้าจอ (Pages) ต่าง ๆ */}
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />

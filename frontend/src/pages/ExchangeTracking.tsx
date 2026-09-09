@@ -1,28 +1,19 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import {
-  ArrowLeft, Clock, CheckCircle, ArrowRightLeft,
-  ShieldCheck, Star, Package, XCircle, AlertCircle, Phone, 
-  MapPin, UserCheck, Check, FileText
-} from "lucide-react";
+import { ArrowLeft, Clock, CheckCircle, ArrowRightLeft, ShieldCheck, Star, Package, XCircle, AlertCircle, Phone, MapPin, UserCheck, Check, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import AppLayout from "@/components/AppLayout";
 import { useToast } from "@/hooks/use-toast";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogHeader, AlertDialogTitle, AlertDialogFooter, AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogFooter, AlertDialogTrigger, } from "@/components/ui/alert-dialog";
 import { completeExchange, getExchanges, IMAGE_BASE_URL, verifyExchangeCode, cancelExchange } from "@/api/api";
 
-// ========================================================
-// 📐 TYPES & INTERFACES
-// ========================================================
 interface ExchangeItem {
   ExchangeID: number | string;
   ExchangeStatus: string;
+  Comment?: string;
+  PartnerComment?: string;
   myPostTitle?: string;
   myPostImage?: string;
   myPostDescription?: string;
@@ -61,14 +52,14 @@ const defaultReasonOptions = [
   "เหตุผลอื่นๆ"
 ];
 
+// =========================================================================
+// COMPONENT: ExchangeTracking (หน้าจอสำหรับติดตามสถานะการแลกเปลี่ยนสิ่งของแบบเรียลไทม์)
+// =========================================================================
 export default function ExchangeTracking() {
   const { matchId } = useParams<{ matchId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // ========================================================
-  // ⚙️ STATE MANAGEMENT
-  // ========================================================
   const [isLoading, setIsLoading] = useState(true);
   const [exchange, setExchange] = useState({
     matchId: matchId || "unknown",
@@ -84,18 +75,19 @@ export default function ExchangeTracking() {
     isTargetMemberVerified: 0,
     isMemberReceived: 0,
     isTargetMemberReceived: 0,
+    hasReviewed: false,
   });
 
   const [cancelReason, setCancelReason] = useState("");
   const [finalReason, setFinalReason] = useState("");
-
   const [verificationCode, setVerificationCode] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
   const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
 
-  // ========================================================
-  // 📦 HELPER FUNCTIONS
-  // ========================================================
+  /**
+   * ฟังก์ชัน: getCorrectImagePath
+   * มีไว้สำหรับ: จัดรูปแบบและตรวจสอบพาธรูปภาพสินค้าให้ถูกต้อง พร้อมรองรับรูปแบบสตริง JSON, คั่นด้วยคอมมา หรือ URL ภายนอก
+   */
   const getCorrectImagePath = (imageName: string | undefined) => {
     if (!imageName || imageName.trim() === "undefined" || imageName === "null") return "/placeholder.jpg";
     try {
@@ -115,6 +107,10 @@ export default function ExchangeTracking() {
     }
   };
 
+  /**
+   * ฟังก์ชัน: fetchTrackingData
+   * มีไว้สำหรับ: ดึงข้อมูลการติดตามการแลกเปลี่ยนจาก API ตามรหัส matchId และแม็ปข้อมูลเข้าสู่สถานะคอมโพเนนต์
+   */
   const fetchTrackingData = useCallback(async () => {
     if (!matchId) return;
     try {
@@ -128,6 +124,9 @@ export default function ExchangeTracking() {
           const currentUser = savedUser ? JSON.parse(savedUser) : null;
           const currentUserId = currentUser?.id ?? currentUser?.user_id ?? currentUser?.MemberID;
           const isMember = String(currentUserId) === String(matchData.MemberID);
+
+          // เช็กสถานะการรีวิวจากฝั่งตัวเอง (Member ใช้ Comment, TargetMember ใช้ PartnerComment)
+          const hasReviewed = isMember ? Boolean(matchData.Comment) : Boolean(matchData.PartnerComment);
 
           setExchange({
             matchId: String(matchData.ExchangeID),
@@ -151,6 +150,7 @@ export default function ExchangeTracking() {
             isTargetMemberVerified: matchData.IsTargetMemberVerified ?? 0,
             isMemberReceived: matchData.IsMemberReceived ?? 0,
             isTargetMemberReceived: matchData.IsTargetMemberReceived ?? 0,
+            hasReviewed: hasReviewed,
           });
         }
       }
@@ -161,13 +161,17 @@ export default function ExchangeTracking() {
     }
   }, [matchId, toast]);
 
+  /**
+   * EFFECT: เรียกใช้งานฟังก์ชัน fetchTrackingData เพื่อโหลดข้อมูลทันทีที่คอมโพเนนต์พร้อมทำงาน
+   */
   useEffect(() => {
     fetchTrackingData();
   }, [fetchTrackingData]);
 
-  // ========================================================
-  // ⚡ HANDLERS
-  // ========================================================
+  /**
+   * ฟังก์ชัน: handleVerifyCode
+   * มีไว้สำหรับ: ตรวจสอบความยาวรหัส OTP และส่งคำขอไปยัง API เพื่อยืนยันรหัสความปลอดภัยสำหรับการแลกเปลี่ยน
+   */
   const handleVerifyCode = async () => {
     if (!matchId) return;
     if (!verificationCode || verificationCode.length < 6) {
@@ -196,6 +200,10 @@ export default function ExchangeTracking() {
     }
   };
 
+  /**
+   * ฟังก์ชัน: handleConfirmCancel
+   * มีไว้สำหรับ: ส่งคำขอยกเลิกรายการแลกเปลี่ยนไปยัง API พร้อมบันทึกสาเหตุการยกเลิก
+   */
   const handleConfirmCancel = async () => {
     if (!cancelReason || !matchId) return;
     try {
@@ -208,14 +216,17 @@ export default function ExchangeTracking() {
     }
   };
 
-  // 🟢 แก้ไข: ยิง API completeExchange ไปบันทึกในฐานข้อมูลจริง
+  /**
+   * ฟังก์ชัน: handleConfirmReceive
+   * มีไว้สำหรับ: ส่งคำขอยืนยันการรับสินค้าไปยัง API เพื่อบันทึกสถานะว่าได้รับสินค้าเรียบร้อยแล้ว
+   */
   const handleConfirmReceive = async () => {
     if (!matchId) return;
     try {
       const res = await completeExchange(matchId, { score: 5, comment: "ได้รับสินค้าเรียบร้อยแล้ว" });
       if (res) {
         toast({ title: "ยืนยันการรับของสำเร็จ", description: "ระบบบันทึกว่าคุณได้รับสินค้าเรียบร้อยแล้ว" });
-        fetchTrackingData(); // โหลดข้อมูลสถานะใหม่ล่าสุดทันที
+        fetchTrackingData();
       }
     } catch (error) {
       console.error("Error confirming receive:", error);
@@ -236,7 +247,6 @@ export default function ExchangeTracking() {
     );
   }
 
-  // คำนวณสถานะ
   const currentStatus = exchange.status;
   const currentIdx = stepIndex[currentStatus] ?? 0;
 
@@ -266,23 +276,21 @@ export default function ExchangeTracking() {
     <AppLayout>
       <section className="py-6 sm:py-10 max-w-5xl mx-auto px-4 space-y-6">
         
-        {/* Header Bar */}
         <div className="flex items-center gap-3">
           <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => navigate(-1)}
-                className="-ml-2"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate(-1)}
+            className="-ml-2 hover:bg-slate-200/60 dark:hover:bg-zinc-800/60 text-foreground transition-all"
+          >
+            <ArrowLeft className="h-5 w-5 text-foreground" />
+          </Button>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">ติดตามการแลกเปลี่ยน</h1>
             <p className="text-xs text-muted-foreground mt-0.5">ตรวจสอบรายละเอียดและสถานะการแลกเปลี่ยนของทั้งสองฝ่าย</p>
           </div>
         </div>
 
-        {/* 🚀 Stepper แนวยาว (ปรับแต่งแก้ดีไซน์ลอย/เส้นทะลุ) */}
         <Card className="border bg-card shadow-sm rounded-2xl">
           <CardContent className="p-6 sm:p-8">
             <h2 className="text-base font-bold text-foreground flex items-center gap-2 mb-6">
@@ -290,11 +298,7 @@ export default function ExchangeTracking() {
             </h2>
             
             <div className="relative flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 sm:gap-2">
-              
-              {/* เส้นหลัง Background */}
               <div className="hidden sm:block absolute top-6 left-[12%] right-[12%] h-1 bg-muted z-0" />
-              
-              {/* เส้น Progress สีไฮไลต์ */}
               <div 
                 className="hidden sm:block absolute top-6 left-[12%] h-1 bg-primary transition-all duration-500 z-0" 
                 style={{ width: `${(currentIdx / (steps.length - 1)) * 76}%` }} 
@@ -307,13 +311,10 @@ export default function ExchangeTracking() {
 
                 return (
                   <div key={step.key} className="flex flex-row sm:flex-col items-center gap-4 sm:gap-2 z-10 w-full sm:w-1/4 relative">
-                    
-                    {/* เส้นแนวตั้งสำหรับ Mobile */}
                     {idx < steps.length - 1 && (
                       <div className={`sm:hidden absolute left-6 top-12 w-0.5 h-10 -ml-[1px] ${isDone && idx < currentIdx ? "bg-primary" : "bg-muted"}`} />
                     )}
 
-                    {/* วงกลม Icon ใส่ bg ทึบทับเส้น และ shadow */}
                     <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 transition-all border-2 ${
                       isCurrent 
                         ? (step.key === "failed" 
@@ -343,19 +344,27 @@ export default function ExchangeTracking() {
           </CardContent>
         </Card>
 
-        {/* 🎉 สถานะ: สำเร็จแล้ว (ให้รีวิว) */}
         {currentStatus === "completed" && (
           <Card className="border bg-card rounded-2xl shadow-sm text-center p-6 space-y-3">
             <div className="text-4xl">🎉</div>
             <h3 className="font-bold text-lg">การแลกเปลี่ยนสำเร็จ!</h3>
-            <p className="text-xs text-muted-foreground">คุณสามารถให้คะแนนรีวิวคู่แลกเปลี่ยนเพื่อเพิ่มความน่าเชื่อถือได้</p>
-            <Button className="rounded-xl bg-primary px-8" onClick={() => navigate(`/review/${exchange.matchId}`)}>
-              <Star className="h-4 w-4 mr-2 fill-current" /> ให้คะแนนและรีวิว
-            </Button>
+            
+            {/* เช็กเงื่อนไข หากรีวิวไปแล้วจะแสดงป้ายสำเร็จแทนปุ่มกด เพื่อป้องกันการกดรีวิวซ้ำ */}
+            {!exchange.hasReviewed ? (
+              <>
+                <p className="text-xs text-muted-foreground">คุณสามารถให้คะแนนรีวิวคู่แลกเปลี่ยนเพื่อเพิ่มความน่าเชื่อถือได้</p>
+                <Button className="rounded-xl bg-primary px-8" onClick={() => navigate(`/review/${exchange.matchId}`)}>
+                  <Star className="h-4 w-4 mr-2 fill-current" /> ให้คะแนนและรีวิว
+                </Button>
+              </>
+            ) : (
+              <div className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 py-2.5 px-4 rounded-xl inline-flex items-center gap-2 mx-auto text-xs font-bold">
+                <CheckCircle className="h-4 w-4" /> คุณได้ให้คะแนนรีวิวรายการนี้เรียบร้อยแล้ว
+              </div>
+            )}
           </Card>
         )}
 
-        {/* 🚫 สถานะ: รายการถูกยกเลิก */}
         {currentStatus === "failed" && (
           <Card className="border border-destructive/20 bg-destructive/5 rounded-2xl p-5 space-y-1.5">
             <div className="flex items-center gap-2 text-destructive font-bold text-base">
@@ -365,7 +374,6 @@ export default function ExchangeTracking() {
           </Card>
         )}
 
-        {/* 📦 รายละเอียดข้อเสนอทั้งสองฝ่าย */}
         <div className="space-y-4">
           <h2 className="text-base font-bold text-foreground flex items-center gap-2">
             <ArrowRightLeft className="h-5 w-5 text-primary" /> รายละเอียดข้อเสนอทั้งสองฝ่าย
@@ -373,7 +381,6 @@ export default function ExchangeTracking() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             
-            {/* 🟢 การ์ดฝั่งของคุณ */}
             <Card className="border-2 border-primary/20 bg-card shadow-sm rounded-2xl overflow-hidden flex flex-col justify-between">
               <div>
                 <div className="bg-primary/10 px-4 py-2.5 border-b border-primary/10 flex items-center justify-between">
@@ -420,7 +427,6 @@ export default function ExchangeTracking() {
               </div>
             </Card>
 
-            {/* 🔵 การ์ดฝั่งคู่แลกเปลี่ยน */}
             <Card className="border bg-card shadow-sm rounded-2xl overflow-hidden flex flex-col justify-between">
               <div>
                 <div className="bg-muted px-4 py-2.5 border-b flex items-center justify-between">
@@ -470,9 +476,7 @@ export default function ExchangeTracking() {
           </div>
         </div>
 
-        {/* ⚡ ACTION CARDS (OTP / โชว์เบอร์) */}
         <div className="space-y-4">
-          {/* 🔴 บล็อกที่ 1: หน้าจอบังคับกรอก OTP */}
           {showOtpScreen && (
             <Card className="glass-card border-primary/20 bg-primary/5 rounded-2xl">
               <CardContent className="p-6 sm:p-8 space-y-4 text-center">
@@ -523,7 +527,6 @@ export default function ExchangeTracking() {
             </Card>
           )}
 
-          {/* 🟢 บล็อกที่ 2: หน้าจอโชว์เบอร์โทร */}
           {showProgressScreen && (
             <Card className="glass-card border-primary/20 bg-primary/5 shadow-sm rounded-2xl">
               <CardContent className="p-6 sm:p-8 space-y-6">
@@ -575,7 +578,6 @@ export default function ExchangeTracking() {
           )}
         </div>
 
-        {/* 🔴 DANGER ZONE: พบปัญหาหรือต้องการยกเลิก? */}
         {currentStatus !== "completed" && currentStatus !== "failed" && (
           <Card className="border border-destructive/20 bg-destructive/5 rounded-2xl p-5 sm:p-6 transition-all mt-8">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

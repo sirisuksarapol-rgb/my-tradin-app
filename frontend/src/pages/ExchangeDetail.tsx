@@ -1,23 +1,13 @@
 import React, { useState, useEffect } from "react";
-import { 
-  ArrowLeft, ArrowRightLeft, Star, MapPin, 
-  Calendar, CheckCircle2, XCircle, Package, Phone, 
-  ShieldCheck, Info, Lock, MessageSquareQuote
-} from "lucide-react";
+import { ArrowLeft, ArrowRightLeft, Star, MapPin, Calendar, CheckCircle2, XCircle, Package, MessageSquareQuote } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import AppLayout from "@/components/AppLayout";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import { getExchanges, getUserStats, IMAGE_BASE_URL } from "@/api/api";
 
-import { 
-  getExchanges, getUserStats, IMAGE_BASE_URL, 
-  requestExchangeCode, verifyExchangeCode, 
-  cancelExchange, completeExchange 
-} from "@/api/api";
-
-// 🎯 INTERFACES
 interface ExchangeDetailData {
   ExchangeID: number;
   ExchangeStatus: string;
@@ -36,19 +26,16 @@ interface ExchangeDetailData {
   SuccessDate?: string;
   CancelDate?: string;
   CancelReason?: string;
-  
   myPostTitle: string;
   myPostImage: string;
   myPostDescription?: string;
   myMeetingLocation?: string;
-
   theirPostTitle: string;
   theirPostImage: string;
   theirPostDescription?: string;
   theirMeetingLocation?: string;
   theirAuthorName: string;
   theirProfileImage?: string;
-  
   Score?: number | null;
   Comment?: string | null;
   PartnerScore?: number | null;
@@ -64,6 +51,9 @@ interface ApiError {
   message?: string;
 }
 
+// =========================================================================
+// COMPONENT: ExchangeDetail (หน้าจอแสดงรายละเอียดเชิงลึกของรายการแลกเปลี่ยน)[cite: 10]
+// =========================================================================
 export default function ExchangeDetail() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -71,15 +61,12 @@ export default function ExchangeDetail() {
   const [item, setItem] = useState<ExchangeDetailData | null>(null);
   const [partnerStats, setPartnerStats] = useState<PartnerStats>({ successfulExchanges: 0, reviewScore: "0.0" });
   const [loading, setLoading] = useState<boolean>(true);
-  const [actionLoading, setActionLoading] = useState<boolean>(false);
-  
-  const [otpStep, setOtpStep] = useState<"none" | "verifying">("none");
-  const [otpCode, setOtpCode] = useState<string>("");
-  
-  const [showReview, setShowReview] = useState<boolean>(false);
-  const [reviewScore, setReviewScore] = useState<number>(5);
-  const [reviewComment, setReviewComment] = useState<string>("");
 
+  /**
+   * ฟังก์ชัน: fetchDetailData[cite: 10]
+   * มีไว้สำหรับ: ดึงข้อมูลรายการแลกเปลี่ยนทั้งหมดจาก API กรองเฉพาะรายการที่ตรงกับ ID บน URL[cite: 10]
+   * และดึงข้อมูลสถิติคะแนนรีวิวของคู่แลกเปลี่ยนมาแสดงผลประกอบกัน[cite: 10]
+   */
   const fetchDetailData = async () => {
     try {
       setLoading(true);
@@ -117,23 +104,13 @@ export default function ExchangeDetail() {
     }
   };
 
+  /**
+   * EFFECT: เรียกใช้งานฟังก์ชัน fetchDetailData และเลื่อนหน้าจอขึ้นด้านบนสุดอัตโนมัติเมื่อค่า id เปลี่ยนแปลง[cite: 10]
+   */
   useEffect(() => {
     fetchDetailData();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [id]);
-
-  const getErrorMessage = (err: unknown, defaultMessage: string): string => {
-    if (err instanceof Error) return err.message;
-    if (typeof err === "object" && err !== null && "message" in err) {
-      return String((err as ApiError).message);
-    }
-    return defaultMessage;
-  };
-
-  const handleRequestOTP = async () => { /* โค้ดเดิม */ };
-  const handleVerifyOTP = async () => { /* โค้ดเดิม */ };
-  const handleCancel = async () => { /* โค้ดเดิม */ };
-  const handleSubmitReview = async () => { /* โค้ดเดิม */ };
 
   if (loading) return <div className="text-center py-20 font-medium text-muted-foreground">กำลังโหลดข้อมูลการแลกเปลี่ยน...</div>;
   if (!item) return <div className="text-center py-20 font-medium text-muted-foreground">ไม่พบข้อมูลรายการนี้</div>;
@@ -143,24 +120,26 @@ export default function ExchangeDetail() {
   const currentUserId = currentUser ? (currentUser.id || currentUser.UserID || currentUser.MemberID) : "";
   
   const isRequester = String(item.MemberID) === String(currentUserId);
-  const myVerified = isRequester ? item.IsMemberVerified : item.IsTargetMemberVerified;
-  const hasReviewed = isRequester ? item.IsMemberReceived === 1 : item.IsTargetMemberReceived === 1;
-
   const status = item.ExchangeStatus.toLowerCase();
   const isCompleted = status === "completed";
-  const isAccepted = status === "accepted";
-  const isInProgress = status === "in_progress";
   const isFailedOrCancelled = ["cancelled", "rejected", "failed"].includes(status);
 
-  // ดึงคะแนนสำหรับรายการนี้โดยเฉพาะ
   const receivedScore = isRequester ? item.PartnerScore : item.Score;
   const receivedComment = isRequester ? item.PartnerComment : item.Comment;
 
+  /**
+   * ฟังก์ชัน: getImageUrl[cite: 10]
+   * มีไว้สำหรับ: จัดรูปแบบ URL ของรูปภาพสินค้า โดยดึงชื่อไฟล์ภาพแรกและเชื่อมต่อกับ Base URL ของระบบอัปโหลด[cite: 10]
+   */
   const getImageUrl = (imageString: string): string => {
     if (!imageString) return "/placeholder-image.png";
     return `${IMAGE_BASE_URL}/uploads/${imageString.split(",")[0].trim()}`;
   };
 
+  /**
+   * ฟังก์ชัน: formatDate[cite: 10]
+   * มีไว้สำหรับ: แปลงรูปแบบสตริงวันที่ให้อยู่ในรูปแบบมาตรฐาน YYYY-MM-DD เพื่อให้อ่านง่าย[cite: 10]
+   */
   const formatDate = (dateString?: string) => {
     if (!dateString) return "-";
     const date = new Date(dateString);
@@ -176,15 +155,18 @@ export default function ExchangeDetail() {
       <section className="py-8 sm:py-12 bg-[#FAFAFA] min-h-screen">
         <div className="mx-auto max-w-5xl px-4 sm:px-6 space-y-6">
           
-          {/* Header */}
           <div className="flex items-center gap-2 mb-6">
-            <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="-ml-2">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
+            <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate(-1)}
+                className="-ml-2 hover:bg-slate-200/60 dark:hover:bg-zinc-800/60 text-foreground transition-all"
+              >
+                <ArrowLeft className="h-5 w-5 text-foreground" />
+              </Button>
             <h1 className="text-xl sm:text-2xl font-bold">รายละเอียดการแลกเปลี่ยน</h1>
           </div>
 
-          {/* Stepper Status */}
           {!isFailedOrCancelled ? (
             <Card className="border border-border/50 shadow-sm bg-background p-6">
               <div className="grid grid-cols-4 gap-2 text-center relative">
@@ -205,12 +187,10 @@ export default function ExchangeDetail() {
 
           <div className="space-y-6">
             
-            {/* 1. Item Comparison Card */}
             <Card className="border border-border/50 shadow-sm bg-background">
               <CardContent className="p-6 sm:p-8 space-y-6">
                 <div className="flex flex-col sm:flex-row items-start gap-6 justify-between w-full">
                   
-                  {/* ของของคุณ */}
                   <div className="flex-1 w-full min-w-0 bg-muted/20 p-5 rounded-2xl border border-border/60">
                     <div className="flex flex-col items-center space-y-4">
                       <div className="w-32 h-32 sm:w-40 sm:h-40 bg-white rounded-xl overflow-hidden shadow-sm flex-shrink-0 p-2">
@@ -230,12 +210,10 @@ export default function ExchangeDetail() {
                     </div>
                   </div>
 
-                  {/* ไอคอนสลับ */}
                   <div className="hidden sm:flex items-center justify-center pt-24 flex-shrink-0 px-2">
                     <ArrowRightLeft className="h-6 w-6 text-primary/40" />
                   </div>
 
-                  {/* สิ่งที่ได้รับ */}
                   <div className="flex-1 w-full min-w-0 bg-muted/20 p-5 rounded-2xl border border-border/60">
                     <div className="flex flex-col items-center space-y-4">
                       <div className="w-32 h-32 sm:w-40 sm:h-40 bg-white rounded-xl overflow-hidden shadow-sm flex-shrink-0 p-2">
@@ -258,16 +236,15 @@ export default function ExchangeDetail() {
 
                 <Separator />
 
-                {/* แสดงวันที่ */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <DetailRow icon={<Calendar />} label="วันที่เริ่มแลกเปลี่ยน" value={item.StartDate ? formatDate(item.StartDate) : "-"} />
-                  <DetailRow icon={<CheckCircle2 />} label="วันที่แลกเปลี่ยนสำเร็จ" value={item.SuccessDate ? formatDate(item.SuccessDate) : "ยังไม่สำเร็จ"} />
+                  <DetailRow icon={<CheckCircle2 />} label={isFailedOrCancelled ? "วันที่ยกเลิก" : "วันที่แลกเปลี่ยนสำเร็จ"} value={isFailedOrCancelled ? (item.CancelDate ? formatDate(item.CancelDate) : "-") : (item.SuccessDate ? formatDate(item.SuccessDate) : "ยังไม่สำเร็จ")} />
                 </div>
               </CardContent>
             </Card>
 
-            {/* 2. Review Section (แสดงเฉพาะรีวิวที่คุณได้รับเท่านั้น) */}
-            {receivedScore != null && (
+            {/* แสดงส่วนรีวิวเฉพาะเมื่อสำเร็จและมีคะแนน */}
+            {isCompleted && receivedScore != null && (
               <Card className="border border-border/50 shadow-sm bg-background">
                 <CardContent className="p-6 space-y-6">
                   <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
@@ -275,7 +252,6 @@ export default function ExchangeDetail() {
                   </h2>
                   
                   <div className="space-y-4">
-                    {/* คะแนนที่คุณได้รับ */}
                     <div className="bg-background border shadow-sm rounded-xl p-5 space-y-3 relative overflow-hidden">
                       <div className="absolute top-0 left-0 w-1.5 h-full bg-primary"></div>
                       <p className="text-xs font-bold text-primary">คะแนนที่คุณได้รับ</p>
@@ -296,7 +272,27 @@ export default function ExchangeDetail() {
               </Card>
             )}
 
-            {/* 3. ข้อมูลคู่แลกเปลี่ยน (ค่าเฉลี่ยทั้งหมด) */}
+            {/* แสดงสรุปข้อมูลการยกเลิกแทน เมื่อรายการไม่สำเร็จหรือถูกยกเลิก */}
+            {isFailedOrCancelled && (
+              <Card className="border border-rose-200 shadow-sm bg-rose-50/20">
+                <CardContent className="p-6 space-y-4">
+                  <h2 className="text-sm font-bold text-rose-900 flex items-center gap-2">
+                    <XCircle className="w-5 h-5 text-rose-600" /> สรุปข้อมูลการยกเลิกรายการ
+                  </h2>
+                  <div className="space-y-3 text-xs">
+                    <div className="flex items-center justify-between bg-white/70 p-3 rounded-xl border border-rose-100">
+                      <span className="text-muted-foreground font-medium">วันที่ยกเลิก:</span>
+                      <span className="font-bold text-foreground">{item.CancelDate ? formatDate(item.CancelDate) : "-"}</span>
+                    </div>
+                    <div className="bg-white/70 p-3 rounded-xl border border-rose-100 space-y-1">
+                      <span className="text-muted-foreground font-medium block">เหตุผลในการยกเลิก:</span>
+                      <p className="font-semibold text-foreground italic">"{item.CancelReason || 'ไม่มีระบุเหตุผลเพิ่มเติม'}"</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             <Card className="border border-border/50 shadow-sm bg-background">
               <CardContent className="p-6 space-y-4">
                 <h2 className="text-sm font-bold text-foreground">ข้อมูลคู่แลกเปลี่ยน</h2>
@@ -337,7 +333,9 @@ export default function ExchangeDetail() {
   );
 }
 
-// Sub-components
+// =========================================================================
+// COMPONENT: StepIndicator[cite: 10]
+// =========================================================================
 function StepIndicator({ step, currentStatus, label }: { step: number; currentStatus: string; label: string }) {
   let activeStep = 1;
   if (currentStatus === "accepted") activeStep = 2;
@@ -361,6 +359,9 @@ function StepIndicator({ step, currentStatus, label }: { step: number; currentSt
   );
 }
 
+// =========================================================================
+// COMPONENT: DetailRow[cite: 10]
+// =========================================================================
 function DetailRow({ icon, label, value, full = false }: { icon: React.ReactNode; label: string; value: string; full?: boolean }) {
   return (
     <div className={`flex items-start gap-3 p-0 ${full ? "sm:col-span-2" : ""}`}>

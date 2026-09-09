@@ -1,30 +1,17 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { 
-  Search, Plus, Edit2, Trash2, LayoutGrid, List, 
-  CheckCircle2, AlertTriangle, Eye, Sparkles, Layers, 
-  icons, HelpCircle, LucideIcon 
-} from "lucide-react";
-import { 
-  getCategories, 
-  createCategory, 
-  updateCategory, 
-  deleteCategory 
-} from "@/api/api";
+import { Search, Plus, Edit2, Trash2, LayoutGrid, List, CheckCircle2, AlertTriangle, Eye, Sparkles, Layers, icons, HelpCircle, LucideIcon } from "lucide-react";
+import { getCategories, createCategory, updateCategory, deleteCategory } from "@/api/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogDescription 
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/hooks/use-toast";
 
-// --- Interface ข้อมูลหมวดหมู่จาก Database ---
+// =========================================================================
+// INTERFACE: โครงสร้างข้อมูลหมวดหมู่ (Category Interface)
+// =========================================================================
 interface Category {
   CategoryID: number;
   CategoryName: string;
@@ -32,42 +19,53 @@ interface Category {
   ItemCount?: number;
 }
 
-// --- Type-Safe Dynamic Icon Component ---
+// =========================================================================
+// INTERFACE: โครงสร้างข้อมูลสำหรับ Dynamic Icon Component
+// =========================================================================
 interface DynamicIconProps {
   name: string;
   className?: string;
 }
 
+// =========================================================================
+// COMPONENT: DynamicIcon (แสดงไอคอนแบบไดนามิกโดยอิงจากชื่อ String)
+// =========================================================================
 const DynamicIcon: React.FC<DynamicIconProps> = ({ name, className = "w-5 h-5" }) => {
   const IconComponent = (icons[name as keyof typeof icons] as LucideIcon) || HelpCircle;
   return <IconComponent className={className} />;
 };
 
-// 🌟 ดึงรายชื่อไอคอนทั้งหมดที่มีใน lucide-react (1,000+ ไอคอน!)
+// ดึงรายการกุญแจไอคอนทั้งหมดจากไลบรารี Lucide Icons
 const ALL_ICON_KEYS = Object.keys(icons);
 
+// =========================================================================
+// COMPONENT: CategoryManagement (คอมโพเนนต์หลักสำหรับจัดการหมวดหมู่สินค้า)
+// =========================================================================
 export function CategoryManagement() {
-  // State ข้อมูลจาก DB จริง
+  
+  // สถานะเก็บข้อมูลหมวดหมู่จากฐานข้อมูลและสถานะการโหลดข้อมูล
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   
-  // State ควบคุม UI
+  // สถานะควบคุมคำค้นหาและรูปแบบมุมมอง (Grid หรือ Table)
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
 
-  // State สำหรับ Dialogs
+  // สถานะควบคุมการเปิด/ปิดหน้าต่าง Modal ต่างๆ ภายในระบบ
   const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
   const [isIconPickerOpen, setIsIconPickerOpen] = useState<boolean>(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
 
-  // State ฟอร์ม
+  // สถานะข้อมูลภายในฟอร์มเพิ่ม/แก้ไขหมวดหมู่
   const [formName, setFormName] = useState<string>("");
   const [formIconName, setFormIconName] = useState<string>("Package");
   const [iconSearchTerm, setIconSearchTerm] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  // --- ดึงข้อมูลจาก Database ผ่าน API ---
+  // =====================================================================
+  // ฟังก์ชัน: ดึงข้อมูลหมวดหมู่ทั้งหมดจากฐานข้อมูลผ่าน API (FETCH CATEGORIES DATA)
+  // =====================================================================
   const fetchCategoriesData = async (): Promise<void> => {
     setIsLoading(true);
     try {
@@ -87,11 +85,14 @@ export function CategoryManagement() {
     }
   };
 
+  // ดึงข้อมูลเมื่อโหลดคอมโพเนนต์ครั้งแรก (Mounting)
   useEffect(() => {
     fetchCategoriesData();
   }, []);
 
-  // เปิด Modal เพิ่มหมวดหมู่
+  // =====================================================================
+  // ฟังก์ชัน: เปิด Modal สำหรับเพิ่มหมวดหมู่ใหม่ (HANDLE OPEN ADD MODAL)
+  // =====================================================================
   const handleOpenAddModal = (): void => {
     setEditingCategory(null);
     setFormName("");
@@ -99,7 +100,9 @@ export function CategoryManagement() {
     setIsFormOpen(true);
   };
 
-  // เปิด Modal แก้ไขหมวดหมู่
+  // =====================================================================
+  // ฟังก์ชัน: เปิด Modal สำหรับแก้ไขหมวดหมู่ที่มีอยู่ (HANDLE OPEN EDIT MODAL)
+  // =====================================================================
   const handleOpenEditModal = (cat: Category): void => {
     setEditingCategory(cat);
     setFormName(cat.CategoryName);
@@ -107,7 +110,9 @@ export function CategoryManagement() {
     setIsFormOpen(true);
   };
 
-  // บันทึกข้อมูล (เพิ่มใหม่ / แก้ไข)
+  // =====================================================================
+  // ฟังก์ชัน: บันทึกข้อมูลหมวดหมู่ แยกกรณีเพิ่มใหม่หรือแก้ไขข้อมูลเดิม (HANDLE SAVE CATEGORY)
+  // =====================================================================
   const handleSaveCategory = async (): Promise<void> => {
     if (!formName.trim()) {
       toast({
@@ -153,7 +158,9 @@ export function CategoryManagement() {
     }
   };
 
-  // ยืนยันการลบหมวดหมู่
+  // =====================================================================
+  // ฟังก์ชัน: ยืนยันการลบหมวดหมู่จากระบบ (HANDLE CONFIRM DELETE)
+  // =====================================================================
   const handleConfirmDelete = async (): Promise<void> => {
     if (!deleteTarget) return;
 
@@ -175,12 +182,14 @@ export function CategoryManagement() {
     }
   };
 
-  // กรองรายการหมวดหมู่ตามคำค้นหา
+  // กรองรายการหมวดหมู่ตามข้อความค้นหาของผู้ใช้
   const filteredCategories = categories.filter((cat) =>
     cat.CategoryName.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // 🔍 กรองไอคอนทั้งหมดแบบ Fast Search (แสดงผลครั้งละไม่เกิน 120 ไอคอนเพื่อความลื่นไหล)
+  // =====================================================================
+  // MEMO: กรองรายชื่อไอคอนสำหรับการค้นหาแบบรวดเร็ว (แสดงผลครั้งละไม่เกิน 120 ไอคอน)
+  // =====================================================================
   const filteredIcons = useMemo(() => {
     if (!iconSearchTerm.trim()) {
       return ALL_ICON_KEYS.slice(0, 120);
@@ -193,7 +202,7 @@ export function CategoryManagement() {
   return (
     <div className="space-y-6 animate-in fade-in duration-300 font-sans">
       
-      {/* 📊 Header Toolbar */}
+      {/* ส่วนหัวข้อและปุ่มเพิ่มหมวดหมู่ */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-card p-5 rounded-2xl border border-border/60 shadow-sm">
         <div>
           <div className="flex items-center gap-2">
@@ -219,7 +228,7 @@ export function CategoryManagement() {
         </Button>
       </div>
 
-      {/* 🔍 Search and View Controls */}
+      {/* แถบค้นหาและปุ่มสลับมุมมองระหว่าง Grid และ Table */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="relative w-full sm:w-80">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -253,7 +262,7 @@ export function CategoryManagement() {
         </div>
       </div>
 
-      {/* 🎴 GRID VIEW */}
+      {/* ส่วนแสดงผลข้อมูลในรูปแบบ Grid หรือ Table ตาม state ปัจจุบัน */}
       {isLoading ? (
         <div className="flex justify-center py-16">
           <div className="animate-spin h-8 w-8 border-4 border-primary rounded-full border-t-transparent" />
@@ -320,7 +329,6 @@ export function CategoryManagement() {
           )}
         </div>
       ) : (
-        /* 📋 TABLE VIEW */
         <div className="bg-card rounded-2xl border border-border/60 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-left">
@@ -379,7 +387,7 @@ export function CategoryManagement() {
         </div>
       )}
 
-      {/* 🎨 MODAL: เพิ่ม / แก้ไข หมวดหมู่ */}
+      {/* Modal ฟอร์มสำหรับเพิ่มหรือแก้ไขข้อมูลหมวดหมู่ */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="max-w-xl rounded-3xl p-6 border-border/80 shadow-2xl backdrop-blur-xl">
           <DialogHeader>
@@ -435,7 +443,7 @@ export function CategoryManagement() {
               </div>
             </div>
 
-            {/* 👁️ REALTIME LIVE PREVIEW */}
+            {/* ส่วนแสดงตัวอย่างข้อมูลแบบเรียลไทม์ (Live Preview Component) */}
             <div className="md:col-span-5 flex flex-col justify-between bg-muted/30 p-4 rounded-2xl border border-border/50">
               <div>
                 <div className="flex items-center gap-1.5 text-muted-foreground text-[10px] font-bold uppercase tracking-wider mb-3">
@@ -480,7 +488,7 @@ export function CategoryManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* 🔍 MODAL: ICON PICKER GRID (ดึงไอคอน 1,000+ ตัวพร้อมระบบค้นหา) */}
+      {/* Modal สำหรับเลือกไอคอน (Icon Picker Grid Modal) */}
       <Dialog open={isIconPickerOpen} onOpenChange={setIsIconPickerOpen}>
         <DialogContent className="max-w-lg rounded-3xl p-6 border-border/80 shadow-2xl backdrop-blur-xl">
           <DialogHeader>
@@ -544,7 +552,7 @@ export function CategoryManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* ⚠️ MODAL: ยืนยันการลบ */}
+      {/* Modal ยืนยันการลบหมวดหมู่ (Delete Confirmation Modal) */}
       {deleteTarget && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
           <div

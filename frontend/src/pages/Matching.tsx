@@ -1,18 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  ArrowRightLeft, CheckCircle, XCircle, Clock,
-  Sparkles, Inbox, Package, AlertCircle
-} from "lucide-react";
+import { ArrowRightLeft, CheckCircle, XCircle, Clock, Sparkles, Inbox, Package, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import AppLayout from "@/components/AppLayout";
+import { getItems as fetchItemsAPI, IMAGE_BASE_URL, getExchanges } from "@/api/api";
 
-// เรียกฟังก์ชันจาก API ไฟล์ตั้งค่าหลัก
-import { getItems as fetchItemsAPI, IMAGE_BASE_URL, getExchanges } from "@/api/api"; 
-
-// 🌟 ปรับ Configuration สีและไอคอนให้ตรงกับสถานะจริงในฐานข้อมูล
 const statusConfig = {
   pending: { 
     label: "รอตอบรับ", 
@@ -73,6 +67,9 @@ interface DBExchange {
   theirAuthorName?: string;
 }
 
+// =========================================================================
+// COMPONENT: Matching (หน้าจอจัดการและค้นหาคู่แมตช์การแลกเปลี่ยนสิ่งของ)
+// =========================================================================
 export default function Matching() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<"items" | "status">("items");
@@ -83,7 +80,10 @@ export default function Matching() {
   const [exchanges, setExchanges] = useState<DBExchange[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 1. ดึงข้อมูลจากฐานข้อมูลหลัก
+  /**
+   * ฟังก์ชัน: loadData
+   * มีไว้สำหรับ: ดึงข้อมูลรายการสินค้าทั้งหมดและข้อมูลการแลกเปลี่ยนจาก API พร้อมจัดการสถานะกำลังโหลดข้อมูล
+   */
   const loadData = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -106,6 +106,9 @@ export default function Matching() {
     }
   }, []);
 
+  /**
+   * EFFECT: ดึงข้อมูลผู้ใช้งานปัจจุบันจาก LocalStorage และเรียกฟังก์ชันโหลดข้อมูลเมื่อคอมโพเนนต์พร้อมทำงาน
+   */
   useEffect(() => {
     const savedUser = localStorage.getItem("user");
     if (savedUser) {
@@ -116,13 +119,19 @@ export default function Matching() {
     loadData();
   }, [loadData]);
 
+  /**
+   * EFFECT: โหลดข้อมูลใหม่โดยอัตโนมัติเมื่อผู้ใช้สลับมายังแท็บแสดงสถานะการแมตช์
+   */
   useEffect(() => {
     if (activeTab === "status") {
       loadData();
     }
   }, [activeTab, loadData]);
 
-  // 2. จัดการแปลง Path รูปภาพแบบปลอดภัย
+  /**
+   * ฟังก์ชัน: getCorrectImagePath
+   * มีไว้สำหรับ: จัดรูปแบบและทำความสะอาดพาธรูปภาพสินค้าให้ถูกต้อง รองรับทั้งกรณีเป็น URL ภายนอก รูปภาพหลายรูป หรือรูปแบบ JSON
+   */
   const getCorrectImagePath = (imageName: string | undefined) => {
     if (!imageName || imageName.trim() === "undefined" || imageName === "null") return "/placeholder.jpg";
     try {
@@ -142,13 +151,19 @@ export default function Matching() {
     }
   };
 
-  // กรองไอเทมของคุณเพื่อแสดงในหน้า "เริ่มหาคู่แมตช์"
+  /**
+   * ตัวแปรคำนวณ (Computed): displayItems
+   * มีไว้สำหรับ: กรองรายการสิ่งของที่เป็นของสมาชิกปัจจุบันเพื่อนำมาแสดงในหน้าเลือกหาคู่แมตช์
+   */
   const displayItems = useMemo(() => {
     if (!currentUserId) return [];
     return items.filter((item) => String(item.MemberID) === currentUserId);
   }, [items, currentUserId]);
 
-  // นับคำขอแจ้งเตือนสีแดง
+  /**
+   * ตัวแปรคำนวณ (Computed): incomingCount
+   * มีไว้สำหรับ: คำนวณจำนวนคำขอแลกเปลี่ยนขาเข้าใหม่ที่อยู่ในสถานะรอตอบรับและยังไม่เคยเปิดดู
+   */
   const incomingCount = useMemo(() => {
     if (!currentUserId) return 0;
     
@@ -166,7 +181,11 @@ export default function Matching() {
     }).length;
   }, [exchanges, currentUserId]);
 
-  // 3. กรองรายการแลกเปลี่ยนตามสถานะจริง
+  /**
+   * ตัวแปรคำนวณ (Computed): filteredMatches
+   * มีไว้สำหรับ: กรองรายการแลกเปลี่ยนที่ผู้ใช้งานปัจจุบันเป็นผู้ส่งหรือผู้รับ จัดเรียงตามคะแนนความเหมาะสม (Score) 
+   * และกรองตามประเภทสถานะที่ผู้ใช้เลือกดู
+   */
   const filteredMatches = useMemo(() => {
     if (!currentUserId) return [];
     
@@ -187,24 +206,27 @@ export default function Matching() {
 
   return (
     <AppLayout>
-      {/* Header */}
       <section className="border-b border-border/50 bg-muted/30 w-screen relative left-1/2 -translate-x-1/2 -mt-6 px-4 sm:px-6">
         <div className="mx-auto max-w-5xl py-8">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-6 w-6 text-primary" />
-                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight font-heading">Smart Match</h1>
+                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight font-heading">
+                  Smart Match
+                </h1>
               </div>
-              <p className="text-sm text-muted-foreground">ระบบแนะนำคู่แลกเปลี่ยนที่เหมาะสมสำหรับคุณ</p>
+              <p className="text-sm text-muted-foreground">
+                ระบบแนะนำคู่แลกเปลี่ยนที่เหมาะสมสำหรับคุณ
+              </p>
             </div>
-            
-            <Button 
-              variant="outline" 
-              onClick={() => navigate("/incoming-requests")} 
-              className="gap-2 rounded-full shadow-sm relative overflow-visible"
+
+            <Button
+              variant="outline"
+              onClick={() => navigate("/incoming-requests")}
+              className="gap-2 rounded-full shadow-sm relative overflow-visible hover:bg-slate-200/60 dark:hover:bg-zinc-800/60 hover:text-foreground transition-all"
             >
-              <Inbox className="h-4 w-4" /> 
+              <Inbox className="h-4 w-4" />
               <span>คำขอที่ได้รับ</span>
               {incomingCount > 0 && (
                 <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white shadow-sm animate-pulse">
@@ -218,7 +240,6 @@ export default function Matching() {
 
       <section className="py-8">
         <div className="mx-auto max-w-5xl space-y-8">
-          {/* Tabs สลับโหมดทำงาน */}
           <div className="flex p-1 bg-muted/50 rounded-xl border border-border/50 max-w-md">
             <button
               onClick={() => setActiveTab("items")}
@@ -235,32 +256,55 @@ export default function Matching() {
           </div>
 
           {isLoading ? (
-            <div className="text-center py-12 text-muted-foreground animate-pulse">กำลังเรียกข้อมูลจากระบบฐานข้อมูลแลกเปลี่ยน...</div>
+            <div className="text-center py-12 text-muted-foreground animate-pulse">
+              กำลังเรียกข้อมูลจากระบบฐานข้อมูลแลกเปลี่ยน...
+            </div>
           ) : activeTab === "items" ? (
-            /* Items Tab */
             <div className="space-y-4 animate-slide-up">
-              <p className="text-sm font-semibold font-heading">เลือกสิ่งของเพื่อค้นหาคู่แมตช์</p>
+              <p className="text-sm font-semibold font-heading">
+                เลือกสิ่งของเพื่อค้นหาคู่แมตช์
+              </p>
               {displayItems.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                   {displayItems.map((post) => (
-                    <Card key={post.ItemID} className="glass-card hover:border-primary/30 transition-colors">
+                    <Card
+                      key={post.ItemID}
+                      className="glass-card hover:border-primary/30 transition-colors"
+                    >
                       <CardContent className="p-4 flex items-center gap-4">
-                        <img 
-                          src={getCorrectImagePath(post.ItemImage)} 
-                          alt={post.ItemName} 
-                          className="w-20 h-20 rounded-xl object-cover shadow-sm bg-muted" 
+                        <img
+                          src={getCorrectImagePath(post.ItemImage)}
+                          alt={post.ItemName}
+                          className="w-20 h-20 rounded-xl object-cover shadow-sm bg-muted"
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
-                            if (target.src !== window.location.origin + "/placeholder.jpg") target.src = "/placeholder.jpg";
+                            if (
+                              target.src !==
+                              window.location.origin + "/placeholder.jpg"
+                            )
+                              target.src = "/placeholder.jpg";
                           }}
                         />
                         <div className="flex-1 min-w-0 space-y-2">
-                          <p className="text-sm font-bold truncate">{post.ItemName}</p>
-                          <Badge variant="secondary" className="text-[10px]">{post.CategoryName || "ทั่วไป"}</Badge>
-                          <p className="text-xs text-muted-foreground truncate">
-                            ต้องการแลก: <span className="font-medium text-foreground">{post.DesiredItem || "อะไรก็ได้"}</span>
+                          <p className="text-sm font-bold truncate">
+                            {post.ItemName}
                           </p>
-                          <Button size="sm" className="w-full h-8" onClick={() => navigate(`/match-results/${post.ItemID}`)}>
+                          <Badge variant="secondary" className="text-[10px]">
+                            {post.CategoryName || "ทั่วไป"}
+                          </Badge>
+                          <p className="text-xs text-muted-foreground truncate">
+                            ต้องการแลก:{" "}
+                            <span className="font-medium text-foreground">
+                              {post.DesiredItem || "อะไรก็ได้"}
+                            </span>
+                          </p>
+                          <Button
+                            size="sm"
+                            className="w-full h-8"
+                            onClick={() =>
+                              navigate(`/match-results/${post.ItemID}`)
+                            }
+                          >
                             ค้นหาคู่แมตช์
                           </Button>
                         </div>
@@ -271,20 +315,24 @@ export default function Matching() {
               ) : (
                 <div className="flex flex-col items-center py-16 space-y-3 bg-muted/30 rounded-2xl border border-dashed border-border">
                   <Package className="h-10 w-10 text-muted-foreground/50" />
-                  <p className="text-muted-foreground">คุณยังไม่ได้ลงของสำหรับแลกเปลี่ยน</p>
+                  <p className="text-muted-foreground">
+                    คุณยังไม่ได้ลงของสำหรับแลกเปลี่ยน
+                  </p>
                 </div>
               )}
             </div>
           ) : (
-            /* Status Tab */
             <div className="space-y-6 animate-slide-up">
-              {/* ตัวกรองสถานะ */}
               <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                 {[
                   { id: "all", label: "ทั้งหมด", icon: null },
                   { id: "pending", label: "รอตอบรับ", icon: Clock },
                   { id: "accepted", label: "ตอบรับแล้ว", icon: CheckCircle },
-                  { id: "in_progress", label: "กำลังดำเนินการ", icon: ArrowRightLeft },
+                  {
+                    id: "in_progress",
+                    label: "กำลังดำเนินการ",
+                    icon: ArrowRightLeft,
+                  },
                   { id: "completed", label: "สำเร็จแล้ว", icon: CheckCircle },
                   { id: "rejected", label: "ถูกปฏิเสธ", icon: XCircle },
                   { id: "failed", label: "ยกเลิกแล้ว", icon: AlertCircle },
@@ -301,22 +349,30 @@ export default function Matching() {
                 ))}
               </div>
 
-              {/* รายการแสดงข้อมูลผลการแมตช์ที่คุณเกี่ยวข้อง */}
               {filteredMatches.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   {filteredMatches.map((match) => {
-                    const currentStatus = (match.ExchangeStatus || "pending").toLowerCase();
-                    const config = statusConfig[currentStatus as keyof typeof statusConfig] || statusConfig.pending;
+                    const currentStatus = (
+                      match.ExchangeStatus || "pending"
+                    ).toLowerCase();
+                    const config =
+                      statusConfig[
+                        currentStatus as keyof typeof statusConfig
+                      ] || statusConfig.pending;
                     const StatusIcon = config.icon;
                     return (
                       <Card
                         key={match.ExchangeID}
                         className="glass-card cursor-pointer hover:shadow-md transition-all"
-                        onClick={() => navigate(`/exchange-tracking/${match.ExchangeID}`)}
+                        onClick={() =>
+                          navigate(`/exchange-tracking/${match.ExchangeID}`)
+                        }
                       >
                         <CardContent className="p-5 space-y-4">
                           <div className="flex items-center justify-between gap-2">
-                            <Badge className={`${config.className} font-semibold py-1 px-2.5 rounded-full`}>
+                            <Badge
+                              className={`${config.className} font-semibold py-1 px-2.5 rounded-full`}
+                            >
                               <StatusIcon className="h-3.5 w-3.5 mr-1.5 shrink-0" />
                               <span>{config.label}</span>
                             </Badge>
@@ -326,29 +382,45 @@ export default function Matching() {
                           </div>
                           <div className="flex items-center gap-4">
                             <div className="flex-1 text-center space-y-2 min-w-0">
-                              <img 
-                                src={getCorrectImagePath(match.myPostImage)} 
-                                className="w-20 h-20 rounded-xl object-cover mx-auto shadow-sm bg-muted" 
+                              <img
+                                src={getCorrectImagePath(match.myPostImage)}
+                                className="w-20 h-20 rounded-xl object-cover mx-auto shadow-sm bg-muted"
                                 onError={(e) => {
                                   const target = e.target as HTMLImageElement;
-                                  if (target.src !== window.location.origin + "/placeholder.jpg") target.src = "/placeholder.jpg";
+                                  if (
+                                    target.src !==
+                                    window.location.origin + "/placeholder.jpg"
+                                  )
+                                    target.src = "/placeholder.jpg";
                                 }}
                               />
-                              <p className="text-xs font-bold line-clamp-1">{match.myPostTitle || "สิ่งของของคุณ"}</p>
-                              <p className="text-[10px] text-muted-foreground">ของของคุณ</p>
+                              <p className="text-xs font-bold line-clamp-1">
+                                {match.myPostTitle || "สิ่งของของคุณ"}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground">
+                                ของของคุณ
+                              </p>
                             </div>
                             <ArrowRightLeft className="h-5 w-5 text-primary shrink-0" />
                             <div className="flex-1 text-center space-y-2 min-w-0">
-                              <img 
-                                src={getCorrectImagePath(match.theirPostImage)} 
-                                className="w-20 h-20 rounded-xl object-cover mx-auto shadow-sm bg-muted" 
+                              <img
+                                src={getCorrectImagePath(match.theirPostImage)}
+                                className="w-20 h-20 rounded-xl object-cover mx-auto shadow-sm bg-muted"
                                 onError={(e) => {
                                   const target = e.target as HTMLImageElement;
-                                  if (target.src !== window.location.origin + "/placeholder.jpg") target.src = "/placeholder.jpg";
+                                  if (
+                                    target.src !==
+                                    window.location.origin + "/placeholder.jpg"
+                                  )
+                                    target.src = "/placeholder.jpg";
                                 }}
                               />
-                              <p className="text-xs font-bold line-clamp-1">{match.theirPostTitle || "ของที่สนใจแลก"}</p>
-                              <p className="text-[10px] text-muted-foreground">โดย {match.theirAuthorName || "ผู้ใช้งานอื่น"}</p>
+                              <p className="text-xs font-bold line-clamp-1">
+                                {match.theirPostTitle || "ของที่สนใจแลก"}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground">
+                                โดย {match.theirAuthorName || "ผู้ใช้งานอื่น"}
+                              </p>
                             </div>
                           </div>
                         </CardContent>

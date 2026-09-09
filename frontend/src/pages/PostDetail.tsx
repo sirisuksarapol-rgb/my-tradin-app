@@ -1,20 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
-import {
-  ArrowLeft,
-  MapPin,
-  ArrowRightLeft,
-  Star,
-  MessageCircle,
-  Globe,
-  FileText,
-  ChevronLeft,
-  ChevronRight,
-  ShieldAlert,
-  Flag,
-  CheckCircle,
-  Sparkles,
-} from "lucide-react";
+import { ArrowLeft, MapPin, ArrowRightLeft, Star, MessageCircle, Globe, FileText, ChevronLeft, ChevronRight, ShieldAlert, Flag, CheckCircle, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,19 +8,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import AppLayout from "@/components/AppLayout";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  getItems as fetchItemsAPI,
-  getUserStats,
-  IMAGE_BASE_URL,
-} from "@/api/api";
+import { getItems as fetchItemsAPI, getUserStats, IMAGE_BASE_URL } from "@/api/api";
 import { createReport } from "@/api/api";
 import ReportModal from "@/components/ReportModal";
 
@@ -43,11 +19,9 @@ interface DBItemDetail {
   item_id?: number;
   ItemName?: string;
   item_name?: string;
-
   ItemDescription?: string;
   Description?: string;
   description?: string;
-
   DesiredItem?: string;
   desired_item?: string;
   CategoryID?: number;
@@ -67,8 +41,6 @@ interface DBItemDetail {
   date?: string;
   item_date?: string;
   map_link?: string;
-
-  // ข้อมูลสมาชิก
   MemberID?: number;
   member_id?: number;
   DisplayName?: string;
@@ -76,12 +48,9 @@ interface DBItemDetail {
   Email?: string;
   email?: string;
   MemberStatus?: string;
-
   ProfileImage?: string;
   profile_image?: string;
   user_image?: string;
-
-  // เรตติ้งและการแลกเปลี่ยน
   author_rating?: number;
   AuthorRating?: number;
   rating?: number | string;
@@ -90,6 +59,9 @@ interface DBItemDetail {
   exchange_count?: number;
 }
 
+// =========================================================================
+// COMPONENT: PostDetail (หน้าจอสำหรับแสดงรายละเอียดเชิงลึกของโพสต์สินค้าชิ้นนั้น ๆ)
+// =========================================================================
 export default function PostDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -103,23 +75,24 @@ export default function PostDetail() {
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [reportReason, setReportReason] = useState("");
 
-  // 💡 1. สร้าง State มารองรับค่าสถิติจริงที่ดึงแบบ Real-time จาก DB หลังบ้าน
   const [realRating, setRealRating] = useState<string>("0.0");
   const [realExchanges, setRealExchanges] = useState<number>(0);
 
   const user = JSON.parse(localStorage.getItem("user") || "{}");
 
   const fromPage = location.state?.fromPage;
-  const isFromIncomingRequest =
-    location.state?.fromIncomingRequest || fromPage === "incoming";
-
+  const isFromIncomingRequest = location.state?.fromIncomingRequest || fromPage === "incoming";
   const isOwnPostView = location.state?.isOwnPostView || false;
   const fromAdmin = location.state?.fromAdmin || false;
-
   const matchScore = location.state?.matchScore;
   const isFromMatch = location.state?.fromMatch;
   const matchData = location.state?.matchData;
 
+  /**
+   * ฟังก์ชัน: fetchPostDetail
+   * มีไว้สำหรับ: ดึงข้อมูลรายละเอียดสินค้าทั้งหมดจาก API ทำการค้นหารายการที่ตรงกับรหัสไอเทม (id) บน URL 
+   * พร้อมทั้งดึงข้อมูลสถิติคะแนนรีวิวและจำนวนการแลกเปลี่ยนสำเร็จของผู้ลงโพสต์แบบเรียลไทม์
+   */
   useEffect(() => {
     const fetchPostDetail = async () => {
       try {
@@ -134,7 +107,6 @@ export default function PostDetail() {
         if (foundPost) {
           setPost(foundPost);
 
-          // 💡 2. ดึงไอดีผู้โพสต์เพื่อส่งไปขอข้อมูลสถิติจริงจากตาราง exchange
           const targetAuthorId = foundPost.MemberID || foundPost.member_id;
           if (targetAuthorId) {
             const statsRes = await getUserStats(targetAuthorId);
@@ -190,32 +162,15 @@ export default function PostDetail() {
   const title = post.ItemName || post.item_name || "ไม่ระบุชื่อ";
   const category = post.category_name || post.CategoryName || "ทั่วไป";
 
-  const createdAt =
-    post.created_at ||
-    post.CreatedAt ||
-    post.createdAt ||
-    post.created_date ||
-    post.date ||
-    post.item_date ||
-    "";
-  const wantedItem =
-    post.DesiredItem || post.desired_item || "ไม่ระบุสิ่งที่ต้องการแลก";
-  const description =
-    post.ItemDescription ||
-    post.Description ||
-    post.description ||
-    "ไม่มีรายละเอียดเพิ่มเติม";
+  const createdAt = post.created_at || post.CreatedAt || post.createdAt || post.created_date || post.date || post.item_date || "";
+  const wantedItem = post.DesiredItem || post.desired_item || "ไม่ระบุสิ่งที่ต้องการแลก";
+  const description = post.ItemDescription || post.Description || post.description || "ไม่มีรายละเอียดเพิ่มเติม";
 
-  const locationName =
-    post.MeetingLocation || post.meeting_location || "ไม่ระบุสถานที่";
-  const mapLink =
-    post.map_link ||
-    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationName)}`;
+  const locationName = post.MeetingLocation || post.meeting_location || "ไม่ระบุสถานที่";
+  const mapLink = post.map_link || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationName)}`;
 
   const authorId = post.MemberID || post.member_id || "";
-  const isOwner =
-    String(user?.MemberID || user?.member_id || "") === String(authorId) ||
-    isOwnPostView;
+  const isOwner = String(user?.MemberID || user?.member_id || "") === String(authorId) || isOwnPostView;
 
   const loggedInName = user?.DisplayName || user?.display_name || "";
   let authorName = post.DisplayName || post.display_name || "";
@@ -227,57 +182,30 @@ export default function PostDetail() {
     authorName = "ผู้ใช้งานทั่วไป";
   }
 
-  const authorEmail =
-    post.Email ||
-    post.email ||
-    (isOwner ? user?.Email || user?.email : "") ||
-    "ไม่มีข้อมูลอีเมล";
+  const authorEmail = post.Email || post.email || (isOwner ? user?.Email || user?.email : "") || "ไม่มีข้อมูลอีเมล";
 
-  const rawProfileImg =
-    post.ProfileImage ||
-    post.profile_image ||
-    post.user_image ||
-    (isOwner ? user?.ProfileImage || user?.profile_image : "");
+  const rawProfileImg = post.ProfileImage || post.profile_image || post.user_image || (isOwner ? user?.ProfileImage || user?.profile_image : "");
   let profileImageUrl = "";
-  if (
-    rawProfileImg &&
-    rawProfileImg.trim() !== "undefined" &&
-    rawProfileImg.trim() !== "null" &&
-    rawProfileImg.trim() !== ""
-  ) {
+  if (rawProfileImg && rawProfileImg.trim() !== "undefined" && rawProfileImg.trim() !== "null" && rawProfileImg.trim() !== "") {
     const cleanImg = rawProfileImg.trim();
-    profileImageUrl = cleanImg.startsWith("http")
-      ? cleanImg
-      : `${IMAGE_BASE_URL}/uploads/${cleanImg}`;
+    profileImageUrl = cleanImg.startsWith("http") ? cleanImg : `${IMAGE_BASE_URL}/uploads/${cleanImg}`;
   }
 
   let images: string[] = [];
-  if (
-    post.image_paths &&
-    Array.isArray(post.image_paths) &&
-    post.image_paths.length > 0
-  ) {
+  if (post.image_paths && Array.isArray(post.image_paths) && post.image_paths.length > 0) {
     images = post.image_paths;
   } else {
-    const rawImage = String(
-      post.image_path || post.image_name || post.ItemImage || "",
-    );
+    const rawImage = String(post.image_path || post.image_name || post.ItemImage || "");
     if (rawImage && rawImage.trim() !== "undefined" && rawImage.trim() !== "") {
       try {
         const cleanStr = rawImage.trim();
         if (cleanStr.includes(",")) {
           images = cleanStr.split(",").map((img) => {
             const tImg = img.trim();
-            return tImg.startsWith("http")
-              ? tImg
-              : `${IMAGE_BASE_URL}/uploads/${tImg}`;
+            return tImg.startsWith("http") ? tImg : `${IMAGE_BASE_URL}/uploads/${tImg}`;
           });
         } else {
-          images.push(
-            cleanStr.startsWith("http")
-              ? cleanStr
-              : `${IMAGE_BASE_URL}/uploads/${cleanStr}`,
-          );
+          images.push(cleanStr.startsWith("http") ? cleanStr : `${IMAGE_BASE_URL}/uploads/${cleanStr}`);
         }
       } catch (e) {
         images.push("/placeholder.jpg");
@@ -287,47 +215,50 @@ export default function PostDetail() {
     }
   }
 
-  const nextImage = () =>
-    setCurrentImageIndex((p) => (p === images.length - 1 ? 0 : p + 1));
-  const prevImage = () =>
-    setCurrentImageIndex((p) => (p === 0 ? images.length - 1 : p - 1));
+  /**
+   * ฟังก์ชัน: nextImage
+   * มีไว้สำหรับ: เปลี่ยนภาพแกลเลอรีไปยังรูปถัดไป วนกลับมาภาพแรกสุดหากอยู่ที่ภาพสุดท้าย
+   */
+  const nextImage = () => setCurrentImageIndex((p) => (p === images.length - 1 ? 0 : p + 1));
+  
+  /**
+   * ฟังก์ชัน: prevImage
+   * มีไว้สำหรับ: เปลี่ยนภาพแกลเลอรีกลับไปยังรูปก่อนหน้า วนไปภาพสุดท้ายสุดหากอยู่ที่ภาพแรก
+   */
+  const prevImage = () => setCurrentImageIndex((p) => (p === 0 ? images.length - 1 : p - 1));
 
+  /**
+   * ฟังก์ชัน: handleReport
+   * มีไว้สำหรับ: ตรวจสอบเหตุผลการรายงาน ส่งข้อมูลรายงานปัญหาโพสต์ไปยัง API พร้อมแสดงการแจ้งเตือนสถานะความสำเร็จ
+   */
   const handleReport = async () => {
     if (!reportReason.trim()) {
       toast({
         title: "กรุณาระบุเหตุผล",
         variant: "destructive",
       });
-
       return;
     }
 
     try {
       await createReport({
         ItemID: itemId,
-
         MemberID: user.MemberID,
-
         ProblemType: "รายงานโพสต์",
-
         HelpCenterData: reportReason,
       });
 
       toast({
         title: "ส่งรายงานสำเร็จ",
-
         description: "ขอบคุณสำหรับการแจ้งปัญหา",
       });
 
       setReportReason("");
-
       setIsReportOpen(false);
     } catch (err) {
       console.log(err);
-
       toast({
         title: "ส่งรายงานไม่สำเร็จ",
-
         variant: "destructive",
       });
     }
@@ -337,16 +268,15 @@ export default function PostDetail() {
     <AppLayout>
       <section className="py-8 sm:py-12">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          {/* Header */}
           <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2"> 
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => navigate(-1)}
-                className="-ml-2"
+                className="-ml-2 hover:bg-slate-200/60 dark:hover:bg-zinc-800/60 text-foreground transition-all"
               >
-                <ArrowLeft className="h-5 w-5" />
+                <ArrowLeft className="h-5 w-5 text-foreground" />
               </Button>
               <FileText className="h-5 w-5 text-primary" />
               <h1 className="text-xl sm:text-2xl font-bold">รายละเอียดโพสต์</h1>
@@ -365,9 +295,7 @@ export default function PostDetail() {
             )}
           </div>
 
-          {/* Two-column layout */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
-            {/* Left: Image Gallery */}
             <div className="space-y-4">
               <div className="relative rounded-2xl overflow-hidden group bg-muted">
                 <img
@@ -409,7 +337,6 @@ export default function PostDetail() {
                 )}
               </div>
 
-              {/* Thumbnails */}
               {images.length > 1 && (
                 <div className="flex gap-2 overflow-x-auto pb-1">
                   {images.map((img, i) => (
@@ -429,9 +356,7 @@ export default function PostDetail() {
               )}
             </div>
 
-            {/* Right: Content */}
             <div className="space-y-6">
-              {/* แถบแสดงคะแนนความเหมาะสมจาก AI (จะแสดงเมื่อกดมาจากหน้า MatchResults) */}
               {matchScore !== undefined && (
                 <div className="bg-primary rounded-xl px-4 py-3 flex items-center justify-center gap-2 shadow-sm">
                   <Sparkles className="h-4 w-4 text-primary-foreground" />
@@ -441,7 +366,6 @@ export default function PostDetail() {
                 </div>
               )}
 
-              {/* ส่วน Title และ Date */}
               <div className="space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
@@ -456,10 +380,9 @@ export default function PostDetail() {
                 )}
               </div>
 
-              {/* Wanted Item */}
               <Card className="glass-card border-primary/20">
                 <CardContent className="p-4 flex items-center gap-3">
-                  <ArrowRightLeft className="h-6 w-6 text-primary shrink-0" />
+                  <ArrowRightLeft className="h-4 w-4 text-primary shrink-0" />
                   <div>
                     <p className="text-xs text-muted-foreground">
                       ต้องการแลกกับ
@@ -469,7 +392,6 @@ export default function PostDetail() {
                 </CardContent>
               </Card>
 
-              {/* Description */}
               <div className="space-y-2">
                 <h2 className="text-sm font-bold">รายละเอียด</h2>
                 <p className="text-sm text-muted-foreground leading-relaxed">
@@ -477,7 +399,6 @@ export default function PostDetail() {
                 </p>
               </div>
 
-              {/* Location */}
               <div className="space-y-2">
                 <h2 className="text-sm font-bold">สถานที่นัดรับ</h2>
                 <div className="flex items-center justify-between p-3 rounded-xl border border-primary/10 bg-secondary/10">
@@ -502,7 +423,6 @@ export default function PostDetail() {
 
               <Separator />
 
-              {/* Author Card */}
               <Link
                 to={`/user/${authorId}`}
                 state={{
@@ -510,8 +430,8 @@ export default function PostDetail() {
                   authorName,
                   authorEmail,
                   rawProfileImg,
-                  authorRating: realRating, // 💡 ผูกข้อมูลจริงเรียบร้อย
-                  authorExchanges: realExchanges, // 💡 ผูกข้อมูลจริงเรียบร้อย
+                  authorRating: realRating,
+                  authorExchanges: realExchanges,
                 }}
               >
                 <Card className="glass-card hover:shadow-md transition-shadow">
@@ -554,7 +474,6 @@ export default function PostDetail() {
                 </Card>
               </Link>
 
-              {/* Action Buttons */}
               <div className="flex gap-3 pt-2">
                 {fromAdmin ? (
                   <Button
@@ -572,7 +491,6 @@ export default function PostDetail() {
                     size="lg"
                     disabled={isOwner}
                     onClick={() => {
-                      // 💡 เช็กว่าถ้ามาจากหน้า AI Match ให้ส่ง URL แบบ match พร้อมแนบข้อมูลไปด้วย
                       if (isFromMatch && matchData) {
                         navigate(
                           `/exchange-preview/match-${matchData.myPost.ItemID}-${itemId}`,
@@ -581,7 +499,6 @@ export default function PostDetail() {
                           },
                         );
                       } else {
-                        // กรณีเข้ามาดูโพสต์ปกติทั่วไป
                         navigate(`/exchange-preview/post-${itemId}`);
                       }
                     }}
@@ -596,11 +513,10 @@ export default function PostDetail() {
         </div>
       </section>
 
-      {/* Report Dialog */}
       <ReportModal
         isOpen={isReportOpen}
         onClose={() => setIsReportOpen(false)}
-        targetType="item" // หรือใช้ "user" ถ้าเป็นหน้าโปรไฟล์
+        targetType="item"
         targetId={itemId}
         targetTitle={title}
       />

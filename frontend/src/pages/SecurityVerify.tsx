@@ -10,6 +10,9 @@ import { useToast } from "@/hooks/use-toast";
 const MOCK_PIN = "5291";
 const MOCK_PHONE = "089-123-4567";
 
+// =========================================================================
+// COMPONENT: SecurityVerify (หน้าจอสำหรับยืนยันรหัสความปลอดภัย PIN เพื่อเปิดเผยข้อมูลเบอร์โทรศัพท์คู่แลกเปลี่ยน)
+// =========================================================================
 export default function SecurityVerify() {
   const { matchId } = useParams();
   const navigate = useNavigate();
@@ -17,6 +20,11 @@ export default function SecurityVerify() {
   const [pin, setPin] = useState("");
   const [verified, setVerified] = useState(false);
 
+  /**
+   * ฟังก์ชัน: handleVerify
+   * มีไว้สำหรับ: ตรวจสอบความถูกต้องของรหัส PIN ที่ผู้ใช้งานกรอกเทียบกับรหัสจำลอง (MOCK_PIN) 
+   * หากถูกต้องจะเปลี่ยนสถานะเป็นยืนยันสำเร็จและแสดงการแจ้งเตือน หากไม่ถูกต้องจะล้างค่า PIN และแสดงข้อความแจ้งเตือนข้อผิดพลาด
+   */
   const handleVerify = () => {
     if (pin === MOCK_PIN) {
       setVerified(true);

@@ -1,9 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { 
-  ArrowRightLeft, MapPin, Phone, ShieldCheck, Sparkles, ArrowLeft, 
-  Box, CheckCircle2, Circle, Loader2, Info, FileText 
-} from "lucide-react";
+import { ArrowRightLeft, MapPin, Phone, ShieldCheck, Sparkles, ArrowLeft, Box, CheckCircle2, Circle, Loader2, Info, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,6 +28,9 @@ interface ApiErrorResponse {
   error?: string;
 }
 
+// =========================================================================
+// COMPONENT: ExchangePreview (หน้าจอตรวจสอบและยืนยันรายละเอียดก่อนส่งคำขอแลกเปลี่ยน)
+// =========================================================================
 export default function ExchangePreview() {
   const { matchId } = useParams();
   const navigate = useNavigate();
@@ -45,6 +45,9 @@ export default function ExchangePreview() {
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [selectedMyPostId, setSelectedMyPostId] = useState<string | number>("");
 
+  /**
+   * ฟังก์ชัน: โหลดข้อมูลรายการไอเทมทั้งหมดจากฐานข้อมูลและตรวจสอบรหัสผู้ใช้ปัจจุบันจาก LocalStorage
+   */
   useEffect(() => {
     const loadRealData = async () => {
       try {
@@ -69,6 +72,9 @@ export default function ExchangePreview() {
     loadRealData();
   }, []);
 
+  /**
+   * ฟังก์ชัน: แปลงและจัดการเส้นทางไฟล์รูปภาพสินค้าให้ถูกต้องพร้อมใช้งาน
+   */
   const getCorrectImagePath = (imageName: string | undefined) => {
     if (!imageName || imageName.trim() === "undefined" || imageName === "null") return "/placeholder.jpg";
     try {
@@ -87,11 +93,17 @@ export default function ExchangePreview() {
     }
   };
 
+  /**
+   * ฟังก์ชัน: กรองรายการสิ่งของที่เป็นของตนเองจากระบบคลังสินค้า (Inventory)
+   */
   const myInventory = useMemo(() => {
     if (!currentUserId) return [];
     return dbItems.filter(item => String(item.MemberID) === currentUserId);
   }, [dbItems, currentUserId]);
 
+  /**
+   * ฟังก์ชัน: แยกประเภทและดึงรหัสเป้าหมาย (targetId) กับรหัสสินค้าเริ่มต้น (preSelectedMyId) จาก URL params
+   */
   const { targetId, preSelectedMyId } = useMemo(() => {
     if (!matchId) return { targetId: "", preSelectedMyId: "" };
     if (matchId.startsWith("match-")) {
@@ -104,6 +116,9 @@ export default function ExchangePreview() {
     return { targetId: matchId, preSelectedMyId: "" };
   }, [matchId]);
 
+  /**
+   * ฟังก์ชัน: กำหนดค่าเริ่มต้นให้กับสินค้าของตนเองที่จะใช้ในการแลกเปลี่ยน
+   */
   useEffect(() => {
     if (preSelectedMyId && !selectedMyPostId) {
       setSelectedMyPostId(preSelectedMyId);
@@ -115,6 +130,9 @@ export default function ExchangePreview() {
   const isFromMatchResults = matchId?.startsWith("match-");
   const isFromPostDetails = matchId?.startsWith("post-");
 
+  /**
+   * ฟังก์ชัน: รวบรวมข้อมูลการเปรียบเทียบระหว่างสินค้าของตนเองและสินค้าของคู่แลกเปลี่ยน
+   */
   const match = useMemo(() => {
     const theirPost = dbItems.find(p => String(p.ItemID) === String(targetId));
     const mySelectedPost = myInventory.find(p => String(p.ItemID) === String(selectedMyPostId)) || myInventory[0];
@@ -161,6 +179,9 @@ export default function ExchangePreview() {
     };
   }, [matchId, selectedMyPostId, dbItems, myInventory, location.state, targetId]);
 
+  /**
+   * ฟังก์ชัน: ตรวจสอบความถูกต้องของเบอร์โทรและสินค้า แล้วส่งคำขอแลกเปลี่ยนไปยัง API ระบบ
+   */
   const handleConfirm = async () => {
     if (!phone || phone.replace(/-/g, "").length < 10) {
       toast({
@@ -256,9 +277,14 @@ export default function ExchangePreview() {
           
           {/* Header */}
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="-ml-2">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
+            <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate(-1)}
+                className="-ml-2 hover:bg-slate-200/60 dark:hover:bg-zinc-800/60 text-foreground transition-all"
+              >
+                <ArrowLeft className="h-5 w-5 text-foreground" />
+              </Button>
             <div>
               <div className="flex items-center gap-2">
                 <ShieldCheck className="h-6 w-6 text-primary" />
@@ -381,7 +407,7 @@ export default function ExchangePreview() {
                   </div>
                 )}
 
-                {/* ปุ่มลูกศรตรงกลาง (ปรับตามธีมหน้า Detail) */}
+                {/* ปุ่มลูกศรตรงกลาง */}
                 <div className="hidden md:flex absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-primary text-primary-foreground items-center justify-center shadow-md border-2 border-background z-10 transition-transform hover:scale-110">
                   <ArrowRightLeft className="h-5 w-5" />
                 </div>
@@ -494,16 +520,6 @@ export default function ExchangePreview() {
               ) : (
                 "ยืนยันส่งคำขอแลกเปลี่ยน"
               )}
-            </Button>
-            
-            {/* ปุ่มยกเลิก แบบลูกศรย้อนกลับ+สีแดง */}
-            <Button
-              variant="ghost"
-              className="w-full h-11 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors font-semibold"
-              onClick={() => navigate(-1)}
-              disabled={submitting}
-            >
-              ยกเลิก
             </Button>
           </div>
 

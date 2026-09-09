@@ -21,7 +21,6 @@ import {
 } from "@/api/api";
 import ReportModal from "@/components/ReportModal";
 
-// 💡 กำหนด Interface ของคำรีวิวจริงที่ส่งมาจาก API หลังบ้าน
 interface DBUserReview {
   ExchangeID: number;
   ReviewerName: string;
@@ -42,7 +41,6 @@ interface UserProfileData {
   reviewScore?: string;
 }
 
-// 💡 เพิ่ม Interface สำหรับข้อมูล Item เพื่อแทนที่การใช้ any
 interface ItemData {
   MemberID?: number | string;
   member_id?: number | string;
@@ -51,6 +49,9 @@ interface ItemData {
   ProfileImage?: string;
 }
 
+// =========================================================================
+// COMPONENT: UserProfile (หน้าจอสำหรับแสดงข้อมูลโปรไฟล์ของผู้ใช้งานคนอื่น สถิติ และรีวิวจากผู้ใช้จริง)
+// =========================================================================
 export default function UserProfile() {
   const { userId } = useParams<{ userId: string }>();
   const location = useLocation();
@@ -63,7 +64,6 @@ export default function UserProfile() {
 
   const loggedInUser = JSON.parse(localStorage.getItem("user") || "{}");
 
-  // แกะข้อมูลที่ถูกส่งพ่วงต่อมาข้ามหน้า
   const stateData = location.state as {
     fromAdmin?: boolean;
     authorName?: string;
@@ -75,6 +75,11 @@ export default function UserProfile() {
 
   const fromAdmin = stateData?.fromAdmin || false;
 
+  /**
+   * ฟังก์ชัน: โหลดข้อมูลโปรไฟล์ สถิติ และรายการรีวิวจากระบบฐานข้อมูล
+   * มีไว้สำหรับ: เลื่อนหน้าจอขึ้นด้านบนสุด ดึงข้อมูลสิ่งของทั้งหมดมานับจำนวนโพสต์ของผู้ใช้นี้
+   * เรียกใช้งาน API เพื่อดึงคะแนนรีวิว สถิติการแลกเปลี่ยนสำเร็จ และรายการคอมเมนต์รีวิวจริง พร้อมทั้งแม็ปข้อมูลเข้าสู่ State
+   */
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
 
@@ -82,33 +87,28 @@ export default function UserProfile() {
       try {
         setIsLoading(true);
 
-        // 1. ดึงสิ่งของทั้งหมด และกรองนับเฉพาะของ User คนนี้
         const itemsRes = await fetchItemsAPI();
         const items = itemsRes.data || [];
 
-        // 💡 แปลง ID เป็น String ทั้งคู่ก่อนเทียบ ป้องกันบั๊กสิ่งของโชว์เลขซ้ำกัน
         const userItemsCount = items.filter(
           (item: ItemData) =>
             String(item.MemberID || item.member_id) === String(userId),
         ).length;
 
-        // 2. เรียก API ดึงข้อมูลสถิติจริงและคำรีวิว
         const statsRes = await getUserStats(userId!);
 
         let dbExchanges = stateData?.authorExchanges || 0;
         let dbRating = stateData?.authorRating || "0.0";
         let dbReviews: DBUserReview[] = [];
 
-        // 💡 เช็คว่าถ้า Backend คืนค่ากลับมา Success ค่อยจับยัดใส่ State
         if (statsRes && statsRes.success && statsRes.data) {
           dbExchanges = statsRes.data.successfulExchanges;
           dbRating = statsRes.data.reviewScore;
           dbReviews = statsRes.data.reviews || [];
         }
 
-        setReviews(dbReviews); // อัปเดตตารางคอมเมนต์
+        setReviews(dbReviews);
 
-        // 3. ผูกข้อมูลลงหน้าจอ
         const currentLoggedInID = String(
           loggedInUser?.MemberID || loggedInUser?.member_id || "",
         );
@@ -197,28 +197,27 @@ export default function UserProfile() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-8">
         <div className="flex items-center justify-between">
           <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => navigate(-1)}
-                className="-ml-2"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate(-1)}
+            className="-ml-2 hover:bg-slate-200/60 dark:hover:bg-zinc-800/60 text-foreground transition-all"
+          >
+            <ArrowLeft className="h-5 w-5 text-foreground" />
+          </Button>
 
-          {/* 🟢 เพิ่มปุ่มรายงานผู้ใช้งานตรงนี้ */}
           {!isOwner && (
             <Button
-                variant="ghost"
-                size="icon"
-                className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                onClick={() => setIsReportOpen(true)}
-                title="รายงานผู้ใช้งาน"
-              >
-                <Flag className="h-5 w-5" />
-              </Button>
+              variant="ghost"
+              size="icon"
+              className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+              onClick={() => setIsReportOpen(true)}
+              title="รายงานผู้ใช้งาน"
+            >
+              <Flag className="h-5 w-5" />
+            </Button>
           )}
         </div>
-        {/* ข้อมูลโปรไฟล์หลักและสถิติ 3 ช่อง */}
+
         <div className="grid md:grid-cols-[auto_1fr] gap-8 items-start">
           <Avatar className="h-28 w-28 mx-auto md:mx-0 border-4 border-background shadow-lg">
             {profileImageUrl && (
@@ -271,7 +270,6 @@ export default function UserProfile() {
 
         <Separator />
 
-        {/* โซนส่วนแสดงรีวิวและความคิดเห็นจริง */}
         <div className="space-y-4">
           <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
             <MessageSquare className="h-5 w-5 text-primary" />{" "}
@@ -314,13 +312,11 @@ export default function UserProfile() {
                         </div>
                       </div>
 
-                      {/* ส่วนคะแนนรีวิวจริงที่คู่แลกเปลี่ยนให้ */}
                       <div className="flex items-center gap-0.5 bg-yellow-500/10 px-2 py-0.5 rounded-full text-yellow-600 text-xs font-semibold">
                         <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
                         {Number(review.Rating || 0).toFixed(1)}
                       </div>
                     </div>
-                    {/* ความคิดเห็นจากฟิลด์ Comment ในตาราง DB */}
                     <p className="text-sm text-muted-foreground pl-10 italic">
                       "{review.Comment}"
                     </p>
@@ -342,7 +338,6 @@ export default function UserProfile() {
         )}
       </div>
 
-      {/* แจ้งปัญหา */}
       <ReportModal
         isOpen={isReportOpen}
         onClose={() => setIsReportOpen(false)}

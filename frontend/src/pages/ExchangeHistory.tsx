@@ -1,19 +1,13 @@
-import React, { useState, useEffect } from "react";
-import { 
-  ArrowLeft, Clock, ArrowRightLeft, ChevronRight, Calendar, 
-  CheckCircle2, XCircle, RefreshCw 
-} from "lucide-react";
+import { useState, useEffect } from "react";
+import { ArrowLeft, Clock, ArrowRightLeft, ChevronRight, Calendar, CheckCircle2, XCircle, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import AppLayout from "@/components/AppLayout";
 import { motion, AnimatePresence } from "framer-motion";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { getExchanges, IMAGE_BASE_URL } from "@/api/api";
 
-// 🎯 TYPES & INTERFACES
 interface ExchangeItem {
   ExchangeID: number;
   ExchangeStatus: string;
@@ -35,11 +29,19 @@ interface ExchangeItem {
   theirAuthorName: string;
 }
 
+// =========================================================================
+// COMPONENT: ExchangeHistory (หน้าจอสำหรับแสดงประวัติรายการแลกเปลี่ยนทั้งหมดของผู้ใช้)[cite: 8]
+// =========================================================================
 export default function ExchangeHistory() {
   const navigate = useNavigate();
   const [userExchanges, setUserExchanges] = useState<ExchangeItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [activeTab, setActiveTab] = useState<"success" | "failed">("success");
 
+  /**
+   * ฟังก์ชัน: fetchHistoryData[cite: 8]
+   * มีไว้สำหรับ: ดึงข้อมูลประวัติการแลกเปลี่ยนทั้งหมดจาก API และอัปเดตลงใน State พร้อมจัดการสถานะกำลังโหลด[cite: 8]
+   */
   useEffect(() => {
     const fetchHistoryData = async () => {
       try {
@@ -59,7 +61,6 @@ export default function ExchangeHistory() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
-  // 💡 แยกประเภทรายการเป็น 2 กลุ่มตามแท็บที่ต้องการ (สำเร็จ, ไม่สำเร็จ)
   const completedList = userExchanges.filter((item) =>
     item.ExchangeStatus.toLowerCase() === "completed"
   );
@@ -70,12 +71,16 @@ export default function ExchangeHistory() {
   return (
     <AppLayout>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-6">
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="-ml-2">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
+            <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate(-1)}
+                className="-ml-2 hover:bg-slate-200/60 dark:hover:bg-zinc-800/60 text-foreground transition-all"
+              >
+                <ArrowLeft className="h-5 w-5 text-foreground" />
+              </Button>
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold">ประวัติการแลกเปลี่ยน</h1>
               <p className="text-xs text-muted-foreground mt-0.5">ติดตามและดูประวัติการทำรายการแลกเปลี่ยนทั้งหมดของคุณ</p>
@@ -84,7 +89,6 @@ export default function ExchangeHistory() {
         </div>
 
         {loading ? (
-          /* Skeleton Loading */
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {[1, 2, 3, 4, 5, 6].map((idx) => (
               <div key={idx} className="h-52 rounded-2xl bg-muted/60 animate-pulse p-4 space-y-3">
@@ -102,20 +106,25 @@ export default function ExchangeHistory() {
             ))}
           </div>
         ) : (
-          <>
-            {/* Tabs สำเร็จ และ ไม่สำเร็จ */}
-            <Tabs defaultValue="success" className="w-full">
-              <TabsList className="grid w-full max-w-md grid-cols-2 rounded-full bg-muted p-1 h-11">
-                <TabsTrigger value="success" className="rounded-full py-2 text-xs sm:text-sm font-medium">
-                  สำเร็จ ({completedList.length})
-                </TabsTrigger>
-                <TabsTrigger value="failed" className="rounded-full py-2 text-xs sm:text-sm font-medium">
-                  ไม่สำเร็จ ({failedList.length})
-                </TabsTrigger>
-              </TabsList>
+          <div className="space-y-6">
+            <div className="flex p-1 bg-muted/50 rounded-xl border border-border/50 max-w-md">
+              <button
+                onClick={() => setActiveTab("success")}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-lg transition-all ${activeTab === "success" ? "bg-primary text-primary-foreground shadow-md" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                <CheckCircle2 className="h-4 w-4" /> สำเร็จ ({completedList.length})
+              </button>
+              <button
+                onClick={() => setActiveTab("failed")}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-lg transition-all ${activeTab === "failed" ? "bg-primary text-primary-foreground shadow-md" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                <XCircle className="h-4 w-4" /> ไม่สำเร็จ ({failedList.length})
+              </button>
+            </div>
 
-              <AnimatePresence mode="wait">
-                <TabsContent value="success" className="mt-6 outline-none">
+            <AnimatePresence mode="wait">
+              {activeTab === "success" ? (
+                <motion.div key="success" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
                   {completedList.length > 0 ? (
                     <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       {completedList.map((item) => (
@@ -125,9 +134,9 @@ export default function ExchangeHistory() {
                   ) : (
                     <EmptyState message="คุณยังไม่มีรายการแลกเปลี่ยนที่สำเร็จ" />
                   )}
-                </TabsContent>
-
-                <TabsContent value="failed" className="mt-6 outline-none">
+                </motion.div>
+              ) : (
+                <motion.div key="failed" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
                   {failedList.length > 0 ? (
                     <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       {failedList.map((item) => (
@@ -137,32 +146,42 @@ export default function ExchangeHistory() {
                   ) : (
                     <EmptyState message="ไม่มีรายการที่ถูกยกเลิกหรือปฏิเสธ" />
                   )}
-                </TabsContent>
-              </AnimatePresence>
-            </Tabs>
-          </>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         )}
       </div>
     </AppLayout>
   );
 }
 
+// =========================================================================
+// COMPONENT: ExchangeDetailCard (คอมโพเนนต์ย่อยแสดงการ์ดสรุปข้อมูลรายการแลกเปลี่ยนแต่ละรายการ)[cite: 8]
+// =========================================================================
 function ExchangeDetailCard({ item }: { item: ExchangeItem }) {
   const navigate = useNavigate();
   const status = item.ExchangeStatus.toLowerCase();
   const partnerName = item.theirAuthorName;
 
+  /**
+   * ฟังก์ชัน: getImageUrl[cite: 8]
+   * มีไว้สำหรับ: จัดรูปแบบและดึง URL ของรูปภาพสินค้า โดยตัดเอาชื่อภาพแรกมาเชื่อมต่อกับ Base URL[cite: 8]
+   */
   const getImageUrl = (imageString: string) => {
     if (!imageString) return "/placeholder-image.png";
     const firstImage = imageString.split(",")[0].trim();
     return `${IMAGE_BASE_URL}/uploads/${firstImage}`;
   };
 
-  // 💡 เพิ่มฟังก์ชันแปลงวันที่ให้อยู่ในฟอร์แมต YYYY-MM-DD
+  /**
+   * ฟังก์ชัน: formatDate[cite: 8]
+   * มีไว้สำหรับ: แปลงสตริงวันที่ให้อยู่ในรูปแบบมาตรฐาน YYYY-MM-DD พร้อมตรวจสอบความถูกต้องของข้อมูล[cite: 8]
+   */
   const formatDate = (dateString?: string) => {
     if (!dateString) return "-";
     const date = new Date(dateString);
-    if (isNaN(date.getTime())) return "-"; // ป้องกันกรณีข้อมูลพัง
+    if (isNaN(date.getTime())) return "-";
     
     const yyyy = date.getFullYear();
     const mm = String(date.getMonth() + 1).padStart(2, '0');
@@ -174,7 +193,6 @@ function ExchangeDetailCard({ item }: { item: ExchangeItem }) {
   const myItemImage = getImageUrl(item.myPostImage);
   const theirItemImage = getImageUrl(item.theirPostImage);
 
-  // Badge สถานะ
   let statusBadge = { label: "รอดำเนินการ", style: "bg-amber-100 text-amber-800 border-amber-200", icon: RefreshCw };
   
   if (status === "completed") {
@@ -190,12 +208,7 @@ function ExchangeDetailCard({ item }: { item: ExchangeItem }) {
       <Card className="glass-card border-none shadow-sm hover:shadow-md transition-all h-full flex flex-col justify-between">
         <CardContent className="p-4 space-y-4">
           <div className="flex items-center justify-between border-b border-border/50 pb-3">
-            <div className="flex items-center gap-2">
-              <Avatar className="h-8 w-8 border border-border">
-                <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-bold">
-                  {partnerName.charAt(0)}
-                </AvatarFallback>
-              </Avatar>
+            <div>
               <p className="font-bold text-sm line-clamp-1">{partnerName}</p>
             </div>
             <Badge variant="outline" className={`text-[11px] font-medium gap-1 px-2 py-0.5 ${statusBadge.style}`}>
@@ -223,7 +236,6 @@ function ExchangeDetailCard({ item }: { item: ExchangeItem }) {
             </p>
           )}
 
-          {/* 💡 เรียกใช้ฟังก์ชัน formatDate ตรงนี้แทน .split(" ")[0] */}
           <div className="flex flex-col text-[11px] text-muted-foreground bg-secondary/30 p-2.5 rounded-lg space-y-1">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
@@ -248,7 +260,12 @@ function ExchangeDetailCard({ item }: { item: ExchangeItem }) {
             </div>
           </div>
 
-          <Button variant="outline" size="sm" className="w-full text-xs font-semibold" onClick={() => navigate(`/exchange-detail/${item.ExchangeID}`)}>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="w-full text-xs font-semibold bg-slate-100 dark:bg-zinc-800/60 text-slate-700 dark:text-zinc-300 border-border/60 hover:bg-slate-200 dark:hover:bg-zinc-800 hover:text-slate-900 dark:hover:text-white transition-all" 
+            onClick={() => navigate(`/exchange-detail/${item.ExchangeID}`)}
+          >
             ดูรายละเอียด <ChevronRight className="h-3.5 w-3.5 ml-1" />
           </Button>
         </CardContent>
@@ -257,6 +274,9 @@ function ExchangeDetailCard({ item }: { item: ExchangeItem }) {
   );
 }
 
+// =========================================================================
+// COMPONENT: EmptyState (คอมโพเนนต์ย่อยสำหรับแสดงผลเมื่อไม่มีข้อมูลในรายการ)[cite: 8]
+// =========================================================================
 function EmptyState({ message }: { message: string }) {
   return (
     <div className="text-center py-16 opacity-60">

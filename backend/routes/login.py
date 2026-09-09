@@ -1,18 +1,38 @@
-import jwt
 import datetime
-from flask import Blueprint, request, jsonify
+import jwt
+from flask import Blueprint, jsonify, request
 from db import get_connection
 from werkzeug.security import check_password_hash
 
+# ==========================================
+# LOGIN BLUEPRINT CONFIGURATION
+# ==========================================
 # สร้าง Blueprint กำหนดให้ API หมวดนี้ขึ้นต้นด้วย /api/login
 login_bp = Blueprint("login", __name__, url_prefix="/api/login")
 
-# กุญแจลับสำหรับสร้างและถอดรหัส JWT Token (ห้ามทำหลุดเด็ดขาด)
+# กุญแจลับสำหรับสร้างและถอดรหัส JWT Token
 SECRET_KEY = "tradin_super_secret_key_2026_secure_long_key_for_jwt"
 
+
+# ==========================================
+# 1. API: เข้าสู่ระบบ (LOGIN)
+# ==========================================
 @login_bp.route("", methods=["POST"])
 def login():
-    # 1. รับและตรวจสอบข้อมูลเบื้องต้น
+    """
+    API Endpoint: POST /api/login
+    คำอธิบาย: จัดการกระบวนการเข้าสู่ระบบ (Authentication) สำหรับทั้งผู้ใช้งานทั่วไป (Member) และผู้ดูแลระบบ (Admin)
+    
+    รายละเอียดการทำงาน:
+    1. รับข้อมูล JSON Request (อีเมลและรหัสผ่าน) และตรวจสอบความครบถ้วนเบื้องต้น
+    2. ค้นหาข้อมูลในตาราง member หากพบจะตรวจสอบรหัสผ่าน (รองรับทั้งแบบ Hash และ Plain text)
+    3. หากรหัสผ่านถูกต้อง จะสร้าง JWT Token (อายุการใช้งาน 24 ชั่วโมง) พร้อมกำหนดสิทธิ์ role เป็น 'member' และส่งคืนข้อมูลผู้ใช้
+    4. หากไม่พบข้อมูลในตาราง member จะทำการค้นหาต่อในตาราง admin (ผู้ดูแลระบบ)
+    5. หากพบในตาราง admin และรหัสผ่านถูกต้อง จะสร้าง JWT Token พร้อมกำหนดสิทธิ์ role เป็น 'admin' และส่งคืนข้อมูล
+    6. หากไม่พบข้อมูลในทั้งสองตารางหรือรหัสผ่านไม่ถูกต้อง จะคืนค่าสถานะ 401
+    7. จัดการข้อผิดพลาดของระบบด้วย Try-Except และปิดการเชื่อมต่อฐานข้อมูลในบล็อก Finally อย่างปลอดภัย
+    """
+    # 1. รับและตรวจสอบข้อมูลเบื้องต้นจาก Request Body
     data = request.get_json(silent=True)
 
     if not data:
@@ -47,7 +67,7 @@ def login():
                 ProfileImage,
                 Password
             FROM member
-            WHERE Email=%s
+            WHERE Email = %s
         """, (email,))
 
         member = cursor.fetchone()
@@ -67,7 +87,7 @@ def login():
                     "message": "อีเมลหรือรหัสผ่านไม่ถูกต้อง"
                 }), 401
 
-            # สร้าง Payload ข้อมูลที่จะฝังไปใน Token (หมดอายุใน 24 ชั่วโมง)
+            # สร้าง Payload สำหรับฝังใน Token (กำหนดอายุการใช้งาน 24 ชั่วโมง)
             payload = {
                 "member_id": member["MemberID"],
                 "role": "member",
@@ -75,7 +95,6 @@ def login():
                 "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=24)
             }
 
-            # สร้าง JWT Token
             token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
 
             return jsonify({
@@ -94,7 +113,6 @@ def login():
         # =====================================================
         # 3. ตรวจสอบข้อมูลในตาราง Admin (ผู้ดูแลระบบ)
         # =====================================================
-        # โค้ดจะทำงานมาถึงตรงนี้ได้ แปลว่าหาอีเมลในตาราง member ไม่เจอ
         cursor.execute("""
             SELECT
                 AdminID,
@@ -102,7 +120,7 @@ def login():
                 Email,
                 Password
             FROM admin
-            WHERE Email=%s
+            WHERE Email = %s
         """, (email,))
 
         admin = cursor.fetchone()
@@ -143,7 +161,7 @@ def login():
             }), 200
 
         # =====================================================
-        # 4. กรณีหาไม่เจอทั้ง Member และ Admin
+        # 4. กรณีไม่พบข้อมูลทั้งในตาราง Member และ Admin
         # =====================================================
         return jsonify({
             "success": False,
@@ -151,7 +169,7 @@ def login():
         }), 401
 
     except Exception as e:
-        print("Login Error :", e)
+        print("Login Error:", e)
         return jsonify({
             "success": False,
             "message": "เกิดข้อผิดพลาดที่เซิร์ฟเวอร์"

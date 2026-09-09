@@ -10,6 +10,10 @@ import AppLayout from "@/components/AppLayout";
 import { useToast } from "@/hooks/use-toast";
 import { getItems, updateItem, getCategories, IMAGE_BASE_URL } from "@/api/api";
 
+// =========================================================================
+// INTERFACES: โครงสร้างข้อมูล TypeScript สำหรับ Type Safety
+// =========================================================================
+
 interface DBItemDetail {
   ItemID?: number;
   ItemName?: string;
@@ -30,13 +34,16 @@ interface Category {
   CategoryName: string;
 }
 
+// =========================================================================
+// COMPONENT: EditPost (หน้าจอสำหรับแก้ไขโพสต์สินค้าหรือสิ่งของที่เคยลงประกาศไว้)
+// =========================================================================
 export default function EditPost() {
   const { postId } = useParams<{ postId: string }>(); 
   const navigate = useNavigate();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // States สำหรับเก็บข้อมูลฟอร์ม
+  // States สำหรับเก็บข้อมูลฟอร์มและจัดการสถานะการทำงาน
   const [images, setImages] = useState<string[]>([]); 
   const [imageFiles, setImageFiles] = useState<(File | string)[]>([]); 
   const [categoriesList, setCategoriesList] = useState<Category[]>([]);
@@ -51,6 +58,9 @@ export default function EditPost() {
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // =====================================================================
+  // EFFECT: ดึงรายการหมวดหมู่ทั้งหมดจาก API เมื่อคอมโพเนนต์ถูกโหลด
+  // =====================================================================
   useEffect(() => {
     const fetchCategoriesData = async () => {
       try {
@@ -64,12 +74,14 @@ export default function EditPost() {
     fetchCategoriesData();
   }, []);
 
-  // กรอง "ทั้งหมด" ออก
+  // กรองหมวดหมู่ "ทั้งหมด" ออกจากการเลือก
   const filteredCategories = categoriesList.filter(
     (cat) => cat.CategoryName !== "ทั้งหมด"
   );
 
-  // 1. ดึงข้อมูลโพสต์เดิมมาจัดใส่ฟอร์ม
+  // =====================================================================
+  // EFFECT: ดึงข้อมูลโพสต์เดิมตามรหัส postId มาใส่ลงในฟอร์มแก้ไข
+  // =====================================================================
   useEffect(() => {
     const fetchPostDetail = async () => {
       try {
@@ -118,7 +130,9 @@ export default function EditPost() {
     }
   }, [postId, toast]);
 
-  // Clean up Blob URLs 
+  // =====================================================================
+  // EFFECT: ทำความสะอาด (Cleanup) Blob URLs เพื่อป้องกันปัญหาหน่วยความจำรั่วไหล (Memory Leak)
+  // =====================================================================
   useEffect(() => {
     return () => {
       images.forEach(img => {
@@ -127,10 +141,16 @@ export default function EditPost() {
     };
   }, [images]);
 
+  // =====================================================================
+  // EFFECT: เลื่อนหน้าจอขึ้นไปด้านบนสุดโดยอัตโนมัติเมื่อคอมโพเนนต์พร้อมใช้งาน
+  // =====================================================================
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
+  // =====================================================================
+  // ฟังก์ชัน: จัดการการเลือกรูปภาพใหม่และตรวจสอบเงื่อนไขจำกัดสูงสุด 6 รูป
+  // =====================================================================
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
@@ -155,6 +175,9 @@ export default function EditPost() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  // =====================================================================
+  // ฟังก์ชัน: ลบรูปภาพออกจากรายการพรีวิวและอาเรย์จัดการไฟล์ พร้อมยกเลิก Blob URL
+  // =====================================================================
   const removeImage = (index: number) => {
     const targetImage = images[index];
     if (targetImage.startsWith("blob:")) {
@@ -164,7 +187,9 @@ export default function EditPost() {
     setImageFiles(prev => prev.filter((_, i) => i !== index));
   };
 
-  // 2. ฟังก์ชันส่งข้อมูลอัปเดตไปที่ API
+  // =====================================================================
+  // ฟังก์ชัน: ตรวจสอบความถูกต้องของข้อมูลฟอร์มและส่งคำขออัปเดตข้อมูลไปยัง API
+  // =====================================================================
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const newErrors: Record<string, string> = {};
@@ -224,6 +249,7 @@ export default function EditPost() {
     }
   };
 
+  // แสดงผลสถานะกำลังโหลดข้อมูลเริ่มต้นของโพสต์
   if (loading) {
     return (
       <AppLayout>
@@ -234,42 +260,72 @@ export default function EditPost() {
 
   return (
     <AppLayout>
-      {/* Hero */}
+      {/* ส่วนหัวข้อหน้าจอแก้ไขโพสต์ */}
       <section className="border-b border-border/50 bg-muted/30 w-screen relative left-1/2 -translate-x-1/2 -mt-6 px-4 sm:px-6">
         <div className="mx-auto max-w-5xl py-8">
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-3">
-                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight font-heading">แก้ไขโพสต์</h1>
+                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight font-heading">
+                  แก้ไขโพสต์
+                </h1>
               </div>
-              <p className="text-sm text-muted-foreground mt-1">แก้ไขข้อมูลสิ่งของที่ต้องการแลกเปลี่ยน</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                แก้ไขข้อมูลสิ่งของที่ต้องการแลกเปลี่ยน
+              </p>
             </div>
-            <Button variant="ghost" size="icon" onClick={() => navigate("/my-posts")} className="rounded-full">
-              <X className="h-5 w-5" />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate("/my-posts")}
+              className="rounded-full hover:bg-slate-200/60 dark:hover:bg-zinc-800/60 text-foreground hover:text-foreground transition-all"
+            >
+              <X className="h-5 w-5 text-foreground" />
             </Button>
           </div>
         </div>
       </section>
 
+      {/* ส่วนฟอร์มหลักสำหรับการกรอกข้อมูลแก้ไข */}
       <section className="py-8 sm:py-12">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <form onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 lg:gap-12">
-
-              {/* Left: Images */}
+              {/* คอลัมน์ซ้าย: จัดการรูปภาพสินค้า */}
               <div className="lg:col-span-2 space-y-3">
                 <div className="flex justify-between items-center">
-                  <Label className={`text-sm font-semibold ${errors.images ? "text-red-500" : ""}`}>
-                    รูปภาพ ({images.length}/6) <span className="text-red-500 font-normal">*ขั้นต่ำ 3 รูป</span>
+                  <Label
+                    className={`text-sm font-semibold ${errors.images ? "text-red-500" : ""}`}
+                  >
+                    รูปภาพ ({images.length}/6){" "}
+                    <span className="text-red-500 font-normal">
+                      *ขั้นต่ำ 3 รูป
+                    </span>
                   </Label>
                 </div>
 
-                <input type="file" ref={fileInputRef} className="hidden" accept="image/*" multiple onChange={handleImageChange} />
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  className="hidden"
+                  accept="image/*"
+                  multiple
+                  onChange={handleImageChange}
+                />
 
-                <div className={`grid grid-cols-3 gap-3 ${errors.images ? "p-2 bg-red-50 rounded-xl border border-red-200" : ""}`}>
+                <div
+                  className={`grid grid-cols-3 gap-3 ${errors.images ? "p-2 bg-red-50 rounded-xl border border-red-200" : ""}`}
+                >
                   {images.map((img, i) => (
-                    <div key={i} className="relative aspect-square rounded-2xl overflow-hidden bg-muted group border border-border">
-                      <img src={img} alt="" className="w-full h-full object-cover" />
+                    <div
+                      key={i}
+                      className="relative aspect-square rounded-2xl overflow-hidden bg-muted group border border-border"
+                    >
+                      <img
+                        src={img}
+                        alt=""
+                        className="w-full h-full object-cover"
+                      />
                       <button
                         type="button"
                         onClick={() => removeImage(i)}
@@ -290,23 +346,31 @@ export default function EditPost() {
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       className={`aspect-square rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-1 transition-all
-                        ${errors.images
-                          ? "border-red-300 bg-red-50 text-red-500 hover:bg-red-100"
-                          : "border-border text-muted-foreground hover:border-primary hover:text-primary hover:bg-primary/5"
+                        ${
+                          errors.images
+                            ? "border-red-300 bg-red-50 text-red-500 hover:bg-red-100"
+                            : "border-border text-muted-foreground hover:border-primary hover:text-primary hover:bg-primary/5"
                         }`}
                     >
                       <Camera className="h-6 w-6" />
-                      <span className="text-[10px] font-medium">เพิ่มรูปภาพ</span>
+                      <span className="text-[10px] font-medium">
+                        เพิ่มรูปภาพ
+                      </span>
                     </button>
                   )}
                 </div>
-                {errors.images && <p className="text-xs text-red-500">{errors.images}</p>}
+                {errors.images && (
+                  <p className="text-xs text-red-500">{errors.images}</p>
+                )}
               </div>
 
-              {/* Right: Form fields */}
+              {/* คอลัมน์ขวา: ฟิลด์ข้อมูลรายละเอียดโพสต์ */}
               <div className="lg:col-span-3 space-y-5">
                 <div className="space-y-2">
-                  <Label htmlFor="title" className={`font-semibold ${errors.title ? "text-red-500" : ""}`}>
+                  <Label
+                    htmlFor="title"
+                    className={`font-semibold ${errors.title ? "text-red-500" : ""}`}
+                  >
                     ชื่อสิ่งของ <span className="text-red-500">*</span>
                   </Label>
                   <Input
@@ -314,40 +378,59 @@ export default function EditPost() {
                     placeholder="ระบุชื่อสิ่งของของคุณ"
                     className={`h-11 ${errors.title ? "border-red-500 focus-visible:ring-red-500" : ""}`}
                     value={title}
-                    onChange={(e) => { setTitle(e.target.value); if (errors.title) setErrors(prev => ({ ...prev, title: "" })); }}
+                    onChange={(e) => {
+                      setTitle(e.target.value);
+                      if (errors.title)
+                        setErrors((prev) => ({ ...prev, title: "" }));
+                    }}
                   />
-                  {errors.title && <p className="text-xs text-red-500">{errors.title}</p>}
+                  {errors.title && (
+                    <p className="text-xs text-red-500">{errors.title}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label className={`font-semibold ${errors.category ? "text-red-500" : ""}`}>
+                  <Label
+                    className={`font-semibold ${errors.category ? "text-red-500" : ""}`}
+                  >
                     หมวดหมู่ <span className="text-red-500">*</span>
                   </Label>
-                  
-                  <Select 
-                    value={categoryId ? String(categoryId) : ""} 
-                    onValueChange={(val) => { 
+
+                  <Select
+                    value={categoryId ? String(categoryId) : ""}
+                    onValueChange={(val) => {
                       setCategoryId(Number(val));
-                      if (errors.category) setErrors(prev => ({ ...prev, category: "" }));
+                      if (errors.category)
+                        setErrors((prev) => ({ ...prev, category: "" }));
                     }}
                   >
-                    <SelectTrigger className={`h-11 ${errors.category ? "border-red-500 ring-red-500" : ""}`}>
+                    <SelectTrigger
+                      className={`h-11 ${errors.category ? "border-red-500 ring-red-500" : ""}`}
+                    >
                       <SelectValue placeholder="เลือกหมวดหมู่" />
                     </SelectTrigger>
                     <SelectContent>
                       {filteredCategories.map((cat) => (
-                        <SelectOption key={cat.CategoryID} value={String(cat.CategoryID)}>
+                        <SelectOption
+                          key={cat.CategoryID}
+                          value={String(cat.CategoryID)}
+                        >
                           {cat.CategoryName}
                         </SelectOption>
                       ))}
                     </SelectContent>
                   </Select>
-                  
-                  {errors.category && <p className="text-xs text-red-500">{errors.category}</p>}
+
+                  {errors.category && (
+                    <p className="text-xs text-red-500">{errors.category}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="desc" className={`font-semibold ${errors.description ? "text-red-500" : ""}`}>
+                  <Label
+                    htmlFor="desc"
+                    className={`font-semibold ${errors.description ? "text-red-500" : ""}`}
+                  >
                     รายละเอียดสินค้า <span className="text-red-500">*</span>
                   </Label>
                   <Textarea
@@ -355,13 +438,22 @@ export default function EditPost() {
                     placeholder="อธิบายสภาพสินค้า เช่น ปีที่ซื้อ ตำหนิ หรือสาเหตุที่อยากแลก"
                     className={`min-h-[120px] ${errors.description ? "border-red-500 focus-visible:ring-red-500" : ""}`}
                     value={description}
-                    onChange={(e) => { setDescription(e.target.value); if (errors.description) setErrors(prev => ({ ...prev, description: "" })); }}
+                    onChange={(e) => {
+                      setDescription(e.target.value);
+                      if (errors.description)
+                        setErrors((prev) => ({ ...prev, description: "" }));
+                    }}
                   />
-                  {errors.description && <p className="text-xs text-red-500">{errors.description}</p>}
+                  {errors.description && (
+                    <p className="text-xs text-red-500">{errors.description}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="wanted" className={`font-semibold ${errors.wantedItem ? "text-red-500" : ""}`}>
+                  <Label
+                    htmlFor="wanted"
+                    className={`font-semibold ${errors.wantedItem ? "text-red-500" : ""}`}
+                  >
                     สิ่งของที่ต้องการแลก <span className="text-red-500">*</span>
                   </Label>
                   <Input
@@ -369,31 +461,53 @@ export default function EditPost() {
                     placeholder="เช่น กล้องฟิล์ม, ลำโพงบลูทูธ"
                     className={`h-11 ${errors.wantedItem ? "border-red-500 focus-visible:ring-red-500" : ""}`}
                     value={wantedItem}
-                    onChange={(e) => { setWantedItem(e.target.value); if (errors.wantedItem) setErrors(prev => ({ ...prev, wantedItem: "" })); }}
+                    onChange={(e) => {
+                      setWantedItem(e.target.value);
+                      if (errors.wantedItem)
+                        setErrors((prev) => ({ ...prev, wantedItem: "" }));
+                    }}
                   />
-                  {errors.wantedItem && <p className="text-xs text-red-500">{errors.wantedItem}</p>}
+                  {errors.wantedItem && (
+                    <p className="text-xs text-red-500">{errors.wantedItem}</p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="location" className={`font-semibold ${errors.location ? "text-red-500" : ""}`}>
+                    <Label
+                      htmlFor="location"
+                      className={`font-semibold ${errors.location ? "text-red-500" : ""}`}
+                    >
                       สถานที่นัดรับ <span className="text-red-500">*</span>
                     </Label>
                     <div className="relative">
-                      <MapPin className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 z-10 ${errors.location ? "text-red-500" : "text-primary"}`} />
+                      <MapPin
+                        className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 z-10 ${errors.location ? "text-red-500" : "text-primary"}`}
+                      />
                       <Input
                         id="location"
                         placeholder="ระบุสถานที่นัดรับ"
                         className={`h-11 pl-10 ${errors.location ? "border-red-500 focus-visible:ring-red-500" : ""}`}
                         value={location}
-                        onChange={(e) => { setLocation(e.target.value); if (errors.location) setErrors(prev => ({ ...prev, location: "" })); }}
+                        onChange={(e) => {
+                          setLocation(e.target.value);
+                          if (errors.location)
+                            setErrors((prev) => ({ ...prev, location: "" }));
+                        }}
                       />
                     </div>
-                    {errors.location && <p className="text-xs text-red-500">{errors.location}</p>}
+                    {errors.location && (
+                      <p className="text-xs text-red-500">{errors.location}</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="locationLink" className="font-semibold text-muted-foreground">ลิงก์ตำแหน่ง (Google Maps)</Label>
+                    <Label
+                      htmlFor="locationLink"
+                      className="font-semibold text-muted-foreground"
+                    >
+                      ลิงก์ตำแหน่ง (Google Maps)
+                    </Label>
                     <div className="relative">
                       <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
@@ -408,19 +522,13 @@ export default function EditPost() {
                   </div>
                 </div>
 
-                {/* Actions */}
+                {/* ปุ่มควบคุมการทำงาน (Actions) */}
                 <div className="pt-4 flex flex-col sm:flex-row gap-3">
-                  <Button type="submit" className="flex-1 h-12 text-base font-bold shadow-lg">
-                    บันทึกการแก้ไข
-                  </Button>
-                  {/* 💡 ปรับปุ่มยกเลิกให้สูง h-12 และมีขนาดตัวหนังสือ text-base font-bold เท่ากับปุ่มส่งข้อมูล */}
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    className="h-12 text-base font-bold px-6 sm:w-auto hover:bg-orange-500/85 hover:text-white" 
-                    onClick={() => navigate(-1)}
+                  <Button
+                    type="submit"
+                    className="flex-1 h-12 text-base font-bold shadow-lg"
                   >
-                    ยกเลิก
+                    บันทึกการแก้ไข
                   </Button>
                 </div>
               </div>
