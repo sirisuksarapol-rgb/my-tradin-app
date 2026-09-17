@@ -1,46 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
-import {
-  Link,
-  useLocation,
-  useNavigate,
-  useSearchParams,
-} from "react-router-dom";
-import {
-  Plus,
-  ArrowLeftRight,
-  Bell,
-  Package,
-  Sun,
-  Moon,
-  LogOut,
-  ChevronRight,
-  AlertTriangle,
-  X,
-  User,
-  Shield,
-  Search,
-  Home,
-} from "lucide-react";
+import { Link, useLocation,
+  useNavigate, useSearchParams } from "react-router-dom";
+import { Plus, ArrowLeftRight, Bell, Package, Sun, Moon, LogOut, ChevronRight, AlertTriangle, X, User, Shield, Search, Home, Grid3X3, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/hooks/use-theme";
 import logo from "@/assets/logo.png";
-import {
-  getUnreadNotificationCount,
-  getNotifications,
-  IMAGE_BASE_URL,
-} from "@/api/api";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { getUnreadNotificationCount, getNotifications, IMAGE_BASE_URL } from "@/api/api";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 interface NotificationItem {
   NotificationID: number;
@@ -59,6 +26,7 @@ const navItems = [
   { to: "/matching", icon: ArrowLeftRight, label: "จับคู่" },
   { to: "/my-posts", icon: Package, label: "ของฉัน" },
   { to: "/create-post", icon: Plus, label: "สร้างโพสต์" },
+  { to: "/categories", icon: Grid3X3, label: "หมวดหมู่" },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -69,7 +37,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const [notifCount, setNotifCount] = useState(0);
   const [bellSeenCount, setBellSeenCount] = useState<number>(() => {
-    return Number(localStorage.getItem("bell_last_seen") || 0);
+    return Number(localStorage.getItem("bell_last_seen") || 0); // 💡 คง localStorage ไว้
   });
 
   const [user, setUser] = useState<{
@@ -102,9 +70,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       const res = await getUnreadNotificationCount();
       if (res && res.success) {
         const totalUnread = res.count;
-        const lastSeen = Number(localStorage.getItem("bell_last_seen") || 0);
+        const lastSeen = Number(localStorage.getItem("bell_last_seen") || 0); // 💡 คง localStorage ไว้
         if (totalUnread < lastSeen) {
-          localStorage.setItem("bell_last_seen", String(totalUnread));
+          localStorage.setItem("bell_last_seen", String(totalUnread)); // 💡 คง localStorage ไว้
           setBellSeenCount(totalUnread);
         }
         setNotifCount(totalUnread);
@@ -115,8 +83,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem("user");
-    const userRole = localStorage.getItem("role");
+    // ⚠️ เปลี่ยนเป็น sessionStorage
+    const savedUser = sessionStorage.getItem("user");
+    const userRole = sessionStorage.getItem("role");
 
     if (!savedUser) {
       navigate("/");
@@ -146,7 +115,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       fetchNotifCount();
     } catch (error) {
       console.error("Failed to parse user data:", error);
-      localStorage.removeItem("user");
+      sessionStorage.removeItem("user"); // ⚠️ เปลี่ยนเป็น sessionStorage
       navigate("/");
     }
   }, [location.pathname, navigate, fetchNotifCount]);
@@ -167,7 +136,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (location.pathname === "/notifications" && notifCount > 0) {
-      localStorage.setItem("bell_last_seen", String(notifCount));
+      localStorage.setItem("bell_last_seen", String(notifCount)); // 💡 คง localStorage ไว้
       setBellSeenCount(notifCount);
     }
   }, [location.pathname, notifCount]);
@@ -175,7 +144,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const displayNotifCount = Math.max(0, notifCount - bellSeenCount);
 
   const handleBellClick = async () => {
-    localStorage.setItem("bell_last_seen", String(notifCount));
+    localStorage.setItem("bell_last_seen", String(notifCount)); // 💡 คง localStorage ไว้
     setBellSeenCount(notifCount);
     try {
       const res = await getNotifications();
@@ -193,10 +162,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   };
 
   const confirmLogout = () => {
-    localStorage.removeItem("user");
-    localStorage.removeItem("token");
-    localStorage.removeItem("role");
+    // ⚠️ เคลียร์ Session เฉพาะของแท็บนี้
+    sessionStorage.removeItem("user");
+    sessionStorage.removeItem("token");
+    sessionStorage.removeItem("role");
+    
+    // เคลียร์ค่าการแจ้งเตือนส่วนกลาง
     localStorage.removeItem("bell_last_seen");
+    
     setShowLogoutModal(false);
     navigate("/");
   };
@@ -497,51 +470,90 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </footer>
 
-      {/* Mobile Floating Dock */}
-      <nav className="fixed bottom-5 left-4 right-4 z-50 lg:hidden">
-        <div className="max-w-md mx-auto h-16 bg-white/80 dark:bg-zinc-900/85 backdrop-blur-2xl border border-slate-200/80 dark:border-zinc-800 rounded-full shadow-2xl shadow-black/15 flex items-center justify-between px-4 relative">
-          <Link
-            to="/feed"
-            className={`flex flex-col items-center justify-center w-12 h-12 rounded-2xl transition-all active:scale-90 ${location.pathname === "/feed" ? "text-primary font-bold" : "text-slate-400 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-white"}`}
-          >
-            <Home className="h-5 w-5" />
-            <span className="text-[9px] mt-0.5 font-bold">หน้าหลัก</span>
-          </Link>
+      {/* Mobile Floating Dock - Modern Redesign */}
+<nav className="fixed bottom-5 left-4 right-4 z-50 lg:hidden">
+  <div className="max-w-md mx-auto h-16 bg-white/85 dark:bg-zinc-900/90 backdrop-blur-2xl border border-slate-200/80 dark:border-zinc-800/80 rounded-full shadow-2xl shadow-black/15 flex items-center justify-around px-2 relative">
+    
+    {/* หน้าหลัก */}
+    <Link
+      to="/feed"
+      className={`flex flex-col items-center justify-center w-12 h-12 rounded-2xl transition-all duration-200 active:scale-95 ${
+        location.pathname === "/feed" 
+          ? "text-primary font-bold scale-105" 
+          : "text-slate-400 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-white"
+      }`}
+    >
+      <Home className="h-5 w-5" />
+      <span className="text-[10px] mt-0.5 font-medium tracking-tight">หน้าหลัก</span>
+    </Link>
 
-          <Link
-            to="/matching"
-            className={`flex flex-col items-center justify-center w-12 h-12 rounded-2xl transition-all active:scale-90 ${location.pathname === "/matching" ? "text-primary font-bold" : "text-slate-400 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-white"}`}
-          >
-            <ArrowLeftRight className="h-5 w-5" />
-            <span className="text-[9px] mt-0.5 font-bold">จับคู่</span>
-          </Link>
+    {/* จับคู่ */}
+    <Link
+      to="/matching"
+      className={`flex flex-col items-center justify-center w-12 h-12 rounded-2xl transition-all duration-200 active:scale-95 ${
+        location.pathname === "/matching" 
+          ? "text-primary font-bold scale-105" 
+          : "text-slate-400 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-white"
+      }`}
+    >
+      <ArrowLeftRight className="h-5 w-5" />
+      <span className="text-[10px] mt-0.5 font-medium tracking-tight">จับคู่</span>
+    </Link>
 
-          <Link
-            to="/create-post"
-            className="flex items-center justify-center -mt-6 group focus:outline-none"
-          >
-            <div className="w-13 h-13 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-xl shadow-primary/30 ring-4 ring-white dark:ring-zinc-950 transform group-active:scale-90 transition-transform">
-              <Plus className="h-6 w-6 stroke-[3]" />
-            </div>
-          </Link>
+    {/* ปุ่มสร้างโพสต์ (Floating Center Button) */}
+    <Link
+      to="/create-post"
+      className={`flex flex-col items-center justify-center w-12 h-12 rounded-2xl transition-all duration-200 active:scale-95 ${
+        location.pathname === "/create-post" 
+          ? "text-primary font-bold scale-105" 
+          : "text-slate-400 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-white"
+      }`}
+    >
+      <Plus className="h-5 w-5" />
+      <span className="text-[10px] mt-0.5 font-medium tracking-tight">ของฉัน</span>
+    </Link>
 
-          <Link
-            to="/my-posts"
-            className={`flex flex-col items-center justify-center w-12 h-12 rounded-2xl transition-all active:scale-90 ${location.pathname === "/my-posts" ? "text-primary font-bold" : "text-slate-400 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-white"}`}
-          >
-            <Package className="h-5 w-5" />
-            <span className="text-[9px] mt-0.5 font-bold">ของฉัน</span>
-          </Link>
+    {/* ของฉัน */}
+    <Link
+      to="/my-posts"
+      className={`flex flex-col items-center justify-center w-12 h-12 rounded-2xl transition-all duration-200 active:scale-95 ${
+        location.pathname === "/my-posts" 
+          ? "text-primary font-bold scale-105" 
+          : "text-slate-400 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-white"
+      }`}
+    >
+      <Package className="h-5 w-5" />
+      <span className="text-[10px] mt-0.5 font-medium tracking-tight">ของฉัน</span>
+    </Link>
 
-          <Link
-            to="/profile"
-            className={`flex flex-col items-center justify-center w-12 h-12 rounded-2xl transition-all active:scale-90 ${location.pathname === "/profile" ? "text-primary font-bold" : "text-slate-400 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-white"}`}
-          >
-            <User className="h-5 w-5" />
-            <span className="text-[9px] mt-0.5 font-bold">โปรไฟล์</span>
-          </Link>
-        </div>
-      </nav>
+    {/* โปรไฟล์ */}
+    <Link
+      to="/profile"
+      className={`flex flex-col items-center justify-center w-12 h-12 rounded-2xl transition-all duration-200 active:scale-95 ${
+        location.pathname === "/profile" 
+          ? "text-primary font-bold scale-105" 
+          : "text-slate-400 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-white"
+      }`}
+    >
+      <User className="h-5 w-5" />
+      <span className="text-[10px] mt-0.5 font-medium tracking-tight">โปรไฟล์</span>
+    </Link>
+
+    {/* หมวดหมู่ */}
+    <Link
+      to="/Categories"
+      className={`flex flex-col items-center justify-center w-12 h-12 rounded-2xl transition-all duration-200 active:scale-95 ${
+        location.pathname === "/Categories" 
+          ? "text-primary font-bold scale-105" 
+          : "text-slate-400 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-white"
+      }`}
+    >
+      <Grid3X3 className="h-5 w-5" />
+      <span className="text-[10px] mt-0.5 font-medium tracking-tight">หมวดหมู่</span>
+    </Link>
+
+  </div>
+</nav>
 
       {/* Logout Modal */}
       {showLogoutModal && (

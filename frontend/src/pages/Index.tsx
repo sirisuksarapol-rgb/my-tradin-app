@@ -245,7 +245,7 @@ export default function Index() {
           </div>
 
           <div className="text-center mt-6 z-30 max-w-3xl space-y-3 px-4">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/25 text-xs font-semibold text-primary backdrop-blur-md shadow-sm">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/25 text-xs font-semibold text-black backdrop-blur-md shadow-sm">
               <div className="w-3.5 h-3.5" />
               Welcome to Tradin - Your Sustainable Exchange Platform
             </div>
@@ -272,7 +272,7 @@ export default function Index() {
           <div className="mx-auto max-w-6xl px-4 sm:px-6">
             <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 gap-4">
               <div>
-                <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-primary/10 text-xs font-semibold text-primary mb-3">
+                <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-primary/10 text-xs font-semibold text-black mb-3">
                   <Grid3X3 className="w-3.5 h-3.5" />
                   Categories Overview
                 </div>
@@ -324,10 +324,10 @@ export default function Index() {
                         <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-110 ${styleClass}`}>
                           <IconComponent className="w-7 h-7" strokeWidth={1.5} />
                         </div>
-                        <h3 className="font-bold text-base mb-1.5 text-foreground group-hover:text-primary transition-colors line-clamp-1">{catName}</h3>
-                        <span className="inline-flex items-center px-3 py-1 rounded-full bg-muted text-xs font-semibold text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-                          {cat.ItemCount ?? 0} ไอเทม
-                        </span>
+                        <h3 className="font-bold text-base mb-1.5 text-foreground transition-colors line-clamp-1">{catName}</h3>
+<span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-black text-xs font-semibold transition-colors">
+  {cat.ItemCount ?? 0} ไอเทม
+</span>
                       </div>
                     </div>
                   );
@@ -341,7 +341,7 @@ export default function Index() {
         <section id="about" className="py-16 sm:py-24">
           <div className="mx-auto max-w-6xl px-4 sm:px-6">
             <div className="text-center max-w-2xl mx-auto mb-16 space-y-4">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-primary/10 text-xs font-semibold text-primary">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-primary/10 text-xs font-semibold text-black">
                 <BookOpen className="w-3.5 h-3.5" />
                 System Overview
               </div>

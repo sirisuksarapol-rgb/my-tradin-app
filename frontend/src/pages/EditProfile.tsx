@@ -74,11 +74,11 @@ export default function EditProfile() {
   });
 
   /**
-   * EFFECT: ตรวจสอบและดึงข้อมูลผู้ใช้งานที่เก็บไว้ใน LocalStorage เมื่อคอมโพเนนต์เริ่มทำงาน
+   * EFFECT: ตรวจสอบและดึงข้อมูลผู้ใช้งานที่เก็บไว้ใน sessionStorage เมื่อคอมโพเนนต์เริ่มทำงาน
    * หากไม่พบข้อมูลบัญชี จะทำการนำทางผู้ใช้กลับไปยังหน้าเข้าสู่ระบบทันที
    */
   useEffect(() => {
-    const savedUser = localStorage.getItem("user");
+    const savedUser = sessionStorage.getItem("user");
     if (!savedUser) {
       navigate("/login");
       return;
@@ -247,7 +247,7 @@ export default function EditProfile() {
             : "",
         };
 
-        localStorage.setItem("user", JSON.stringify(updatedUser));
+        sessionStorage.setItem("user", JSON.stringify(updatedUser));
         setUser(updatedUser);
         showToast("บันทึกสำเร็จ", "อัปเดตข้อมูลโปรไฟล์เรียบร้อยแล้ว", "success");
         cancelPasswordChange();

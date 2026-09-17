@@ -1,16 +1,9 @@
 import { useState, useEffect, useMemo, memo, useRef } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
-import { Search, ArrowLeftRight, MapPin, Sparkles, X, Flame, ChevronLeft, ChevronRight, ArrowUpRight, icons, LucideIcon } from "lucide-react";
+import { Search, ArrowLeftRight, MapPin, Flame, ChevronLeft, ChevronRight, ArrowUpRight, ArrowRight} from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import AppLayout from "@/components/AppLayout";
-import { getCategories as fetchCategoriesAPI, getItems as fetchItemsAPI, IMAGE_BASE_URL } from "@/api/api";
-
-interface DBCategory {
-  CategoryID: number;
-  CategoryName: string;
-  IconName?: string;
-}
+import { getItems as fetchItemsAPI, IMAGE_BASE_URL } from "@/api/api";
 
 interface DBItem {
   ItemID?: number;
@@ -40,17 +33,6 @@ interface FormattedPost {
   ownerName: string;
   ownerAvatar?: string;
 }
-
-const CATEGORY_COLORS = [
-  { bg: "bg-blue-500/10", text: "text-blue-600 dark:text-blue-400" },
-  { bg: "bg-amber-500/10", text: "text-amber-600 dark:text-amber-400" },
-  { bg: "bg-emerald-500/10", text: "text-emerald-600 dark:text-emerald-400" },
-  { bg: "bg-purple-500/10", text: "text-purple-600 dark:text-purple-400" },
-  { bg: "bg-rose-500/10", text: "text-rose-600 dark:text-rose-400" },
-  { bg: "bg-cyan-500/10", text: "text-cyan-600 dark:text-cyan-400" },
-  { bg: "bg-indigo-500/10", text: "text-indigo-600 dark:text-indigo-400" },
-  { bg: "bg-orange-500/10", text: "text-orange-600 dark:text-orange-400" },
-];
 
 const ITEMS_PER_PAGE = 40;
 
@@ -90,164 +72,159 @@ const FeaturedCarousel = ({ items }: { items: FormattedPost[] }) => {
   if (featuredItems.length === 0) return null;
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
-            <Flame className="w-4 h-4 fill-primary/20" />
-          </div>
-          <h2 className="text-base font-bold tracking-tight text-foreground">
-            รายการแนะนำน่าแลกวันนี้
+    <div className="space-y-5">
+      {/* 🔹 Header Section: ปรับให้ดูเป็น Section ระดับพรีเมียม */}
+      <div className="flex items-end justify-between px-1">
+        <div className="space-y-1">
+          <h2 className="text-xl md:text-2xl font-extrabold tracking-tight text-foreground">
+            รายการแลกเปลี่ยนล่าสุด
           </h2>
         </div>
 
-        <div className="flex items-center gap-1.5">
+        {/* 🔹 Custom Navigation Buttons: ปุ่มสไตล์มินิมอล */}
+        <div className="flex items-center gap-2 mb-1">
           <button 
             onClick={() => scroll("left")}
-            className="p-2 rounded-full border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted/65 transition-all disabled:opacity-30 shadow-xs"
+            className="flex items-center justify-center w-10 h-10 rounded-full border border-border/60 bg-background/50 backdrop-blur-md text-foreground hover:bg-muted/80 hover:scale-105 active:scale-95 transition-all disabled:opacity-30 disabled:pointer-events-none disabled:hover:scale-100 shadow-sm"
             disabled={currentIndex === 0}
           >
-            <ChevronLeft className="w-4 h-4" />
+            <ChevronLeft className="w-5 h-5" />
           </button>
           <button 
             onClick={() => scroll("right")}
-            className="p-2 rounded-full border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted/65 transition-all disabled:opacity-30 shadow-xs"
+            className="flex items-center justify-center w-10 h-10 rounded-full border border-border/60 bg-background/50 backdrop-blur-md text-foreground hover:bg-muted/80 hover:scale-105 active:scale-95 transition-all disabled:opacity-30 disabled:pointer-events-none disabled:hover:scale-100 shadow-sm"
             disabled={currentIndex === featuredItems.length - 1}
           >
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight className="w-5 h-5" />
           </button>
         </div>
       </div>
 
-      <div 
-        ref={scrollRef}
-        onScroll={handleScroll}
-        className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-none rounded-2xl"
-      >
-        {featuredItems.map((item, idx) => (
-          <div 
-            key={`featured-${item.id}-${idx}`}
-            className="min-w-full md:min-w-[calc(50%-8px)] lg:min-w-[calc(33.333%-11px)] snap-start shrink-0"
-          >
-            <Link to={`/post/${item.id}`} className="block group">
-              <div className="relative h-64 sm:h-72 rounded-2xl overflow-hidden border border-border/50 bg-card group-hover:border-primary/40 transition-all duration-300 shadow-sm">
-                <img 
-                  src={item.imgUrl} 
-                  alt={item.name}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
-                  onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.jpg"; }}
-                />
+      {/* 🔹 Carousel Container: ปรับ Padding ไม่ให้โดนตัดเงา (Clipping) */}
+      <div className="-mx-1 px-1 py-4 -my-4">
+        <div 
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-none"
+        >
+          {featuredItems.map((item, idx) => (
+            <div 
+              key={`featured-${item.id}-${idx}`}
+              className="w-[85vw] sm:w-[320px] md:w-[340px] lg:w-[380px] snap-start shrink-0"
+            >
+              <Link to={`/post/${item.id}`} className="block group outline-none">
+                {/* 🔹 Card Body: ทรงสูง (Portrait) ดูแพงและทันสมัย */}
+                <div className="relative h-[340px] sm:h-[380px] rounded-[2rem] overflow-hidden bg-muted/20 border border-border/40 shadow-sm group-hover:shadow-2xl group-hover:shadow-primary/10 transition-all duration-500">
+                  
+                  {/* ภาพพื้นหลัง: แอนิเมชันซูมเข้าแบบสมูท (Cubic Bezier) */}
+                  <img 
+                    src={item.imgUrl} 
+                    alt={item.name}
+                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] group-hover:scale-110"
+                    onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.jpg"; }}
+                  />
 
-                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
+                  {/* Gradient Overlay: ไล่ระดับสีดำจากฐานขึ้นไป เพื่อให้ตัวหนังสืออ่านง่ายเสมอ */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent opacity-80 group-hover:opacity-90 transition-opacity duration-500" />
 
-                <div className="absolute top-3 left-3 flex items-center gap-2">
-                  <span className="bg-background/90 backdrop-blur-md text-foreground text-[11px] font-semibold px-2.5 py-1 rounded-full border border-white/25 shadow-sm flex items-center gap-1">
-                    <Sparkles className="w-3 h-3 text-amber-500 fill-amber-500" />
-                    สุ่มแนะนำ
-                  </span>
-                </div>
-
-                <div className="absolute top-3 right-3 w-8 h-8 rounded-full bg-background/80 backdrop-blur-md flex items-center justify-center text-foreground opacity-0 group-hover:opacity-100 transition-opacity">
-                  <ArrowUpRight className="w-4 h-4" />
-                </div>
-
-                <div className="absolute bottom-0 left-0 right-0 p-4 space-y-2 text-white">
-                  <div className="flex items-center gap-2 text-xs text-white/80">
-                    <span className="truncate">{item.ownerName}</span>
-                    <span>•</span>
-                    <span className="flex items-center gap-1 truncate">
-                      <MapPin className="w-3 h-3" />
-                      {item.location}
-                    </span>
+                  {/* Icon Hover (Top Right): เด้งขึ้นมาตอนเอาเมาส์ชี้ */}
+                  <div className="absolute top-5 right-5 w-10 h-10 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center text-white opacity-0 translate-y-3 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-500 shadow-xl">
+                    <ArrowUpRight className="w-5 h-5" />
                   </div>
 
-                  <h3 className="font-bold text-base leading-tight line-clamp-1 group-hover:text-primary-foreground transition-colors">
-                    {item.name}
-                  </h3>
+                  {/* Content Container (Bottom) */}
+                  <div className="absolute inset-x-0 bottom-0 p-6 flex flex-col justify-end">
+                    
+                    {/* Meta Data: ผู้โพสต์ และ สถานที่ */}
+                    <div className="flex items-center gap-2.5 text-white/80 text-xs font-medium mb-3">
+                      <span className="truncate max-w-[120px]">{item.ownerName}</span>
+                      <span className="w-1 h-1 rounded-full bg-white/40 shrink-0" />
+                      <span className="flex items-center gap-1.5 truncate">
+                        <MapPin className="w-3.5 h-3.5 opacity-70" />
+                        {item.location}
+                      </span>
+                    </div>
 
-                  <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/15 text-xs text-white/90 w-full">
-                    <ArrowLeftRight className="w-3.5 h-3.5 text-primary shrink-0" />
-                    <span className="text-[11px] font-medium text-white/70 shrink-0">อยากแลก:</span>
-                    <span className="font-medium truncate">{item.desired}</span>
+                    {/* Item Title */}
+                    <h3 className="text-white font-bold text-xl sm:text-2xl leading-tight mb-5 line-clamp-2 drop-shadow-sm group-hover:text-primary-foreground transition-colors">
+                      {item.name}
+                    </h3>
+
+                    {/* Desired Item Badge: ดีไซน์แบบ Glassmorphism (กระจกฝ้า) ลอยตัว */}
+                    <div className="flex items-center gap-3 bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-2.5 w-full transform group-hover:-translate-y-1 transition-transform duration-500">
+                      <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center shrink-0 shadow-sm">
+                        <ArrowLeftRight className="w-4 h-4 text-slate-900" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] text-white/60 font-semibold uppercase tracking-widest mb-0.5 leading-none">
+                          อยากแลกกับ
+                        </p>
+                        <p className="text-sm font-bold text-white truncate">
+                          {item.desired}
+                        </p>
+                      </div>
+                    </div>
+
                   </div>
                 </div>
-              </div>
-            </Link>
-          </div>
-        ))}
+              </Link>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
 };
 
-const ItemSkeleton = () => (
-  <div className="bg-card rounded-xl overflow-hidden border border-border/40 animate-pulse shadow-sm">
-    <div className="w-full aspect-[4/3] bg-muted/65"></div>
-    <div className="p-4 space-y-3">
-      <div className="h-4 bg-muted/80 rounded-md w-3/4"></div>
-      <div className="h-10 bg-muted/40 rounded-lg w-full"></div>
-      <div className="flex justify-between pt-2">
-        <div className="h-3 bg-muted/65 rounded w-1/3"></div>
-        <div className="h-3 bg-muted/65 rounded w-1/4"></div>
-      </div>
-    </div>
-  </div>
-);
-
 const ItemCard = memo(({ post }: { post: FormattedPost }) => {
   const [imgSrc, setImgSrc] = useState(post.imgUrl);
 
   return (
-    <Link to={`/post/${post.id}`} className="block group">
-      <Card className="h-full overflow-hidden border border-border/50 bg-card hover:border-primary/40 hover:shadow-md transition-all duration-300 rounded-xl flex flex-col">
-        <div className="w-full aspect-[4/3] bg-muted/30 relative overflow-hidden">
+    <Link to={`/post/${post.id}`} className="block h-full outline-none group">
+      <Card className="relative h-full flex flex-col overflow-hidden rounded-2xl bg-card border border-border/40 shadow-sm transition-all duration-500 ease-out hover:shadow-xl hover:border-primary/40 hover:-translate-y-1 cursor-pointer">
+        
+        {/* รูปภาพ และ Floating Badge */}
+        <div className="w-full aspect-[4/3] bg-muted/20 relative overflow-hidden">
           <img 
             src={imgSrc} 
             alt={post.name} 
-            className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-500 ease-out" 
+            className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110" 
             onError={() => { 
               if (imgSrc !== "/placeholder.jpg") setImgSrc("/placeholder.jpg"); 
             }}
           />
-          <div className="absolute bottom-2 left-2 flex items-center gap-1.5 bg-background/85 backdrop-blur-md px-2.5 py-1 rounded-full border border-border/40 text-[11px] font-medium text-foreground shadow-xs">
-            <div className="w-4 h-4 rounded-full bg-primary/20 flex items-center justify-center text-[9px] font-bold text-primary overflow-hidden shrink-0">
-              {post.ownerAvatar ? (
-                <img src={`${IMAGE_BASE_URL}/uploads/${post.ownerAvatar}`} alt="" className="w-full h-full object-cover" />
-              ) : (
-                post.ownerName.charAt(0).toUpperCase()
-              )}
-            </div>
-            <span className="truncate max-w-[80px] text-muted-foreground">{post.ownerName}</span>
-          </div>
         </div>
 
-        <CardContent className="p-3.5 flex flex-col flex-1 justify-between space-y-3">
-          <div className="space-y-1.5">
-            <h3 className="font-semibold text-sm leading-snug text-foreground line-clamp-1 group-hover:text-primary transition-colors">
+        {/* เนื้อหาด้านล่าง */}
+        <CardContent className="p-4 sm:p-5 flex flex-col flex-1 justify-between gap-4">
+          <div className="space-y-3.5">
+            {/* ชื่อสิ่งของ (อนุญาตให้แสดง 2 บรรทัดถ้าชื่อยาวไป) */}
+            <h3 className="font-bold text-sm sm:text-base leading-tight text-foreground line-clamp-2  transition-colors duration-300">
               {post.name}
             </h3>
 
-            <div className="bg-muted/40 border border-border/40 rounded-lg p-2 flex items-start gap-2">
-              <ArrowLeftRight className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
-              <div className="text-xs space-y-0.5 min-w-0">
-                <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground block">
-                  อยากแลกกับ
+            {/* ส่วน "ความต้องการ" ดีไซน์ใหม่ให้ดูเป็นสัดส่วน ไม่ทึบ */}
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/5 border border-primary/10 transition-colors duration-300 group-hover:bg-primary/10">
+              <div className="w-8 h-8 rounded-full bg-background flex items-center justify-center shrink-0 shadow-sm">
+                <ArrowLeftRight className="w-4 h-4 text-primary" />
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="text-[9px] uppercase font-bold tracking-wider text-primary/80">
+                  ต้องการแลกกับ
                 </span>
-                <p className="font-medium text-foreground truncate text-[11px]">
+                <p className="font-semibold text-foreground truncate text-xs sm:text-sm">
                   {post.desired}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="pt-2 border-t border-border/30 flex items-center justify-between text-xs text-muted-foreground">
-            <div className="flex items-center gap-1 truncate">
-              <MapPin className="w-3.5 h-3.5 shrink-0 text-muted-foreground/70" />
-              <span className="truncate text-[11px]">{post.location}</span>
+          {/* Footer: สถานที่ และ Icon บอกใบ้การคลิก */}
+          <div className="pt-4 border-t border-border/40 flex items-center justify-between text-muted-foreground mt-auto">
+            <div className="flex items-center gap-1.5 min-w-0 text-xs font-medium">
+              <MapPin className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">{post.location}</span>
             </div>
-            <span className="text-[10px] text-primary font-medium bg-primary/5 px-2 py-0.5 rounded-md shrink-0">
-              พร้อมแลก
-            </span>
           </div>
         </CardContent>
       </Card>
@@ -261,11 +238,9 @@ export default function Feed() {
   
   const querySearch = searchParams.get("search") || "";
   const [search, setSearch] = useState(querySearch);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   
   const [itemsList, setItemsList] = useState<DBItem[]>([]);
-  const [categoryList, setCategoryList] = useState<DBCategory[]>([]); 
   const [isLoading, setIsLoading] = useState(true);
 
   const itemsSectionRef = useRef<HTMLDivElement>(null);
@@ -286,9 +261,8 @@ export default function Feed() {
     const loadData = async () => {
       try {
         setIsLoading(true);
-        const [itemsRes, catRes] = await Promise.all([fetchItemsAPI(), fetchCategoriesAPI()]);
+        const itemsRes = await fetchItemsAPI();
         setItemsList(itemsRes.data || []);
-        setCategoryList(catRes.data || []);
       } catch (error) { 
         console.error("Error fetching data:", error); 
       } finally { 
@@ -300,7 +274,7 @@ export default function Feed() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, selectedCategory]);
+  }, [search]);
 
   const itemsWithUrls = useMemo<FormattedPost[]>(() => {
     if (!Array.isArray(itemsList)) return [];
@@ -343,13 +317,11 @@ export default function Feed() {
 
   const filtered = useMemo(() => {
     return itemsWithUrls.filter((p) => {
-      const matchCat = selectedCategory === null || String(p.catId) === selectedCategory;
       const matchSearch = (p.name || "").toLowerCase().includes(search.toLowerCase()) ||
                           (p.desired || "").toLowerCase().includes(search.toLowerCase());
-      
-      return matchCat && matchSearch;
+      return matchSearch;
     });
-  }, [itemsWithUrls, selectedCategory, search]);
+  }, [itemsWithUrls, search]);
 
   const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
 
@@ -360,7 +332,6 @@ export default function Feed() {
 
   const clearFilters = () => {
     setSearch("");
-    setSelectedCategory(null);
     setCurrentPage(1);
     navigate("/feed", { replace: true });
     window.dispatchEvent(new CustomEvent("globalSearch", { detail: "" }));
@@ -374,86 +345,19 @@ export default function Feed() {
     <AppLayout>
       <div className="max-w-[1400px] mx-auto space-y-6 pb-20 font-sans">
 
-        {!isLoading && itemsWithUrls.length > 0 && !search && selectedCategory === null && (
+        {!isLoading && itemsWithUrls.length > 0 && !search && (
           <section className="pt-2">
             <FeaturedCarousel items={itemsWithUrls} />
           </section>
         )}
 
-        {/* Professional E-Commerce Category Section */}
-        <section className="space-y-3">
-          <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            <span>หมวดหมู่สินค้า</span>
-            {(selectedCategory !== null || search) && (
-              <button 
-                onClick={clearFilters}
-                className="text-primary hover:underline flex items-center gap-1 font-normal lowercase"
-              >
-                <X className="w-3 h-3" /> ล้างตัวกรอง
-              </button>
-            )}
-          </div>
-
-          <div className="grid grid-rows-2 grid-flow-col gap-2 overflow-x-auto pb-2 scrollbar-none">
-            {categoryList.map((catObj, index) => {
-              const catName = catObj.CategoryName;
-              const catId = String(catObj.CategoryID);
-              const iconName = catObj.IconName;
-              const isActive = selectedCategory === catId;
-
-              const IconComponent = (icons[iconName as keyof typeof icons] as LucideIcon) || Sparkles;
-              const colorTheme = CATEGORY_COLORS[index % CATEGORY_COLORS.length];
-
-              return (
-                <button
-                  key={`cat-${catId}-${index}`}
-                  onClick={() => {
-                    setSelectedCategory(isActive ? null : catId);
-                  }}
-                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-medium border transition-all shrink-0 min-w-[140px] sm:min-w-[160px] ${
-                    isActive
-                      ? "bg-slate-200 dark:bg-zinc-800 text-foreground font-semibold border-slate-300 dark:border-zinc-700 shadow-sm"
-                      : "bg-card border-border/40 text-foreground hover:bg-slate-200/60 dark:hover:bg-zinc-800/60 shadow-xs"
-                  }`}
-                >
-                  <div className={`p-1.5 rounded-lg ${colorTheme.bg} ${colorTheme.text}`}>
-                    <IconComponent className="w-4 h-4" />
-                  </div>
-                  <span className="truncate">{catName}</span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
         <section ref={itemsSectionRef} className="space-y-4 scroll-mt-24">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-bold tracking-tight text-foreground">
-              {search ? `ผลการค้นหา "${search}"` : selectedCategory !== null ? "รายการในหมวดหมู่นี้" : "รายการทั้งหมด"}
+              รายการทั้งหมด
             </h2>
           </div>
 
-          {isLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <ItemSkeleton key={i} />
-              ))}
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="text-center py-20 bg-card rounded-2xl border border-dashed border-border/80 p-8 space-y-4 shadow-xs">
-              <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mx-auto text-muted-foreground">
-                <Search className="w-6 h-6" />
-              </div>
-              <div className="space-y-1">
-                <h3 className="font-semibold text-foreground text-sm">ไม่พบรายการที่คุณกำลังค้นหา</h3>
-                <p className="text-xs text-muted-foreground">ลองเปลี่ยนคำค้นหา หรือเลือกหมวดหมู่อื่นดูนะเพื่อน</p>
-              </div>
-              <Button variant="outline" size="sm" onClick={clearFilters} className="rounded-xl text-xs">
-                ดูรายการทั้งหมด
-              </Button>
-            </div>
-          ) : (
-            <>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
                 {paginatedItems.map((post) => (
                   <ItemCard key={post.id} post={post} />
@@ -522,10 +426,7 @@ export default function Feed() {
                   </button>
                 </div>
               )}
-            </>
-          )}
         </section>
-
       </div>
     </AppLayout>
   );

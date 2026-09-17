@@ -1,5 +1,14 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, Clock, ArrowRightLeft, ChevronRight, Calendar, CheckCircle2, XCircle, RefreshCw } from "lucide-react";
+import {
+  ArrowLeft,
+  Clock,
+  ArrowRightLeft,
+  ChevronRight,
+  Calendar,
+  CheckCircle2,
+  XCircle,
+  RefreshCw,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -61,11 +70,13 @@ export default function ExchangeHistory() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
-  const completedList = userExchanges.filter((item) =>
-    item.ExchangeStatus.toLowerCase() === "completed"
+  const completedList = userExchanges.filter(
+    (item) => item.ExchangeStatus.toLowerCase() === "completed",
   );
   const failedList = userExchanges.filter((item) =>
-    ["cancelled", "rejected", "failed"].includes(item.ExchangeStatus.toLowerCase())
+    ["rejected", "failed", "auto_cancelled"].includes(
+      item.ExchangeStatus.toLowerCase(),
+    ),
   );
 
   return (
@@ -74,16 +85,20 @@ export default function ExchangeHistory() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => navigate(-1)}
-                className="-ml-2 hover:bg-slate-200/60 dark:hover:bg-zinc-800/60 text-foreground transition-all"
-              >
-                <ArrowLeft className="h-5 w-5 text-foreground" />
-              </Button>
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate(-1)}
+              className="-ml-2 hover:bg-slate-200/60 dark:hover:bg-zinc-800/60 text-foreground transition-all"
+            >
+              <ArrowLeft className="h-5 w-5 text-foreground" />
+            </Button>
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold">ประวัติการแลกเปลี่ยน</h1>
-              <p className="text-xs text-muted-foreground mt-0.5">ติดตามและดูประวัติการทำรายการแลกเปลี่ยนทั้งหมดของคุณ</p>
+              <div className="flex items-center gap-2">
+                <Clock className="h-6 w-6 text-primary" />
+                <h1 className="text-2xl sm:text-3xl font-bold font-heading">
+                  ประวัติการแลกเปลี่ยน
+                </h1>
+              </div>
             </div>
           </div>
         </div>
@@ -91,7 +106,10 @@ export default function ExchangeHistory() {
         {loading ? (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {[1, 2, 3, 4, 5, 6].map((idx) => (
-              <div key={idx} className="h-52 rounded-2xl bg-muted/60 animate-pulse p-4 space-y-3">
+              <div
+                key={idx}
+                className="h-52 rounded-2xl bg-muted/60 animate-pulse p-4 space-y-3"
+              >
                 <div className="flex justify-between items-center">
                   <div className="h-4 w-24 bg-muted rounded"></div>
                   <div className="h-5 w-16 bg-muted rounded-full"></div>
@@ -107,16 +125,25 @@ export default function ExchangeHistory() {
           </div>
         ) : (
           <div className="space-y-6">
-            <div className="flex p-1 bg-muted/50 rounded-xl border border-border/50 max-w-md">
+            <div className="flex p-1.5 bg-muted/30 rounded-full border border-border/50 max-w-md gap-2">
               <button
                 onClick={() => setActiveTab("success")}
-                className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-lg transition-all ${activeTab === "success" ? "bg-primary text-primary-foreground shadow-md" : "text-muted-foreground hover:text-foreground"}`}
+                className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs sm:text-sm font-bold rounded-full transition-all ${
+                  activeTab === "success"
+                    ? "bg-primary border border-primary/20 text-white shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                }`}
               >
-                <CheckCircle2 className="h-4 w-4" /> สำเร็จ ({completedList.length})
+                <CheckCircle2 className="h-4 w-4" /> สำเร็จ (
+                {completedList.length})
               </button>
               <button
                 onClick={() => setActiveTab("failed")}
-                className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-lg transition-all ${activeTab === "failed" ? "bg-primary text-primary-foreground shadow-md" : "text-muted-foreground hover:text-foreground"}`}
+                className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs sm:text-sm font-bold rounded-full transition-all ${
+                  activeTab === "failed"
+                    ? "bg-primary border border-primary/20 text-white shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                }`}
               >
                 <XCircle className="h-4 w-4" /> ไม่สำเร็จ ({failedList.length})
               </button>
@@ -124,7 +151,12 @@ export default function ExchangeHistory() {
 
             <AnimatePresence mode="wait">
               {activeTab === "success" ? (
-                <motion.div key="success" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+                <motion.div
+                  key="success"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                >
                   {completedList.length > 0 ? (
                     <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       {completedList.map((item) => (
@@ -136,7 +168,12 @@ export default function ExchangeHistory() {
                   )}
                 </motion.div>
               ) : (
-                <motion.div key="failed" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+                <motion.div
+                  key="failed"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                >
                   {failedList.length > 0 ? (
                     <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       {failedList.map((item) => (
@@ -182,23 +219,47 @@ function ExchangeDetailCard({ item }: { item: ExchangeItem }) {
     if (!dateString) return "-";
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return "-";
-    
+
     const yyyy = date.getFullYear();
-    const mm = String(date.getMonth() + 1).padStart(2, '0');
-    const dd = String(date.getDate()).padStart(2, '0');
-    
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
+    const dd = String(date.getDate()).padStart(2, "0");
+
     return `${yyyy}-${mm}-${dd}`;
   };
 
   const myItemImage = getImageUrl(item.myPostImage);
   const theirItemImage = getImageUrl(item.theirPostImage);
 
-  let statusBadge = { label: "รอดำเนินการ", style: "bg-amber-100 text-amber-800 border-amber-200", icon: RefreshCw };
-  
+  let statusBadge = {
+    label: "รอดำเนินการ",
+    style: "bg-amber-100 text-amber-800 border-amber-200",
+    icon: RefreshCw,
+  };
+
   if (status === "completed") {
-    statusBadge = { label: "แลกสำเร็จ", style: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: CheckCircle2 };
-  } else if (["cancelled", "rejected", "failed"].includes(status)) {
-    statusBadge = { label: "ไม่สำเร็จ", style: "bg-rose-50 text-rose-700 border-rose-200", icon: XCircle };
+    statusBadge = {
+      label: "แลกสำเร็จ",
+      style: "bg-emerald-50 text-emerald-700 border-emerald-200",
+      icon: CheckCircle2,
+    };
+  } else if (status === "rejected") {
+    statusBadge = {
+      label: "ถูกปฏิเสธ",
+      style: "bg-orange-50 text-orange-700 border-orange-200",
+      icon: XCircle,
+    };
+  } else if (status === "failed") {
+    statusBadge = {
+      label: "ยกเลิกแล้ว",
+      style: "bg-rose-50 text-rose-700 border-rose-200",
+      icon: XCircle,
+    };
+  } else if (status === "auto_cancelled") {
+    statusBadge = {
+      label: "ยกเลิกอัตโนมัติ",
+      style: "bg-slate-100 text-slate-700 border-slate-200",
+      icon: XCircle,
+    };
   }
 
   const StatusIcon = statusBadge.icon;
@@ -211,36 +272,59 @@ function ExchangeDetailCard({ item }: { item: ExchangeItem }) {
             <div>
               <p className="font-bold text-sm line-clamp-1">{partnerName}</p>
             </div>
-            <Badge variant="outline" className={`text-[11px] font-medium gap-1 px-2 py-0.5 ${statusBadge.style}`}>
+            <Badge
+              variant="outline"
+              className={`text-[11px] font-medium gap-1 px-2 py-0.5 ${statusBadge.style}`}
+            >
               <StatusIcon className="w-3 h-3" /> {statusBadge.label}
             </Badge>
           </div>
 
           <div className="flex items-center gap-4">
             <div className="flex-1 text-center">
-              <img src={myItemImage} className="w-16 h-16 rounded-lg object-cover mx-auto shadow-sm" alt={item.myPostTitle} loading="lazy" />
-              <p className="text-[10px] font-bold mt-2 line-clamp-1">{item.myPostTitle}</p>
+              <img
+                src={myItemImage}
+                className="w-16 h-16 rounded-lg object-cover mx-auto shadow-sm"
+                alt={item.myPostTitle}
+                loading="lazy"
+              />
+              <p className="text-[10px] font-bold mt-2 line-clamp-1">
+                {item.myPostTitle}
+              </p>
             </div>
             <div className="bg-muted p-2 rounded-full flex-shrink-0">
               <ArrowRightLeft className="h-4 w-4 text-muted-foreground" />
             </div>
             <div className="flex-1 text-center">
-              <img src={theirItemImage} className="w-16 h-16 rounded-lg object-cover mx-auto shadow-sm" alt={item.theirPostTitle} loading="lazy" />
-              <p className="text-[10px] font-bold mt-2 line-clamp-1">{item.theirPostTitle}</p>
+              <img
+                src={theirItemImage}
+                className="w-16 h-16 rounded-lg object-cover mx-auto shadow-sm"
+                alt={item.theirPostTitle}
+                loading="lazy"
+              />
+              <p className="text-[10px] font-bold mt-2 line-clamp-1">
+                {item.theirPostTitle}
+              </p>
             </div>
           </div>
 
-          {["cancelled", "rejected", "failed"].includes(status) && item.CancelReason && (
-            <p className="text-[11px] text-destructive bg-destructive/5 p-2 rounded-md line-clamp-1">
-              เหตุผล: {item.CancelReason}
-            </p>
-          )}
+          {["rejected", "failed", "auto_cancelled"].includes(status) &&
+            item.CancelReason && (
+              <p className="text-[11px] text-destructive bg-destructive/5 p-2 rounded-md line-clamp-1">
+                เหตุผล: {item.CancelReason}
+              </p>
+            )}
 
           <div className="flex flex-col text-[11px] text-muted-foreground bg-secondary/30 p-2.5 rounded-lg space-y-1">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <Calendar className="h-3.5 w-3.5" />
-                <span>วันที่เริ่ม: <span className="font-medium text-foreground">{formatDate(item.StartDate)}</span></span>
+                <span>
+                  วันที่เริ่ม:{" "}
+                  <span className="font-medium text-foreground">
+                    {formatDate(item.StartDate)}
+                  </span>
+                </span>
               </div>
             </div>
             <div className="flex items-center justify-between">
@@ -253,17 +337,19 @@ function ExchangeDetailCard({ item }: { item: ExchangeItem }) {
                 <span>
                   {status === "completed" ? "วันที่สำเร็จ: " : "วันที่ยกเลิก: "}
                   <span className="font-medium text-foreground">
-                    {status === "completed" ? formatDate(item.SuccessDate) : formatDate(item.CancelDate)}
+                    {status === "completed"
+                      ? formatDate(item.SuccessDate)
+                      : formatDate(item.CancelDate)}
                   </span>
                 </span>
               </div>
             </div>
           </div>
 
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="w-full text-xs font-semibold bg-slate-100 dark:bg-zinc-800/60 text-slate-700 dark:text-zinc-300 border-border/60 hover:bg-slate-200 dark:hover:bg-zinc-800 hover:text-slate-900 dark:hover:text-white transition-all" 
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full text-xs font-semibold bg-slate-100 dark:bg-zinc-800/60 text-slate-700 dark:text-zinc-300 border-border/60 hover:bg-slate-200 dark:hover:bg-zinc-800 hover:text-slate-900 dark:hover:text-white transition-all"
             onClick={() => navigate(`/exchange-detail/${item.ExchangeID}`)}
           >
             ดูรายละเอียด <ChevronRight className="h-3.5 w-3.5 ml-1" />

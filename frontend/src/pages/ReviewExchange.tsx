@@ -88,12 +88,12 @@ export default function ReviewExchange() {
             <ArrowLeft className="h-5 w-5 text-foreground" />
           </Button>
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
-              ให้คะแนนความพึงพอใจ
-            </h1>
-            <p className="text-xs text-muted-foreground">
-              แบ่งปันประสบการณ์การแลกเปลี่ยนของคุณเพื่อสร้างความน่าเชื่อถือ
-            </p>
+            <div className="flex items-center gap-2">
+              <Star className="h-6 w-6 text-amber-500 fill-amber-500" />
+              <h1 className="text-xl sm:text-2xl font-bold font-heading tracking-tight">
+                ให้คะแนนความพึงพอใจ
+              </h1>
+            </div>
           </div>
         </div>
 

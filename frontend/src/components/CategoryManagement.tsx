@@ -1,11 +1,37 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { Search, Plus, Edit2, Trash2, LayoutGrid, List, CheckCircle2, AlertTriangle, Eye, Sparkles, Layers, icons, HelpCircle, LucideIcon } from "lucide-react";
-import { getCategories, createCategory, updateCategory, deleteCategory } from "@/api/api";
+import {
+  Search,
+  Plus,
+  Edit2,
+  Trash2,
+  LayoutGrid,
+  List,
+  CheckCircle2,
+  AlertTriangle,
+  Eye,
+  Sparkles,
+  Layers,
+  icons,
+  HelpCircle,
+  LucideIcon,
+} from "lucide-react";
+import {
+  getCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
+} from "@/api/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/hooks/use-toast";
 
@@ -30,8 +56,12 @@ interface DynamicIconProps {
 // =========================================================================
 // COMPONENT: DynamicIcon (แสดงไอคอนแบบไดนามิกโดยอิงจากชื่อ String)
 // =========================================================================
-const DynamicIcon: React.FC<DynamicIconProps> = ({ name, className = "w-5 h-5" }) => {
-  const IconComponent = (icons[name as keyof typeof icons] as LucideIcon) || HelpCircle;
+const DynamicIcon: React.FC<DynamicIconProps> = ({
+  name,
+  className = "w-5 h-5",
+}) => {
+  const IconComponent =
+    (icons[name as keyof typeof icons] as LucideIcon) || HelpCircle;
   return <IconComponent className={className} />;
 };
 
@@ -42,11 +72,10 @@ const ALL_ICON_KEYS = Object.keys(icons);
 // COMPONENT: CategoryManagement (คอมโพเนนต์หลักสำหรับจัดการหมวดหมู่สินค้า)
 // =========================================================================
 export function CategoryManagement() {
-  
   // สถานะเก็บข้อมูลหมวดหมู่จากฐานข้อมูลและสถานะการโหลดข้อมูล
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  
+
   // สถานะควบคุมคำค้นหาและรูปแบบมุมมอง (Grid หรือ Table)
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
@@ -184,7 +213,7 @@ export function CategoryManagement() {
 
   // กรองรายการหมวดหมู่ตามข้อความค้นหาของผู้ใช้
   const filteredCategories = categories.filter((cat) =>
-    cat.CategoryName.toLowerCase().includes(searchTerm.toLowerCase())
+    cat.CategoryName.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   // =====================================================================
@@ -195,13 +224,12 @@ export function CategoryManagement() {
       return ALL_ICON_KEYS.slice(0, 120);
     }
     return ALL_ICON_KEYS.filter((keyName) =>
-      keyName.toLowerCase().includes(iconSearchTerm.toLowerCase())
+      keyName.toLowerCase().includes(iconSearchTerm.toLowerCase()),
     ).slice(0, 120);
   }, [iconSearchTerm]);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300 font-sans">
-      
       {/* ส่วนหัวข้อและปุ่มเพิ่มหมวดหมู่ */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-card p-5 rounded-2xl border border-border/60 shadow-sm">
         <div>
@@ -209,14 +237,16 @@ export function CategoryManagement() {
             <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
               <Layers className="w-5 h-5" />
             </div>
-            <h3 className="text-lg font-bold text-foreground">จัดการหมวดหมู่สินค้า</h3>
-            <Badge variant="secondary" className="rounded-full text-xs font-bold px-2.5 bg-secondary/60">
+            <h3 className="text-lg font-bold text-foreground">
+              จัดการหมวดหมู่สินค้า
+            </h3>
+            <Badge
+              variant="secondary"
+              className="rounded-full text-x font-bold px-2.5 bg-primary/20 text-black"
+            >
               {categories.length} หมวดหมู่
             </Badge>
           </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            ดึงข้อมูลและจัดการหมวดหมู่สินค้าจากฐานข้อมูลระบบ Realtime
-          </p>
         </div>
 
         <Button
@@ -235,7 +265,9 @@ export function CategoryManagement() {
           <Input
             placeholder="ค้นหาชื่อหมวดหมู่..."
             value={searchTerm}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+              setSearchTerm(e.target.value)
+            }
             className="pl-9 bg-card border-border/60 rounded-xl focus-visible:ring-primary h-10 text-xs"
           />
         </div>
@@ -245,7 +277,11 @@ export function CategoryManagement() {
             variant={viewMode === "grid" ? "secondary" : "ghost"}
             size="sm"
             onClick={() => setViewMode("grid")}
-            className="h-8 px-3 text-xs rounded-lg gap-1.5 font-bold"
+            className={`h-8 px-3 text-xs rounded-lg gap-1.5 font-bold hover:bg-zinc-200 hover:text-black ${
+              viewMode === "grid"
+                ? "bg-primary/20 text-black"
+                : "bg-transparent text-muted-foreground"
+            }`}
           >
             <LayoutGrid className="w-3.5 h-3.5" />
             <span>Grid</span>
@@ -254,7 +290,11 @@ export function CategoryManagement() {
             variant={viewMode === "table" ? "secondary" : "ghost"}
             size="sm"
             onClick={() => setViewMode("table")}
-            className="h-8 px-3 text-xs rounded-lg gap-1.5 font-bold"
+            className={`h-8 px-3 text-xs rounded-lg gap-1.5 font-bold hover:bg-zinc-200 hover:text-black ${
+              viewMode === "table"
+                ? "bg-primary/20 text-black"
+                : "bg-transparent text-muted-foreground"
+            }`}
           >
             <List className="w-3.5 h-3.5" />
             <span>Table</span>
@@ -272,7 +312,9 @@ export function CategoryManagement() {
           {filteredCategories.length === 0 ? (
             <div className="col-span-full flex flex-col items-center justify-center p-12 text-center border-2 border-dashed border-border/60 rounded-2xl bg-card/30">
               <Layers className="w-12 h-12 text-muted-foreground/40 mb-3" />
-              <p className="text-sm font-semibold text-muted-foreground">ไม่พบข้อมูลหมวดหมู่ในระบบ</p>
+              <p className="text-sm font-semibold text-muted-foreground">
+                ไม่พบข้อมูลหมวดหมู่ในระบบ
+              </p>
             </div>
           ) : (
             filteredCategories.map((cat) => (
@@ -286,12 +328,16 @@ export function CategoryManagement() {
                       <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center border border-primary/20 group-hover:scale-105 transition-transform">
                         <DynamicIcon name={cat.IconName} className="w-6 h-6" />
                       </div>
-                      <Badge variant="outline" className="text-[10px] font-bold rounded-full px-2.5 py-0.5 border bg-emerald-500/10 text-emerald-600 border-emerald-500/30 flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3 text-emerald-500" /> ปกติ
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] font-bold rounded-full px-2.5 py-0.5 border bg-emerald-500/10 text-emerald-600 border-emerald-500/30 flex items-center gap-1"
+                      >
+                        <CheckCircle2 className="w-3 h-3 text-emerald-500" />{" "}
+                        ปกติ
                       </Badge>
                     </div>
 
-                    <h4 className="font-bold text-sm text-foreground group-hover:text-primary transition-colors">
+                    <h4 className="font-bold text-sm text-foreground transition-colors">
                       {cat.CategoryName}
                     </h4>
                     <p className="text-[11px] text-muted-foreground mt-1 font-mono">
@@ -300,7 +346,7 @@ export function CategoryManagement() {
                   </div>
 
                   <div className="flex items-center justify-between pt-3 border-t border-border/40">
-                    <span className="text-[11px] font-bold text-muted-foreground bg-muted/60 px-2.5 py-1 rounded-lg">
+                    <span className="text-xs font-bold  bg-primary/20 text-black px-2.5 py-1 rounded-lg">
                       {cat.ItemCount ?? 0} รายการ
                     </span>
 
@@ -343,19 +389,34 @@ export function CategoryManagement() {
               </thead>
               <tbody className="divide-y divide-border/40 font-medium">
                 {filteredCategories.map((cat) => (
-                  <tr key={cat.CategoryID} className="hover:bg-muted/20 transition-colors">
-                    <td className="px-5 py-3 text-muted-foreground font-mono">{cat.CategoryID}</td>
+                  <tr
+                    key={cat.CategoryID}
+                    className="hover:bg-muted/20 transition-colors"
+                  >
+                    <td className="px-5 py-3 text-muted-foreground font-mono">
+                      {cat.CategoryID}
+                    </td>
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center">
-                          <DynamicIcon name={cat.IconName} className="w-4 h-4" />
+                          <DynamicIcon
+                            name={cat.IconName}
+                            className="w-4 h-4"
+                          />
                         </div>
-                        <span className="font-bold text-foreground text-xs">{cat.CategoryName}</span>
+                        <span className="font-bold text-foreground text-xs">
+                          {cat.CategoryName}
+                        </span>
                       </div>
                     </td>
-                    <td className="px-5 py-3 text-muted-foreground font-mono">{cat.IconName}</td>
+                    <td className="px-5 py-3 text-muted-foreground font-mono">
+                      {cat.IconName}
+                    </td>
                     <td className="px-5 py-3 text-center">
-                      <Badge variant="outline" className="font-bold text-[11px] rounded-md">
+                      <Badge
+                        variant="outline"
+                        className="font-bold text-[11px] rounded-md"
+                      >
                         {cat.ItemCount ?? 0} รายการ
                       </Badge>
                     </td>
@@ -393,13 +454,16 @@ export function CategoryManagement() {
           <DialogHeader>
             <DialogTitle className="text-lg font-bold flex items-center gap-2">
               <div className="p-2 rounded-xl bg-primary/10 text-primary">
-                {editingCategory ? <Edit2 className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+                {editingCategory ? (
+                  <Edit2 className="w-5 h-5" />
+                ) : (
+                  <Plus className="w-5 h-5" />
+                )}
               </div>
-              {editingCategory ? "แก้ไขหมวดหมู่สินค้า" : "เพิ่มหมวดหมู่สินค้าใหม่"}
+              {editingCategory
+                ? "แก้ไขหมวดหมู่สินค้า"
+                : "เพิ่มหมวดหมู่สินค้าใหม่"}
             </DialogTitle>
-            <DialogDescription className="text-xs">
-              กรอกชื่อหมวดหมู่และเลือกไอคอนที่จะแสดงในแอปพลิเคชัน
-            </DialogDescription>
           </DialogHeader>
 
           <Separator className="my-2" />
@@ -413,34 +477,37 @@ export function CategoryManagement() {
                 <Input
                   placeholder="เช่น อุปกรณ์อิเล็กทรอนิกส์"
                   value={formName}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormName(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setFormName(e.target.value)
+                  }
                   className="rounded-xl border-border/60 focus-visible:ring-primary h-10 text-xs font-medium"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-foreground">ไอคอนหมวดหมู่</label>
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-2xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center shrink-0">
-                    <DynamicIcon name={formIconName} className="w-5 h-5" />
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setIconSearchTerm("");
-                      setIsIconPickerOpen(true);
-                    }}
-                    className="flex-1 justify-between rounded-xl h-10 border-border/60 hover:bg-muted/50 text-xs font-bold"
-                  >
-                    <span className="flex items-center gap-2">
-                      <Sparkles className="w-3.5 h-3.5 text-primary" />
-                      {formIconName}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-md">เปลี่ยนไอคอน</span>
-                  </Button>
-                </div>
-              </div>
+  <label className="text-xs font-bold text-foreground">ไอคอนหมวดหมู่</label>
+  <div className="flex items-center gap-3">
+    <div className="w-11 h-11 rounded-2xl bg-primary/20 text-primary border border-primary/20 flex items-center justify-center shrink-0">
+      <DynamicIcon name={formIconName} className="w-5 h-5" />
+    </div>
+    
+    {/* เปลี่ยนมาใช้ <button> ธรรมดาแทนคอมโพเนนต์ Button ของ Shadcn เพื่อตัดสไตล์เบื้องหลังออกทั้งหมด */}
+    <button
+      type="button"
+      onClick={() => {
+        setIconSearchTerm("");
+        setIsIconPickerOpen(true);
+      }}
+      className="flex-1 flex items-center justify-between rounded-xl h-10 px-4 border border-border/60 bg-primary/20 text-xs font-bold text-foreground cursor-pointer transition-none"
+    >
+      <span className="flex items-center gap-2">
+        <DynamicIcon name={formIconName} className="w-3.5 h-3.5 text-primary" />
+        {formIconName}
+      </span>
+      <span className="text-[10px] text-white bg-primary px-2 py-0.5 rounded-md">เปลี่ยนไอคอน</span>
+    </button>
+  </div>
+</div>
             </div>
 
             {/* ส่วนแสดงตัวอย่างข้อมูลแบบเรียลไทม์ (Live Preview Component) */}
@@ -470,13 +537,13 @@ export function CategoryManagement() {
 
           <div className="flex justify-end gap-2.5 pt-4 border-t border-border/50">
             <Button
-              variant="outline"
-              onClick={() => setIsFormOpen(false)}
-              className="rounded-xl h-10 px-5 text-xs font-bold"
-              disabled={isSubmitting}
-            >
-              ยกเลิก
-            </Button>
+  variant="outline"
+  onClick={() => setIsFormOpen(false)}
+  className="rounded-xl h-10 px-5 text-xs font-bold hover:bg-zinc-200 hover:text-zinc-900"
+  disabled={isSubmitting}
+>
+  ยกเลิก
+</Button>
             <Button
               onClick={handleSaveCategory}
               disabled={isSubmitting}
@@ -495,7 +562,10 @@ export function CategoryManagement() {
             <DialogTitle className="text-base font-bold flex items-center justify-between">
               <span className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-primary" />
-                <span>เลือกไอคอนหมวดหมู่ ({ALL_ICON_KEYS.length.toLocaleString()} ตัว)</span>
+                <span>
+                  เลือกไอคอนหมวดหมู่ ({ALL_ICON_KEYS.length.toLocaleString()}{" "}
+                  ตัว)
+                </span>
               </span>
             </DialogTitle>
           </DialogHeader>
@@ -505,7 +575,9 @@ export function CategoryManagement() {
             <Input
               placeholder="ค้นหาไอคอน (ภาษาอังกฤษ เช่น shirt, car, phone, game, tv)..."
               value={iconSearchTerm}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setIconSearchTerm(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                setIconSearchTerm(e.target.value)
+              }
               className="pl-9 rounded-xl border-border/60 text-xs h-10"
               autoFocus
             />
@@ -565,9 +637,14 @@ export function CategoryManagement() {
                 <AlertTriangle className="h-7 w-7 animate-bounce" />
               </div>
               <div>
-                <h4 className="text-base font-bold text-foreground">ยืนยันการลบหมวดหมู่?</h4>
+                <h4 className="text-base font-bold text-foreground">
+                  ยืนยันการลบหมวดหมู่?
+                </h4>
                 <p className="text-xs text-muted-foreground mt-1">
-                  คุณกำลังจะลบหมวดหมู่ <strong className="text-foreground">"{deleteTarget.CategoryName}"</strong>
+                  คุณกำลังจะลบหมวดหมู่{" "}
+                  <strong className="text-foreground">
+                    "{deleteTarget.CategoryName}"
+                  </strong>
                 </p>
               </div>
             </div>
@@ -591,7 +668,6 @@ export function CategoryManagement() {
           </div>
         </div>
       )}
-
     </div>
   );
 }

@@ -1,179 +1,117 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/**
- * การตั้งค่าระบบธีมและโทเค็น (Theme Tokens) สำหรับ Tailwind CSS v4
- * กำหนดฟอนต์หลักและตัวแปรสีระบบ (Design System) ที่เชื่อมโยงกับค่า HSL ตัวแปร CSS ภายนอก
- */
+/* สีเวลาไฮไลต์/ครอบตัวหนังสือ เป็นสีฟ้าสไตล์ Facebook */
+::selection {
+  background-color: #1877f2;
+  color: #ffffff;
+}
+
 @theme {
-  --font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
-
   --color-card: hsl(var(--card));
   --color-card-foreground: hsl(var(--card-foreground));
-
   --color-popover: hsl(var(--popover));
   --color-popover-foreground: hsl(var(--popover-foreground));
-
   --color-primary: hsl(var(--primary));
   --color-primary-foreground: hsl(var(--primary-foreground));
-
   --color-secondary: hsl(var(--secondary));
   --color-secondary-foreground: hsl(var(--secondary-foreground));
-
   --color-muted: hsl(var(--muted));
   --color-muted-foreground: hsl(var(--muted-foreground));
-
   --color-accent: hsl(var(--accent));
   --color-accent-foreground: hsl(var(--accent-foreground));
-
   --color-destructive: hsl(var(--destructive));
   --color-destructive-foreground: hsl(var(--destructive-foreground));
-
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
-
   --radius-md: var(--radius);
-
-  /**
-   * โทเค็นสีเฉพาะสำหรับโครงการ (Custom Greenloop Tokens) 
-   * ใช้กำหนดสถานะต่างๆ เช่น Success, Warning, Info และ Surface
-   */
-  --color-success: hsl(var(--success));
-  --color-success-foreground: hsl(var(--success-foreground));
-  --color-warning: hsl(var(--warning));
-  --color-warning-foreground: hsl(var(--warning-foreground));
-  --color-info: hsl(var(--info));
-  --color-info-foreground: hsl(var(--info-foreground));
-  --color-surface: hsl(var(--surface));
-  --color-surface-foreground: hsl(var(--surface-foreground));
 }
 
-/**
- * การกำหนดค่าตัวแปรสีพื้นฐาน (CSS Custom Properties) สำหรับโหมดปกติ (:root) และโหมดมืด (.dark)
- * ควบคุมโทนสีของแอปพลิเคชันทั้งหมดผ่านระบบพิกัดสี HSL เพื่อให้สลับธีมได้อย่างราบรื่น
- */
 @layer base {
   :root {
-    --background: 40 33% 97%;
-    --foreground: 150 30% 12%;
+    /* โหมดปกติ: พื้นหลังเทาอ่อนสไตล์เฟซบุ๊ค ตัวหนังสือเข้ม คุมโทนเขียวที่ปุ่ม/Primary */
+    --background: 220 14% 96.5%; 
+    --foreground: 210 11% 11%;   
 
     --card: 0 0% 100%;
-    --card-foreground: 150 30% 12%;
+    --card-foreground: 210 11% 11%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 150 30% 12%;
+    --popover-foreground: 210 11% 11%;
 
-    --primary: 152 55% 28%;
-    --primary-foreground: 40 33% 97%;
+    --primary: 152 55% 32%;      /* สีเขียวหลัก */
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 140 20% 90%;
-    --secondary-foreground: 150 30% 18%;
+    --secondary: 220 14% 90%;
+    --secondary-foreground: 210 11% 15%;
 
-    --muted: 140 15% 93%;
-    --muted-foreground: 150 10% 45%;
+    --muted: 220 14% 92%;
+    --muted-foreground: 210 8% 45%;
 
-    --accent: 16 70% 58%;
+    --accent: 210 100% 52%;      
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 140 15% 88%;
-    --input: 140 15% 88%;
-    --ring: 152 55% 28%;
+    --border: 220 13% 88%;
+    --input: 220 13% 88%;
+    --ring: 152 55% 32%;
 
     --radius: 0.75rem;
-
-    --success: 152 60% 40%;
-    --success-foreground: 0 0% 100%;
-    --warning: 40 90% 55%;
-    --warning-foreground: 40 90% 15%;
-    --info: 200 70% 50%;
-    --info-foreground: 0 0% 100%;
-    --surface: 140 15% 95%;
-    --surface-foreground: 150 30% 15%;
   }
 
   .dark {
-    --background: 150 20% 8%;
-    --foreground: 140 15% 93%;
+    /* โหมดมืด: เทาเข้มสะอาดตา ไม่ติดเขียว (สไตล์ Facebook Dark Mode) */
+    --background: 220 13% 10%;   
+    --foreground: 220 14% 90%;   
 
-    --card: 150 20% 11%;
-    --card-foreground: 140 15% 93%;
+    --card: 220 13% 14.5%;     
+    --card-foreground: 220 14% 90%;
 
-    --popover: 150 20% 11%;
-    --popover-foreground: 140 15% 93%;
+    --popover: 220 13% 14.5%;
+    --popover-foreground: 220 14% 90%;
 
-    --primary: 152 50% 45%;
-    --primary-foreground: 150 20% 8%;
+    --primary: 152 50% 45%;      /* สีเขียวสำหรับโหมดมืด (สว่างขึ้นเล็กน้อยให้อ่านง่าย) */
+    --primary-foreground: 220 13% 10%;
 
-    --secondary: 150 15% 18%;
-    --secondary-foreground: 140 15% 90%;
+    --secondary: 220 13% 20%;
+    --secondary-foreground: 220 14% 90%;
 
-    --muted: 150 15% 15%;
-    --muted-foreground: 140 10% 55%;
+    --muted: 220 13% 18%;
+    --muted-foreground: 220 10% 60%;
 
-    --accent: 16 70% 55%;
+    --accent: 210 100% 52%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 62% 30%;
+    --destructive: 0 62% 40%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 150 15% 18%;
-    --input: 150 15% 18%;
+    --border: 220 13% 20%;
+    --input: 220 13% 20%;
     --ring: 152 50% 45%;
-
-    --success: 152 50% 45%;
-    --success-foreground: 0 0% 100%;
-    --warning: 40 80% 50%;
-    --warning-foreground: 0 0% 100%;
-    --info: 200 60% 50%;
-    --info-foreground: 0 0% 100%;
-    --surface: 150 15% 13%;
-    --surface-foreground: 140 15% 90%;
   }
 }
 
-/**
- * การกำหนดค่าสไตล์เริ่มต้นระดับ Element ทั่วทั้งระบบ (Global Base Styles)
- * ควบคุมสีขอบเส้นแบ่งทุกตัวให้ตรงกับค่าตัวแปร border และกำหนดพื้นหลัง สีตัวอักษร ฟอนต์ของหน้าเว็บ
- */
 @layer base {
   * {
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground font-sans;
+    @apply bg-background text-foreground font-sans antialiased;
   }
 }
 
-/**
- * การสร้าง Utility Classes เพิ่มเติมสำหรับใช้งานคอมโพเนนต์เฉพาะทาง
- * เช่น คลาส .glass-card สำหรับทำเอฟเฟกต์กระจกฝ้า (Glassmorphism)
- */
-@layer utilities {
-  .glass-card {
-    @apply bg-card/80 backdrop-blur-md border border-border/50 shadow-sm;
-  }
-}
-
-/**
- * การสร้าง Custom Utility แบบสไตล์ดั้งเดิมสำหรับ Tailwind v4 (@utility)
- * สร้างคลาส eco-gradient สำหรับพื้นหลังไล่ระดับสีที่เป็นเอกลักษณ์
- */
 @utility eco-gradient {
   background: linear-gradient(135deg, hsl(var(--primary)), hsl(152 45% 38%));
 }
 
-/**
- * การสร้าง Custom Utility สำหรับทำตัวอักษรไล่ระดับสี (Gradient Text)
- */
 @utility eco-gradient-text {
   background: linear-gradient(135deg, hsl(var(--primary)), hsl(140 40% 35%));
   -webkit-background-clip: text;

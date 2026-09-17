@@ -71,7 +71,7 @@ export default function Profile() {
 
   useEffect(() => {
     const loadProfile = async () => {
-      const savedUser = localStorage.getItem("user");
+      const savedUser = sessionStorage.getItem("user");
       if (!savedUser) {
         navigate("/");
         return;
@@ -124,7 +124,7 @@ export default function Profile() {
         }
       } catch (error) {
         console.error("Failed to load profile:", error);
-        localStorage.removeItem("user");
+        sessionStorage.removeItem("user");
         navigate("/");
       }
     };
@@ -133,8 +133,8 @@ export default function Profile() {
   }, [navigate]);
 
   const performLogout = () => {
-    localStorage.removeItem("user");
-    localStorage.removeItem("token");
+    sessionStorage.removeItem("user");
+    sessionStorage.removeItem("token");
     navigate("/");
   };
 

@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Camera, MapPin, Globe, Trash2, X, Package, LayoutGrid, AlignLeft, ArrowRightLeft, Sparkles, Loader2} from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Camera, MapPin, Globe, Trash2, X, Package, LayoutGrid, AlignLeft, ArrowRightLeft, Sparkles, Loader2, icons } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,49 +8,83 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import AppLayout from "@/components/AppLayout";
 import { useToast } from "@/hooks/use-toast";
 import { CATEGORIES } from "@/lib/categories_data";
-import { createItem } from "@/api/api"; 
+import { createItem, getCategories } from "@/api/api";
+import { Button } from "@/components/ui/button";
+
+interface DBCategory {
+  CategoryID: number;
+  CategoryName: string;
+  IconName?: string;
+  Color?: string;
+  CategoryColor?: string;
+  color?: string;
+  icon_color?: string;
+}
+
+const DynamicIcon = ({ name, className, style }: { name?: string; className?: string; style?: React.CSSProperties }) => {
+  if (!name) return null;
+  if (name.startsWith("http") || name.startsWith("/")) {
+    return <img src={name} alt="" className={className} style={style} />;
+  }
+  if (name.length <= 2) {
+    return <span className={className} style={style}>{name}</span>;
+  }
+  const iconsMap = icons as unknown as Record<string, React.ComponentType<{ className?: string; style?: React.CSSProperties }>>;
+  const IconComponent = iconsMap[name] || icons.Folder;
+  return <IconComponent className={className} style={style} />;
+};
 
 // =========================================================================
-// COMPONENT: CreatePost (หน้าจอสำหรับสร้างและลงประกาศแลกเปลี่ยนสินค้าใหม่)[cite: 25]
+// COMPONENT: CreatePost (หน้าจอสำหรับสร้างและลงประกาศแลกเปลี่ยนสินค้าใหม่)
 // =========================================================================
 export default function CreatePost() {
   
   // =====================================================================
-  // EFFECT: เลื่อนหน้าจอขึ้นไปด้านบนสุดโดยอัตโนมัติเมื่อคอมโพเนนต์ถูกโหลด (Scroll to Top)[cite: 25]
+  // EFFECT: เลื่อนหน้าจอขึ้นไปด้านบนสุดโดยอัตโนมัติเมื่อคอมโพเนนต์ถูกโหลด (Scroll to Top)
   // =====================================================================
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    const fetchCategoriesData = async () => {
+      try {
+        const res = await getCategories();
+        setCategoriesList(res.data || []);
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+      }
+    };
+    fetchCategoriesData();
   }, []);
 
   const navigate = useNavigate();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // สถานะจัดการรูปภาพ ตัวไฟล์ และสถานะการโหลดข้อมูล[cite: 25]
+  // สถานะจัดการรูปภาพ ตัวไฟล์ และสถานะการโหลดข้อมูล
   const [images, setImages] = useState<string[]>([]);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  // สถานะฟอร์มข้อมูลสินค้า[cite: 25]
+  // สถานะฟอร์มข้อมูลสินค้า
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("");
+  const [categoryId, setCategoryId] = useState<number | string>(""); // <- เพิ่ม State นี้
+  const [categoriesList, setCategoriesList] = useState<DBCategory[]>([]); // <- เพิ่ม State นี้
   const [description, setDescription] = useState("");
   const [wanted, setWanted] = useState("");
   const [location, setLocation] = useState("");
   const [mapLink, setMapLink] = useState("");
   const categories = CATEGORIES.filter(c => c !== "ทั้งหมด");
 
-  // สถานะควบคุมข้อผิดพลาด (Validation Errors) ในแต่ละฟิลด์[cite: 25]
+  // สถานะควบคุมข้อผิดพลาด (Validation Errors) ในแต่ละฟิลด์
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // =====================================================================
-  // ฟังก์ชัน: จัดการการเลือกและอัปโหลดไฟล์รูปภาพสินค้า (HANDLE FILE CHANGE)[cite: 25]
+  // ฟังก์ชัน: จัดการการเลือกและอัปโหลดไฟล์รูปภาพสินค้า (HANDLE FILE CHANGE)
   // =====================================================================
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
     
-    // ตรวจสอบเงื่อนไขจำกัดจำนวนรูปภาพสูงสุดไม่เกิน 6 รูป[cite: 25]
+    // ตรวจสอบเงื่อนไขจำกัดจำนวนรูปภาพสูงสุดไม่เกิน 6 รูป
     if (images.length + files.length > 6) {
       toast({ title: "จำกัดรูปภาพ", description: "สามารถอัปโหลดได้สูงสุด 6 รูปเท่านั้น", variant: "destructive" });
       return;
@@ -60,7 +93,7 @@ export default function CreatePost() {
     const newFilesArray = Array.from(files);
     setSelectedFiles(prev => [...prev, ...newFilesArray]);
 
-    // แปลงไฟล์รูปภาพเป็น Data URL สำหรับใช้แสดงตัวอย่างภาพ (Image Preview) บนหน้าจอ[cite: 25]
+    // แปลงไฟล์รูปภาพเป็น Data URL สำหรับใช้แสดงตัวอย่างภาพ (Image Preview) บนหน้าจอ
     newFilesArray.forEach((file) => {
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -77,7 +110,7 @@ export default function CreatePost() {
   };
 
   // =====================================================================
-  // ฟังก์ชัน: ลบรูปภาพที่เลือกออกจากรายการพรีวิวและอาเรย์ไฟล์[cite: 25]
+  // ฟังก์ชัน: ลบรูปภาพที่เลือกออกจากรายการพรีวิวและอาเรย์ไฟล์
   // =====================================================================
   const removeImage = (index: number) => {
     setImages(images.filter((_, i) => i !== index));
@@ -85,13 +118,13 @@ export default function CreatePost() {
   };
 
   // =====================================================================
-  // ฟังก์ชัน: ตรวจสอบความถูกต้องของฟอร์มและส่งข้อมูลประกาศใหม่ไปยัง API[cite: 25]
+  // ฟังก์ชัน: ตรวจสอบความถูกต้องของฟอร์มและส่งข้อมูลประกาศใหม่ไปยัง API
   // =====================================================================
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const newErrors: Record<string, string> = {};
     
-    // ตรวจสอบข้อมูลจำเป็นและเงื่อนไขความถูกต้อง (Client-side Validation)[cite: 25]
+    // ตรวจสอบข้อมูลจำเป็นและเงื่อนไขความถูกต้อง (Client-side Validation)
     if (images.length < 3) newErrors.images = "กรุณาลงรูปสินค้าอย่างน้อย 3 รูป";
     if (!title.trim()) newErrors.title = "กรุณาระบุชื่อสิ่งของ";
     if (!category) newErrors.category = "กรุณาเลือกหมวดหมู่สิ่งของ";
@@ -108,8 +141,8 @@ export default function CreatePost() {
     setIsLoading(true);
 
     try {
-      // ตรวจสอบข้อมูลผู้ใช้งานจาก LocalStorage เพื่อระบุตัวตนผู้โพสต์[cite: 25]
-      const savedUser = localStorage.getItem("user");
+      // ตรวจสอบข้อมูลผู้ใช้งานจาก sessionStorage เพื่อระบุตัวตนผู้โพสต์
+      const savedUser = sessionStorage.getItem("user");
       const user = savedUser ? JSON.parse(savedUser) : null;
       if (!user) {
         toast({ variant: "destructive", title: "กรุณาเข้าสู่ระบบก่อนทำการโพสต์" });
@@ -119,14 +152,14 @@ export default function CreatePost() {
       
       const currentMemberId = user.id || user.user_id || user.UserID || user.MemberID;
 
-      // จัดเตรียมข้อมูลในรูปแบบ FormData สำหรับรองรับการอัปโหลดไฟล์หลายไฟล์[cite: 25]
+      // จัดเตรียมข้อมูลในรูปแบบ FormData สำหรับรองรับการอัปโหลดไฟล์หลายไฟล์
       const formData = new FormData();
       formData.append("item_name", title);
       formData.append("item_detail", description); 
       formData.append("wanted_item", wanted);
       formData.append("meeting_place", location);   
       formData.append("location_link", mapLink);   
-      formData.append("category_id", "1"); 
+      formData.append("category_id", String(categoryId));
       formData.append("member_id", String(currentMemberId)); 
 
       if (selectedFiles.length > 0) {
@@ -135,7 +168,7 @@ export default function CreatePost() {
         });
       }
 
-      // เรียกใช้งาน API สร้างโพสต์สินค้า[cite: 25]
+      // เรียกใช้งาน API สร้างโพสต์สินค้า
       await createItem(formData);
 
       toast({ 
@@ -159,8 +192,8 @@ export default function CreatePost() {
 
   return (
     <AppLayout>
-      {/* ส่วนหัวข้อหน้าจอ (Header)[cite: 25] */}
-      <section className="border-b border-border/50 bg-muted/30 w-screen relative left-1/2 -translate-x-1/2 -mt-6 px-4 sm:px-6">
+      {/* ส่วนหัวข้อหน้าจอ (Header) */}
+      <section className="border-b border-border/50 w-screen relative left-1/2 -translate-x-1/2 -mt-6 px-4 sm:px-6">
         <div className="mx-auto max-w-5xl py-8">
           <div className="flex items-center justify-between">
             <div>
@@ -185,12 +218,12 @@ export default function CreatePost() {
         </div>
       </section>
 
-      {/* ส่วนฟอร์มกรอกรายละเอียดสินค้า (Form Section)[cite: 25] */}
+      {/* ส่วนฟอร์มกรอกรายละเอียดสินค้า (Form Section) */}
       <section className="py-8 sm:py-10">
         <div className="mx-auto max-w-5xl">
           <form onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 lg:gap-12">
-              {/* คอลัมน์ซ้าย: จัดการรูปภาพสินค้า[cite: 25] */}
+              {/* คอลัมน์ซ้าย: จัดการรูปภาพสินค้า */}
               <div className="lg:col-span-2 space-y-4">
                 <div className="flex justify-between items-center">
                   <Label
@@ -257,9 +290,9 @@ export default function CreatePost() {
                 />
               </div>
 
-              {/* คอลัมน์ขวา: ฟิลด์กรอกข้อมูลรายละเอียดสินค้า[cite: 25] */}
+              {/* คอลัมน์ขวา: ฟิลด์กรอกข้อมูลรายละเอียดสินค้า */}
               <div className="lg:col-span-3 space-y-5">
-                {/* ชื่อสิ่งของ[cite: 25] */}
+                {/* ชื่อสิ่งของ */}
                 <div className="space-y-1.5">
                   <Label
                     htmlFor="title"
@@ -288,47 +321,83 @@ export default function CreatePost() {
                   )}
                 </div>
 
-                {/* หมวดหมู่สิ่งของ[cite: 25] */}
-                <div className="space-y-1.5">
-                  <Label
-                    className={`text-sm font-bold ${errors.category ? "text-destructive" : ""}`}
-                  >
-                    หมวดหมู่สิ่งของ <span className="text-destructive">*</span>
-                  </Label>
-                  <Select
-                    value={category}
-                    onValueChange={(val) => {
-                      setCategory(val);
-                      if (errors.category)
-                        setErrors((prev) => ({ ...prev, category: "" }));
-                    }}
-                  >
-                    <SelectTrigger
-                      className={`relative pl-10 h-11 ${errors.category ? "border-destructive" : ""}`}
-                    >
-                      <LayoutGrid
-                        className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${errors.category ? "text-destructive" : "text-primary"}`}
-                      />
-                      <SelectValue placeholder="เลือกประเภทสินค้า" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories
-                        .filter((c) => c !== "ทั้งหมด")
-                        .map((cat) => (
-                          <SelectItem key={cat} value={cat}>
-                            {cat}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                  {errors.category && (
-                    <p className="text-xs text-destructive">
-                      {errors.category}
-                    </p>
-                  )}
-                </div>
+                {/* หมวดหมู่ */}
+<div className="space-y-2">
+  <Label
+    className={`font-semibold ${errors.category ? "text-red-500" : ""}`}
+  >
+    หมวดหมู่ <span className="text-red-500">*</span>
+  </Label>
 
-                {/* รายละเอียด[cite: 25] */}
+  <Select
+    value={categoryId ? String(categoryId) : ""}
+    onValueChange={(val) => {
+      setCategoryId(Number(val));
+      const selectedCat = categoriesList.find(
+        (cat) => String(cat.CategoryID) === val
+      );
+      if (selectedCat) {
+        setCategory(selectedCat.CategoryName);
+      }
+      if (errors.category)
+        setErrors((prev) => ({ ...prev, category: "" }));
+    }}
+  >
+    <SelectTrigger
+      className={`relative pl-10 h-11 ${errors.category ? "border-red-500 ring-red-500" : ""}`}
+    >
+      {/* วางไอคอนแบบ Absolute ไว้ด้านซ้าย (เหมือนกับช่อง Input อื่นๆ) */}
+      <DynamicIcon 
+        name={
+          categoryId 
+            ? categoriesList.find(c => String(c.CategoryID) === String(categoryId))?.IconName 
+            : "LayoutGrid" // ถ้ายังไม่เลือกให้ใช้ไอคอน LayoutGrid
+        } 
+        className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${
+          errors.category ? "text-red-500" : "text-primary"
+        }`}
+      />
+      
+      {/* แสดงเฉพาะตัวหนังสือของหมวดหมู่ */}
+      <SelectValue placeholder="เลือกหมวดหมู่">
+        {categoryId && (() => {
+          const currentCat = categoriesList.find((c) => String(c.CategoryID) === String(categoryId));
+          return currentCat ? currentCat.CategoryName : "เลือกหมวดหมู่";
+        })()}
+      </SelectValue>
+    </SelectTrigger>
+    <SelectContent>
+      {categoriesList
+        .filter((c) => c.CategoryName !== "ทั้งหมด")
+        .map((cat) => {
+          const iconName = cat.IconName;
+          const iconColor = cat.Color || cat.CategoryColor || cat.color || cat.icon_color;
+          return (
+            <SelectItem
+              key={cat.CategoryID}
+              value={String(cat.CategoryID)}
+              className="hover:bg-slate-200/60 dark:hover:bg-zinc-800/60 hover:text-black dark:hover:text-black focus:bg-slate-200/60 dark:focus:bg-zinc-800/60 focus:text-black dark:focus:text-black cursor-pointer"
+            >
+              <span className="inline-flex items-center gap-2">
+                <DynamicIcon 
+                  name={iconName} 
+                  className="w-4 h-4 shrink-0" 
+                  style={{ color: iconColor || undefined }} 
+                />
+                <span>{cat.CategoryName}</span>
+              </span>
+            </SelectItem>
+          );
+        })} 
+    </SelectContent>
+  </Select>
+
+  {errors.category && (
+    <p className="text-xs text-red-500">{errors.category}</p>
+  )}
+</div>
+
+                {/* รายละเอียด */}
                 <div className="space-y-1.5">
                   <Label
                     htmlFor="desc"
@@ -359,7 +428,7 @@ export default function CreatePost() {
                   )}
                 </div>
 
-                {/* สิ่งที่ต้องการแลก[cite: 25] */}
+                {/* สิ่งที่ต้องการแลก */}
                 <div className="space-y-1.5">
                   <Label
                     htmlFor="wanted"
@@ -389,7 +458,7 @@ export default function CreatePost() {
                   )}
                 </div>
 
-                {/* สถานที่นัดรับและลิงก์แผนที่[cite: 25] */}
+                {/* สถานที่นัดรับและลิงก์แผนที่ */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <Label
@@ -437,7 +506,7 @@ export default function CreatePost() {
                   </div>
                 </div>
 
-                {/* ปุ่มควบคุมการทำงาน (Actions)[cite: 25] */}
+                {/* ปุ่มควบคุมการทำงาน (Actions) */}
                 <div className="pt-4 flex flex-col sm:flex-row gap-3">
                   <Button
                     type="submit"

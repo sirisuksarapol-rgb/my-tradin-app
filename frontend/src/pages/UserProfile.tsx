@@ -4,9 +4,10 @@ import {
   Star,
   ArrowRightLeft,
   Package,
-  Flag,
+  User,
   ShieldAlert,
   MessageSquare,
+  Flag,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,11 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import AppLayout from "@/components/AppLayout";
 import { useState, useEffect } from "react";
-import {
-  getItems as fetchItemsAPI,
-  getUserStats,
-  IMAGE_BASE_URL,
-} from "@/api/api";
+import { getItems, getUserStats, IMAGE_BASE_URL } from "@/api/api";
 import ReportModal from "@/components/ReportModal";
 
 interface DBUserReview {
@@ -27,6 +24,7 @@ interface DBUserReview {
   Rating: number | string;
   Comment: string;
   ReviewDate: string;
+  ReviewerProfileImage?: string;
 }
 
 interface UserProfileData {
@@ -62,7 +60,7 @@ export default function UserProfile() {
   const [isLoading, setIsLoading] = useState(true);
   const [isReportOpen, setIsReportOpen] = useState(false);
 
-  const loggedInUser = JSON.parse(localStorage.getItem("user") || "{}");
+  const loggedInUser = JSON.parse(sessionStorage.getItem("user") || "{}");
 
   const stateData = location.state as {
     fromAdmin?: boolean;
@@ -87,7 +85,7 @@ export default function UserProfile() {
       try {
         setIsLoading(true);
 
-        const itemsRes = await fetchItemsAPI();
+        const itemsRes = await getItems();
         const items = itemsRes.data || [];
 
         const userItemsCount = items.filter(
@@ -196,22 +194,29 @@ export default function UserProfile() {
     <AppLayout>
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-8">
         <div className="flex items-center justify-between">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate(-1)}
-            className="-ml-2 hover:bg-slate-200/60 dark:hover:bg-zinc-800/60 text-foreground transition-all"
-          >
-            <ArrowLeft className="h-5 w-5 text-foreground" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate(-1)}
+              className="-ml-2 hover:bg-slate-200/60 dark:hover:bg-zinc-800/60 text-foreground transition-all"
+            >
+              <ArrowLeft className="h-5 w-5 text-foreground" />
+            </Button>
+            <User className="h-5 w-5 text-primary" />
+            <h1 className="text-xl sm:text-2xl font-bold font-heading">
+              โปรไฟล์เจ้าของ
+            </h1>
+          </div>
 
-          {!isOwner && (
+          {/* 🚩 ปุ่มรายงานผู้ใช้งาน (แสดงเฉพาะเมื่อไม่ใช่เจ้าของและไม่ได้มาจากหน้าแอดมิน) */}
+          {!isOwner && !fromAdmin && (
             <Button
               variant="ghost"
               size="icon"
               className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
               onClick={() => setIsReportOpen(true)}
-              title="รายงานผู้ใช้งาน"
+              title="รายงานผู้ใช้นี้"
             >
               <Flag className="h-5 w-5" />
             </Button>
@@ -294,6 +299,22 @@ export default function UserProfile() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Avatar className="h-8 w-8">
+                          {review.ReviewerProfileImage &&
+                          review.ReviewerProfileImage.trim() !== "" &&
+                          review.ReviewerProfileImage !== "null" &&
+                          review.ReviewerProfileImage !== "undefined" ? (
+                            <AvatarImage
+                              src={
+                                review.ReviewerProfileImage.trim().startsWith(
+                                  "http",
+                                )
+                                  ? review.ReviewerProfileImage.trim()
+                                  : `${IMAGE_BASE_URL}/uploads/${review.ReviewerProfileImage.trim()}`
+                              }
+                              alt={review.ReviewerName}
+                              className="object-cover"
+                            />
+                          ) : null}
                           <AvatarFallback className="text-xs font-semibold bg-primary/20 text-primary">
                             {review.ReviewerName
                               ? review.ReviewerName.charAt(0).toUpperCase()

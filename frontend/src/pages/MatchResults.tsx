@@ -158,7 +158,7 @@ export default function MatchResults() {
         <div className="flex flex-col items-center justify-center p-12 h-[60vh] text-primary">
           <Loader2 className="h-10 w-10 animate-spin mb-4" />
           <p className="font-medium animate-pulse text-sm">
-            ระบบ AI กำลังค้นหาและคำนวณคู่แมตช์ที่เหมาะสมที่สุด...
+            กำลังค้นหาและคำนวณคู่แมตช์ที่เหมาะสมที่สุด...
           </p>
         </div>
       </AppLayout>
@@ -191,8 +191,13 @@ export default function MatchResults() {
           >
             <ArrowLeft className="h-5 w-5 text-foreground" />
           </Button>
-          <Search className="w-5 h-5 text-muted-foreground" />
-          <span className="font-bold text-2xl font-heading">ค้นหาคู่แมตช์</span>
+
+          <div className="flex items-center gap-2">
+            <Search className="h-6 w-6 text-primary" />
+            <span className="font-bold text-2xl font-heading">
+              ค้นหาคู่แมตช์
+            </span>
+          </div>
         </div>
 
         <div className="relative overflow-hidden flex items-center gap-4 rounded-2xl bg-primary/5 p-5 border border-primary/10 max-w-2xl">
@@ -219,9 +224,6 @@ export default function MatchResults() {
 
         <section>
           <div className="flex items-center gap-2 mb-6">
-            <div className="bg-primary/10 p-1.5 rounded-lg">
-              <Sparkles className="h-4 w-4 text-primary" />
-            </div>
             <h2 className="text-xl font-bold font-heading">
               ผลการแมทช์ที่แนะนำ
             </h2>
@@ -234,7 +236,7 @@ export default function MatchResults() {
                   key={match.id}
                   className="relative overflow-hidden border-border/50 hover:shadow-lg transition-all group"
                 >
-                  <div className="absolute top-3 right-3 z-10 rounded-full bg-primary/90 px-2 py-1 text-[10px] font-bold text-primary-foreground shadow-sm">
+                  <div className="absolute top-3 right-3 z-10 rounded-full bg-primary border border-primary/20 px-2 py-1 text-[10px] font-bold text-white shadow-sm shrink-0 whitespace-nowrap">
                     เหมาะสม {match.score}%
                   </div>
                   <CardContent className="p-0">
@@ -276,12 +278,15 @@ export default function MatchResults() {
                         "{match.theirPost.description}"
                       </p>
                       <div className="flex items-center justify-between">
-                        <Badge variant="secondary" className="text-[10px]">
+                        <Badge
+                          variant="secondary"
+                          className="text-[10px] bg-primary/10"
+                        >
                           {match.theirPost.category}
                         </Badge>
                         <Button
                           size="sm"
-                          className="h-7 gap-1 text-[11px] eco-gradient text-primary-foreground rounded-full px-3 shadow-sm"
+                          className="h-7 gap-1 text-[11px] rounded-full px-3 shadow-sm bg-primary border border-primary/20 text-white"
                           onClick={() =>
                             navigate(`/exchange-preview/${match.id}`, {
                               state: { matchData: match },

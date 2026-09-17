@@ -33,7 +33,7 @@ export const API_BASE_URL = `${BASE_URL}/api`;
  * @returns {string|number} รหัสประจำตัวสมาชิก หรือค่าว่างหากไม่พบข้อมูลในระบบ
  */
 const getStoredMemberId = () => {
-  const savedUser = localStorage.getItem("user");
+  const savedUser = sessionStorage.getItem("user");
   if (!savedUser) return "";
   
   const user = JSON.parse(savedUser);
@@ -166,9 +166,11 @@ export const createExchangeRequest = async (payload) => {
       my_item_id: payload.my_item_id,       
       their_item_id: payload.their_item_id, 
       location: payload.location || 'นัดเจอตามตกลง',
-      phone_number: payload.phone_number || ''
+      match_score: payload.match_score || 0,
+      phone_number: payload.phone_number || '',
+      exchange_type: payload.exchange_type
     };
-
+    
     const response = await axios.post(`${API_BASE_URL}/exchanges`, requestData);
     return response.data;
   } catch (error) {
@@ -428,10 +430,13 @@ export const suspendMember = (memberId, payload) => axios.put(`${API_BASE_URL}/a
 export const unsuspendMember = (memberId) => axios.put(`${API_BASE_URL}/admin/users/${memberId}/unsuspend`);
 
 /**
- * ลบโพสต์สินค้าออกจากระบบด้วยสิทธิ์ผู้ดูแลระบบ
- * @param {Number} itemId - รหัสสินค้า
+ * ลบโพสต์สินค้าออกจากระบบด้วยสิทธิ์ผู้ดูแลระบบ พร้อมส่งเหตุผลแจ้งเตือน
  */
-export const adminDeleteItem = (itemId) => axios.delete(`${API_BASE_URL}/admin/items/${itemId}`);
+export const adminDeleteItem = (itemId, reason) => {
+  return axios.delete(`${API_BASE_URL}/admin/items/${itemId}`, { 
+    data: { reason: reason } 
+  });
+};
 
 /**
  * อัปเดตสถานะรายงานปัญหาให้เป็น 'Resolved' (แก้ไขแล้ว/ปิดเคส)

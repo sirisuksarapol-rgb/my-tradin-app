@@ -87,11 +87,30 @@ export default function IncomingRequests() {
     useState<ExchangeRequest | null>(null);
   const [isAccepting, setIsAccepting] = useState(false);
 
+  // State สำหรับเปิดหน้าต่างยืนยันการปฏิเสธ
+  const [rejectRequest, setRejectRequest] = useState<ExchangeRequest | null>(null);
+  const [isRejecting, setIsRejecting] = useState(false);
+
+  // State สำหรับหน้าต่างแจ้งผลลัพธ์ (แก้ไข Syntax แล้ว)
+  const [successModal, setSuccessModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    type: "accept" | "reject" | "";
+    exchangeId: number | null;
+  }>({
+    isOpen: false,
+    title: "",
+    description: "",
+    type: "",
+    exchangeId: null,
+  });
+
   const [requests, setRequests] = useState<ExchangeRequest[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
   const [seenIds, setSeenIds] = useState<number[]>(() => {
-    const saved = localStorage.getItem("seen_exchange_ids");
+    const saved = sessionStorage.getItem("seen_exchange_ids");
     return saved ? JSON.parse(saved) : [];
   });
 
@@ -118,7 +137,7 @@ export default function IncomingRequests() {
     }
   };
 
-  const savedUser = localStorage.getItem("user");
+  const savedUser = sessionStorage.getItem("user");
   const user: LoggedInUser | null = savedUser ? JSON.parse(savedUser) : null;
 
   const fetchIncomingRequests = async () => {
@@ -140,7 +159,6 @@ export default function IncomingRequests() {
 
         const incoming = dataList.filter((req) => {
           const status = (req.ExchangeStatus || "").toLowerCase();
-          // ให้แสดงเฉพาะรายการที่ยังอยู่ในสถานะรอตอบรับจริงๆ เท่านั้น
           return (
             status === "pending" &&
             String(req.TargetMemberID) === String(currentUserId)
@@ -206,11 +224,6 @@ export default function IncomingRequests() {
       );
 
       if (response.data.success) {
-        toast({
-          title: "ตอบรับคำขอแล้ว! 🎉",
-          description: "กำลังส่งรหัส OTP ให้คุณและคู่แลกเปลี่ยน...",
-        });
-
         try {
           await axios.post(`${API_BASE_URL}/${req.ExchangeID}/request-code`, {
             user_id: req.MemberID,
@@ -223,11 +236,13 @@ export default function IncomingRequests() {
         }
 
         setIsPhoneModalOpen(false);
-        setTimeout(() => {
-          navigate(`/exchange-tracking/${req.ExchangeID}`, {
-            state: { newStatus: "accepted" },
-          });
-        }, 1500);
+        setSuccessModal({
+          isOpen: true,
+          title: "ตอบรับคำขอสำเร็จ! 🎉",
+          description: "ระบบกำลังส่งรหัส OTP ให้คุณและคู่แลกเปลี่ยน สามารถตรวจสอบสถานะได้ที่หน้าติดตามการแลกเปลี่ยน",
+          type: "accept",
+          exchangeId: req.ExchangeID,
+        });
       }
     } catch (error) {
       const axiosError = error as AxiosError<ErrorResponse>;
@@ -242,22 +257,28 @@ export default function IncomingRequests() {
     }
   };
 
-  const handleReject = async (req: ExchangeRequest) => {
+  const confirmReject = async () => {
+    if (!rejectRequest) return;
+    setIsRejecting(true);
+
     try {
       const response = await axios.put<ApiResponse<null>>(
-        `${API_BASE_URL}/${req.ExchangeID}`,
+        `${API_BASE_URL}/${rejectRequest.ExchangeID}`,
         { action: "reject" },
       );
 
       if (response.data.success) {
         setRequests((prev) =>
-          prev.filter((item) => item.ExchangeID !== req.ExchangeID),
+          prev.filter((item) => item.ExchangeID !== rejectRequest.ExchangeID),
         );
-
-        toast({
-          title: "ปฏิเสธคำขอแล้ว",
-          description: `แจ้งผลไปยัง ${req.theirAuthorName || "ผู้ใช้งาน"} เรียบร้อย`,
-          variant: "destructive",
+        
+        setRejectRequest(null);
+        setSuccessModal({
+          isOpen: true,
+          title: "ปฏิเสธคำขอเรียบร้อย",
+          description: `แจ้งผลไปยัง ${rejectRequest.theirAuthorName || "ผู้ใช้งาน"} เรียบร้อยแล้ว`,
+          type: "reject",
+          exchangeId: null,
         });
       }
     } catch (error) {
@@ -268,6 +289,8 @@ export default function IncomingRequests() {
           axiosError.response?.data?.message || "ไม่สามารถปฏิเสธคำขอได้",
         variant: "destructive",
       });
+    } finally {
+      setIsRejecting(false);
     }
   };
 
@@ -456,7 +479,7 @@ export default function IncomingRequests() {
                         variant="outline"
                         className="flex-1 border-border/60 text-foreground hover:bg-slate-200/60 dark:hover:bg-zinc-800/60 hover:text-foreground transition-all"
                         size="sm"
-                        onClick={() => handleReject(req)}
+                        onClick={() => setRejectRequest(req)}
                       >
                         <XCircle className="h-4 w-4 mr-1 text-muted-foreground" />{" "}
                         ปฏิเสธ
@@ -550,6 +573,75 @@ export default function IncomingRequests() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog 
+        open={!!rejectRequest} 
+        onOpenChange={(open) => !open && !isRejecting && setRejectRequest(null)}
+      >
+        <AlertDialogContent className="rounded-3xl max-w-sm p-6 text-center shadow-xl">
+          <AlertDialogTitle className="text-xl text-center">ยืนยันการปฏิเสธ</AlertDialogTitle>
+          <p className="text-sm text-muted-foreground mt-2">
+            คุณต้องการปฏิเสธคำขอแลกเปลี่ยนจาก <strong>{rejectRequest?.theirAuthorName}</strong> ใช่หรือไม่?
+          </p>
+          <AlertDialogFooter className="flex flex-col sm:flex-row gap-2 mt-5 sm:space-x-0">
+            <Button
+              variant="outline"
+              className="w-full sm:flex-1 rounded-2xl h-11 text-xs font-semibold border-border/60 bg-card text-foreground hover:bg-slate-100 dark:hover:bg-zinc-800 hover:text-foreground transition-all mt-0 shadow-xs"
+              onClick={() => setRejectRequest(null)}
+              disabled={isRejecting}
+            >
+              ยกเลิก
+            </Button>
+            <Button
+              variant="destructive"
+              className="w-full sm:flex-1 rounded-xl h-11 text-xs font-semibold"
+              onClick={confirmReject}
+              disabled={isRejecting}
+            >
+              {isRejecting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              ยืนยันการปฏิเสธ
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={successModal.isOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSuccessModal(prev => ({ ...prev, isOpen: false }));
+            if (successModal.type === "accept" && successModal.exchangeId) {
+              navigate(`/exchange-tracking/${successModal.exchangeId}`, {
+                state: { newStatus: "accepted" },
+              });
+            }
+          }
+        }}
+      >
+        <AlertDialogContent className="rounded-3xl max-w-sm p-6 text-center shadow-xl">
+          <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner">
+            <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
+          </div>
+          <AlertDialogTitle className="text-xl text-center">{successModal.title}</AlertDialogTitle>
+          <p className="text-sm text-muted-foreground mt-2">
+            {successModal.description}
+          </p>
+          <Button
+            className="w-full rounded-xl mt-6 h-11 font-semibold"
+            onClick={() => {
+              setSuccessModal(prev => ({ ...prev, isOpen: false }));
+              if (successModal.type === "accept" && successModal.exchangeId) {
+                navigate(`/exchange-tracking/${successModal.exchangeId}`, {
+                  state: { newStatus: "accepted" },
+                });
+              }
+            }}
+          >
+            ตกลง
+          </Button>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </AppLayout>
   );
 }

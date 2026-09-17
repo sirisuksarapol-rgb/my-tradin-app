@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Camera, MapPin, Link2, X } from "lucide-react";
+import * as LucideIcons from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { getItems, updateItem, getCategories, IMAGE_BASE_URL } from "@/api/api";
 
 // =========================================================================
-// INTERFACES: โครงสร้างข้อมูล TypeScript สำหรับ Type Safety
+// INTERFACES: โครงสร้างข้อมูล TypeScript สำหรับ Type Safety (ห้ามใช้ any)
 // =========================================================================
 
 interface DBItemDetail {
@@ -29,10 +30,30 @@ interface DBItemDetail {
   image_name?: string;
 }
 
-interface Category {
+interface DBCategory {
   CategoryID: number;
   CategoryName: string;
+  IconName?: string;
+  ItemCount?: number;
+  Color?: string;
+  CategoryColor?: string;
+  color?: string;
+  icon_color?: string;
 }
+
+// คอมโพเนนต์ช่วยเรนเดอร์ไอคอนแบบไดนามิกจากฐานข้อมูล (รองรับ Lucide Icon, URL/Image และ Emoji โดยไม่มีการใช้ any)
+const DynamicIcon = ({ name, className, style }: { name?: string; className?: string; style?: React.CSSProperties }) => {
+  if (!name) return null;
+  if (name.startsWith("http") || name.startsWith("/")) {
+    return <img src={name} alt="" className={className} style={style} />;
+  }
+  if (name.length <= 2) {
+    return <span className={className} style={style}>{name}</span>;
+  }
+  const iconsMap = LucideIcons as unknown as Record<string, React.ComponentType<{ className?: string; style?: React.CSSProperties }>>;
+  const IconComponent = iconsMap[name] || LucideIcons.Folder;
+  return <IconComponent className={className} style={style} />;
+};
 
 // =========================================================================
 // COMPONENT: EditPost (หน้าจอสำหรับแก้ไขโพสต์สินค้าหรือสิ่งของที่เคยลงประกาศไว้)
@@ -46,7 +67,7 @@ export default function EditPost() {
   // States สำหรับเก็บข้อมูลฟอร์มและจัดการสถานะการทำงาน
   const [images, setImages] = useState<string[]>([]); 
   const [imageFiles, setImageFiles] = useState<(File | string)[]>([]); 
-  const [categoriesList, setCategoriesList] = useState<Category[]>([]);
+  const [categoriesList, setCategoriesList] = useState<DBCategory[]>([]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [wantedItem, setWantedItem] = useState("");
@@ -57,6 +78,7 @@ export default function EditPost() {
   const [category, setCategory] = useState("");
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   // =====================================================================
   // EFFECT: ดึงรายการหมวดหมู่ทั้งหมดจาก API เมื่อคอมโพเนนต์ถูกโหลด
@@ -76,7 +98,7 @@ export default function EditPost() {
 
   // กรองหมวดหมู่ "ทั้งหมด" ออกจากการเลือก
   const filteredCategories = categoriesList.filter(
-    (cat) => cat.CategoryName !== "ทั้งหมด"
+    (cat: DBCategory) => cat.CategoryName !== "ทั้งหมด"
   );
 
   // =====================================================================
@@ -188,9 +210,9 @@ export default function EditPost() {
   };
 
   // =====================================================================
-  // ฟังก์ชัน: ตรวจสอบความถูกต้องของข้อมูลฟอร์มและส่งคำขออัปเดตข้อมูลไปยัง API
+  // ฟังก์ชัน: ตรวจสอบความถูกต้องของข้อมูลฟอร์มและเปิด Modal ยืนยันการแก้ไข
   // =====================================================================
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const newErrors: Record<string, string> = {};
     if (images.length < 3) newErrors.images = "กรุณาลงรูปสินค้าอย่างน้อย 3 รูป";
@@ -210,6 +232,14 @@ export default function EditPost() {
       return;
     }
 
+    setShowConfirmDialog(true);
+  };
+
+  // =====================================================================
+  // ฟังก์ชัน: ดำเนินการส่งข้อมูลอัปเดตไปยัง API หลังจากยืนยันผ่าน Modal แล้ว
+  // =====================================================================
+  const confirmSubmit = async () => {
+    setShowConfirmDialog(false);
     try {
       const formData = new FormData();
       formData.append("item_name", title);
@@ -261,7 +291,7 @@ export default function EditPost() {
   return (
     <AppLayout>
       {/* ส่วนหัวข้อหน้าจอแก้ไขโพสต์ */}
-      <section className="border-b border-border/50 bg-muted/30 w-screen relative left-1/2 -translate-x-1/2 -mt-6 px-4 sm:px-6">
+      <section className="border-b border-border/50  w-screen relative left-1/2 -translate-x-1/2 -mt-6 px-4 sm:px-6">
         <div className="mx-auto max-w-5xl py-8">
           <div className="flex items-center justify-between">
             <div>
@@ -400,6 +430,12 @@ export default function EditPost() {
                     value={categoryId ? String(categoryId) : ""}
                     onValueChange={(val) => {
                       setCategoryId(Number(val));
+                      const selectedCat = categoriesList.find(
+                        (cat: DBCategory) => String(cat.CategoryID) === val
+                      );
+                      if (selectedCat) {
+                        setCategory(selectedCat.CategoryName);
+                      }
                       if (errors.category)
                         setErrors((prev) => ({ ...prev, category: "" }));
                     }}
@@ -407,17 +443,46 @@ export default function EditPost() {
                     <SelectTrigger
                       className={`h-11 ${errors.category ? "border-red-500 ring-red-500" : ""}`}
                     >
-                      <SelectValue placeholder="เลือกหมวดหมู่" />
+                      <SelectValue placeholder="เลือกหมวดหมู่">
+                        {categoryId && (() => {
+                          const currentCat = categoriesList.find((c: DBCategory) => String(c.CategoryID) === String(categoryId));
+                          if (!currentCat) return "เลือกหมวดหมู่";
+                          const iconName = currentCat.IconName;
+                          const iconColor = currentCat.Color || currentCat.CategoryColor || currentCat.color || currentCat.icon_color;
+                          return (
+                            <span className="inline-flex items-center gap-2">
+                              <DynamicIcon 
+                                name={iconName} 
+                                className="w-4 h-4 shrink-0" 
+                                style={{ color: iconColor || undefined }} 
+                              />
+                              <span>{currentCat.CategoryName}</span>
+                            </span>
+                          );
+                        })()}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      {filteredCategories.map((cat) => (
-                        <SelectOption
-                          key={cat.CategoryID}
-                          value={String(cat.CategoryID)}
-                        >
-                          {cat.CategoryName}
-                        </SelectOption>
-                      ))}
+                      {filteredCategories.map((cat: DBCategory) => {
+                        const iconName = cat.IconName;
+                        const iconColor = cat.Color || cat.CategoryColor || cat.color || cat.icon_color;
+                        return (
+                          <SelectOption
+                            key={cat.CategoryID}
+                            value={String(cat.CategoryID)}
+                            className="hover:bg-slate-200/60 dark:hover:bg-zinc-800/60 hover:text-black dark:hover:text-black focus:bg-slate-200/60 dark:focus:bg-zinc-800/60 focus:text-black dark:focus:text-black cursor-pointer"
+                          >
+                            <span className="inline-flex items-center gap-2">
+                              <DynamicIcon 
+                                name={iconName} 
+                                className="w-4 h-4 shrink-0" 
+                                style={{ color: iconColor || undefined }} 
+                              />
+                              <span>{cat.CategoryName}</span>
+                            </span>
+                          </SelectOption>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
 
@@ -536,6 +601,34 @@ export default function EditPost() {
           </form>
         </div>
       </section>
+
+      {/* Modal ยืนยันการแก้ไขกลางจอ */}
+      {showConfirmDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-background p-6 rounded-2xl shadow-2xl max-w-sm w-full mx-4 text-center space-y-6 border border-border animate-in fade-in zoom-in-95 duration-200">
+            <p className="text-lg font-bold text-foreground">
+              แน่ใจนะว่าจะแก้ไข
+            </p>
+            <div className="flex gap-3 justify-center">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setShowConfirmDialog(false)}
+                className="flex-1 h-11 border border-border hover:bg-slate-200/60 dark:hover:bg-zinc-800/60 hover:text-black dark:hover:text-black text-foreground transition-all"
+              >
+                ยกเลิก
+              </Button>
+              <Button
+                type="button"
+                onClick={confirmSubmit}
+                className="flex-1 h-11"
+              >
+                ยืนยัน
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppLayout>
   );
 }

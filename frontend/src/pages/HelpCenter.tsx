@@ -80,7 +80,7 @@ export default function HelpCenter() {
       try {
          setIsLoading(true);
          
-         const savedUser = localStorage.getItem("user");
+         const savedUser = sessionStorage.getItem("user");
          const currentUser: LocalUser | null = savedUser ? JSON.parse(savedUser) : null;
          const memberId = currentUser?.id || currentUser?.MemberID || currentUser?.UserID || currentUser?.user_id;
 

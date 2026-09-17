@@ -75,7 +75,7 @@ export default function Navbar() {
                   <button
                     key={link.to}
                     onClick={() => handleNavClick(link.to)}
-                    className={`group relative px-4 py-2 text-sm font-semibold tracking-wide transition-colors cursor-pointer bg-transparent border-none ${isActive ? "text-primary" : "text-neutral-900 hover:text-primary"}`}
+                    className={`group relative px-4 py-2 text-sm font-semibold tracking-wide transition-colors cursor-pointer bg-transparent border-none ${isActive ? "text-black" : "text-neutral-900 hover:text-black"}`}
                   >
                     <span>{link.label}</span>
                     <span className={`absolute bottom-0 left-4 right-4 h-[3px] bg-primary rounded-full transition-all duration-300 ease-out origin-center ${isActive ? "scale-x-100 opacity-100" : "scale-x-0 opacity-0 group-hover:scale-x-100 group-hover:opacity-100"}`} />
@@ -89,7 +89,7 @@ export default function Navbar() {
             <Button 
               variant="ghost" 
               size="sm" 
-              className="font-semibold text-sm text-neutral-900 hover:text-primary hover:bg-muted/50 gap-2 h-10 px-4 transition-colors" 
+              className="font-semibold text-sm text-neutral-900 hover:text-black hover:bg-muted/50 gap-2 h-10 px-4 transition-colors" 
               asChild
             >
               <Link to="/login">

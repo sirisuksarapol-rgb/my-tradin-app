@@ -1,6 +1,20 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
-import { ArrowLeft, MapPin, ArrowRightLeft, Star, MessageCircle, Globe, FileText, ChevronLeft, ChevronRight, ShieldAlert, Flag, CheckCircle, Sparkles } from "lucide-react";
+import {
+  ArrowLeft,
+  MapPin,
+  ArrowRightLeft,
+  Star,
+  MessageCircle,
+  Globe,
+  FileText,
+  ChevronLeft,
+  ChevronRight,
+  ShieldAlert,
+  Flag,
+  CheckCircle,
+  Sparkles,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,9 +22,19 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import AppLayout from "@/components/AppLayout";
 import { useToast } from "@/hooks/use-toast";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { getItems as fetchItemsAPI, getUserStats, IMAGE_BASE_URL } from "@/api/api";
+import {
+  getItems as fetchItemsAPI,
+  getUserStats,
+  IMAGE_BASE_URL,
+} from "@/api/api";
 import { createReport } from "@/api/api";
 import ReportModal from "@/components/ReportModal";
 
@@ -78,10 +102,11 @@ export default function PostDetail() {
   const [realRating, setRealRating] = useState<string>("0.0");
   const [realExchanges, setRealExchanges] = useState<number>(0);
 
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const user = JSON.parse(sessionStorage.getItem("user") || "{}");
 
   const fromPage = location.state?.fromPage;
-  const isFromIncomingRequest = location.state?.fromIncomingRequest || fromPage === "incoming";
+  const isFromIncomingRequest =
+    location.state?.fromIncomingRequest || fromPage === "incoming";
   const isOwnPostView = location.state?.isOwnPostView || false;
   const fromAdmin = location.state?.fromAdmin || false;
   const matchScore = location.state?.matchScore;
@@ -90,7 +115,7 @@ export default function PostDetail() {
 
   /**
    * ฟังก์ชัน: fetchPostDetail
-   * มีไว้สำหรับ: ดึงข้อมูลรายละเอียดสินค้าทั้งหมดจาก API ทำการค้นหารายการที่ตรงกับรหัสไอเทม (id) บน URL 
+   * มีไว้สำหรับ: ดึงข้อมูลรายละเอียดสินค้าทั้งหมดจาก API ทำการค้นหารายการที่ตรงกับรหัสไอเทม (id) บน URL
    * พร้อมทั้งดึงข้อมูลสถิติคะแนนรีวิวและจำนวนการแลกเปลี่ยนสำเร็จของผู้ลงโพสต์แบบเรียลไทม์
    */
   useEffect(() => {
@@ -162,15 +187,32 @@ export default function PostDetail() {
   const title = post.ItemName || post.item_name || "ไม่ระบุชื่อ";
   const category = post.category_name || post.CategoryName || "ทั่วไป";
 
-  const createdAt = post.created_at || post.CreatedAt || post.createdAt || post.created_date || post.date || post.item_date || "";
-  const wantedItem = post.DesiredItem || post.desired_item || "ไม่ระบุสิ่งที่ต้องการแลก";
-  const description = post.ItemDescription || post.Description || post.description || "ไม่มีรายละเอียดเพิ่มเติม";
+  const createdAt =
+    post.created_at ||
+    post.CreatedAt ||
+    post.createdAt ||
+    post.created_date ||
+    post.date ||
+    post.item_date ||
+    "";
+  const wantedItem =
+    post.DesiredItem || post.desired_item || "ไม่ระบุสิ่งที่ต้องการแลก";
+  const description =
+    post.ItemDescription ||
+    post.Description ||
+    post.description ||
+    "ไม่มีรายละเอียดเพิ่มเติม";
 
-  const locationName = post.MeetingLocation || post.meeting_location || "ไม่ระบุสถานที่";
-  const mapLink = post.map_link || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationName)}`;
+  const locationName =
+    post.MeetingLocation || post.meeting_location || "ไม่ระบุสถานที่";
+  const mapLink =
+    post.map_link ||
+    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationName)}`;
 
   const authorId = post.MemberID || post.member_id || "";
-  const isOwner = String(user?.MemberID || user?.member_id || "") === String(authorId) || isOwnPostView;
+  const isOwner =
+    String(user?.MemberID || user?.member_id || "") === String(authorId) ||
+    isOwnPostView;
 
   const loggedInName = user?.DisplayName || user?.display_name || "";
   let authorName = post.DisplayName || post.display_name || "";
@@ -182,30 +224,57 @@ export default function PostDetail() {
     authorName = "ผู้ใช้งานทั่วไป";
   }
 
-  const authorEmail = post.Email || post.email || (isOwner ? user?.Email || user?.email : "") || "ไม่มีข้อมูลอีเมล";
+  const authorEmail =
+    post.Email ||
+    post.email ||
+    (isOwner ? user?.Email || user?.email : "") ||
+    "ไม่มีข้อมูลอีเมล";
 
-  const rawProfileImg = post.ProfileImage || post.profile_image || post.user_image || (isOwner ? user?.ProfileImage || user?.profile_image : "");
+  const rawProfileImg =
+    post.ProfileImage ||
+    post.profile_image ||
+    post.user_image ||
+    (isOwner ? user?.ProfileImage || user?.profile_image : "");
   let profileImageUrl = "";
-  if (rawProfileImg && rawProfileImg.trim() !== "undefined" && rawProfileImg.trim() !== "null" && rawProfileImg.trim() !== "") {
+  if (
+    rawProfileImg &&
+    rawProfileImg.trim() !== "undefined" &&
+    rawProfileImg.trim() !== "null" &&
+    rawProfileImg.trim() !== ""
+  ) {
     const cleanImg = rawProfileImg.trim();
-    profileImageUrl = cleanImg.startsWith("http") ? cleanImg : `${IMAGE_BASE_URL}/uploads/${cleanImg}`;
+    profileImageUrl = cleanImg.startsWith("http")
+      ? cleanImg
+      : `${IMAGE_BASE_URL}/uploads/${cleanImg}`;
   }
 
   let images: string[] = [];
-  if (post.image_paths && Array.isArray(post.image_paths) && post.image_paths.length > 0) {
+  if (
+    post.image_paths &&
+    Array.isArray(post.image_paths) &&
+    post.image_paths.length > 0
+  ) {
     images = post.image_paths;
   } else {
-    const rawImage = String(post.image_path || post.image_name || post.ItemImage || "");
+    const rawImage = String(
+      post.image_path || post.image_name || post.ItemImage || "",
+    );
     if (rawImage && rawImage.trim() !== "undefined" && rawImage.trim() !== "") {
       try {
         const cleanStr = rawImage.trim();
         if (cleanStr.includes(",")) {
           images = cleanStr.split(",").map((img) => {
             const tImg = img.trim();
-            return tImg.startsWith("http") ? tImg : `${IMAGE_BASE_URL}/uploads/${tImg}`;
+            return tImg.startsWith("http")
+              ? tImg
+              : `${IMAGE_BASE_URL}/uploads/${tImg}`;
           });
         } else {
-          images.push(cleanStr.startsWith("http") ? cleanStr : `${IMAGE_BASE_URL}/uploads/${cleanStr}`);
+          images.push(
+            cleanStr.startsWith("http")
+              ? cleanStr
+              : `${IMAGE_BASE_URL}/uploads/${cleanStr}`,
+          );
         }
       } catch (e) {
         images.push("/placeholder.jpg");
@@ -219,13 +288,15 @@ export default function PostDetail() {
    * ฟังก์ชัน: nextImage
    * มีไว้สำหรับ: เปลี่ยนภาพแกลเลอรีไปยังรูปถัดไป วนกลับมาภาพแรกสุดหากอยู่ที่ภาพสุดท้าย
    */
-  const nextImage = () => setCurrentImageIndex((p) => (p === images.length - 1 ? 0 : p + 1));
-  
+  const nextImage = () =>
+    setCurrentImageIndex((p) => (p === images.length - 1 ? 0 : p + 1));
+
   /**
    * ฟังก์ชัน: prevImage
    * มีไว้สำหรับ: เปลี่ยนภาพแกลเลอรีกลับไปยังรูปก่อนหน้า วนไปภาพสุดท้ายสุดหากอยู่ที่ภาพแรก
    */
-  const prevImage = () => setCurrentImageIndex((p) => (p === 0 ? images.length - 1 : p - 1));
+  const prevImage = () =>
+    setCurrentImageIndex((p) => (p === 0 ? images.length - 1 : p - 1));
 
   /**
    * ฟังก์ชัน: handleReport
@@ -269,7 +340,7 @@ export default function PostDetail() {
       <section className="py-8 sm:py-12">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-2"> 
+            <div className="flex items-center gap-2">
               <Button
                 variant="ghost"
                 size="icon"
@@ -358,10 +429,10 @@ export default function PostDetail() {
 
             <div className="space-y-6">
               {matchScore !== undefined && (
-                <div className="bg-primary rounded-xl px-4 py-3 flex items-center justify-center gap-2 shadow-sm">
-                  <Sparkles className="h-4 w-4 text-primary-foreground" />
-                  <span className="text-sm font-semibold text-primary-foreground">
-                    คะแนนความเหมาะสมจาก AI: {matchScore}%
+                <div className="bg-primary border border-primary/20 rounded-xl px-4 py-3 flex items-center justify-center gap-2 shadow-sm">
+                  <div className="h-4 w-4 text-white" />
+                  <span className="text-sm font-semibold text-white">
+                    คะแนนความเหมาะสม: {matchScore}%
                   </span>
                 </div>
               )}
@@ -371,9 +442,9 @@ export default function PostDetail() {
                   <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
                     {title}
                   </h1>
-                  <Badge variant="secondary" className="shrink-0 text-xs">
-                    {category}
-                  </Badge>
+                  <Badge variant="secondary" className="shrink-0 text-xs bg-primary/10 hover:bg-primary/10">
+    {category}
+  </Badge>
                 </div>
                 {createdAt && (
                   <p className="text-sm text-muted-foreground">{createdAt}</p>

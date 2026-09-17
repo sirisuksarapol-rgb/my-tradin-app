@@ -52,9 +52,9 @@ export default function Login() {
     try {
       const response = await loginApi(formData); 
       if (response.data.success) { 
-        localStorage.setItem("user", JSON.stringify(response.data.user)); 
-        localStorage.setItem("token", response.data.token); 
-        localStorage.setItem("role", response.data.role); 
+        sessionStorage.setItem("user", JSON.stringify(response.data.user)); 
+        sessionStorage.setItem("token", response.data.token); 
+        sessionStorage.setItem("role", response.data.role); 
 
         if (response.data.role === "admin") { 
           navigate("/admin"); 
