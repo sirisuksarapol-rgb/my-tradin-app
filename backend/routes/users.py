@@ -131,3 +131,79 @@ def update_user(user_id):
         # ปิด Cursor และการเชื่อมต่อฐานข้อมูลเพื่อความปลอดภัยของระบบ
         cursor.close()
         conn.close()
+        
+# =========================================================================
+# 2. API: ดึงสถิติและรีวิวของผู้ใช้งาน (GET /api/users/<user_id>/stats)
+# =========================================================================
+@users_bp.route('/api/users/<int:user_id>/stats', methods=['GET'])
+def get_user_stats(user_id):
+    """
+    API Endpoint: GET /api/users/<int:user_id>/stats
+    คำอธิบาย: ดึงข้อมูลสถิติการแลกเปลี่ยนสำเร็จ, คะแนนรีวิวเฉลี่ย และรายการรีวิวพร้อมรูปโปรไฟล์ผู้รีวิว
+    """
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        # 1. คำนวณจำนวนการแลกเปลี่ยนสำเร็จ และคะแนนรีวิวเฉลี่ย
+        sql_stats = """
+            SELECT 
+                COUNT(CASE WHEN ExchangeStatus IN ('accepted', 'completed') THEN 1 END) AS successfulExchanges,
+                COALESCE(AVG(
+                    CASE 
+                        WHEN MemberID = %s THEN PartnerScore 
+                        WHEN TargetMemberID = %s THEN Score 
+                    END
+                ), 0) AS reviewScore
+            FROM exchange
+            WHERE (MemberID = %s OR TargetMemberID = %s) 
+              AND ExchangeStatus IN ('accepted', 'completed')
+              AND (PartnerScore IS NOT NULL OR Score IS NOT NULL)
+        """
+        cursor.execute(sql_stats, (user_id, user_id, user_id, user_id))
+        stats = cursor.fetchone()
+
+        successful_exchanges = stats['successfulExchanges'] if stats else 0
+        review_score = float(stats['reviewScore']) if stats and stats['reviewScore'] is not None else 0.0
+
+        # 2. ดึงรายการรีวิวและความคิดเห็น พร้อมรูปโปรไฟล์และชื่อของผู้รีวิว
+        sql_reviews = """
+            SELECT
+                e.ExchangeID,
+                e.SuccessDate AS ReviewDate,
+                CASE WHEN e.MemberID = %s THEN e.PartnerScore ELSE e.Score END AS Rating,
+                CASE WHEN e.MemberID = %s THEN e.PartnerComment ELSE e.Comment END AS Comment,
+                CASE 
+                    WHEN e.MemberID = %s THEN COALESCE(target_member.DisplayName, 'ผู้ใช้งานทั่วไป')
+                    ELSE COALESCE(requester_member.DisplayName, 'ผู้ใช้งานทั่วไป')
+                END AS ReviewerName,
+                CASE 
+                    WHEN e.MemberID = %s THEN target_member.ProfileImage
+                    ELSE requester_member.ProfileImage
+                END AS ReviewerProfileImage
+            FROM exchange e
+            LEFT JOIN member requester_member ON e.MemberID = requester_member.MemberID
+            LEFT JOIN member target_member ON e.TargetMemberID = target_member.MemberID
+            WHERE ((e.MemberID = %s AND e.PartnerScore IS NOT NULL) OR (e.TargetMemberID = %s AND e.Score IS NOT NULL))
+              AND e.ExchangeStatus IN ('accepted', 'completed')
+            ORDER BY e.SuccessDate DESC
+        """
+        cursor.execute(sql_reviews, (user_id, user_id, user_id, user_id, user_id, user_id))
+        reviews = cursor.fetchall()
+
+        return jsonify({
+            "success": True,
+            "data": {
+                "successfulExchanges": successful_exchanges,
+                "reviewScore": f"{review_score:.1f}",
+                "reviews": reviews
+            }
+        }), 200
+
+    except Exception as e:
+        print(f"❌ Get User Stats Error: {str(e)}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+    finally:
+        cursor.close()
+        conn.close()

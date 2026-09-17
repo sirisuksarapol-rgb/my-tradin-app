@@ -65,7 +65,10 @@ def login():
                 Email,
                 DisplayName,
                 ProfileImage,
-                Password
+                Password,
+                MemberStatus,
+                SuspendedUntil,
+                SuspendReason
             FROM member
             WHERE Email = %s
         """, (email,))
@@ -73,6 +76,22 @@ def login():
         member = cursor.fetchone()
 
         if member:
+            if member.get("MemberStatus") == "Suspended":
+                suspended_until = member.get("SuspendedUntil")
+                reason = member.get("SuspendReason") or "ละเมิดเงื่อนไขการใช้งาน"
+                
+                # ตรวจสอบว่าพ้นกำหนดแบนชั่วคราวหรือยัง (กรณีระงับชั่วคราว)
+                if suspended_until and datetime.datetime.now() > suspended_until:
+                    # (ทางเลือก) สามารถเขียนโค้ดเคลียร์สถานะกลับเป็น Active ตรงนี้ได้ หรือให้แอดมินกดปลดแบน
+                    pass
+                else:
+                    return jsonify({
+                        "success": False,
+                        "message": "บัญชีของคุณถูกระงับการใช้งาน",
+                        "reason": reason,
+                        "suspended_until": suspended_until.strftime('%d/%m/%Y %H:%M น.') if suspended_until else "ถาวร"
+                    }), 403
+                    
             stored_password = member["Password"]
 
             # ตรวจสอบรหัสผ่าน (รองรับทั้งแบบเข้ารหัส Hash และแบบข้อความธรรมดา)

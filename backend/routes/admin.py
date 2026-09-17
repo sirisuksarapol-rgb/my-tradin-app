@@ -152,19 +152,10 @@ def users():
 # ==========================================
 @admin_bp.route("/items", methods=["GET"])
 def items():
-    """
-    API Endpoint: GET /items
-    คำอธิบาย: ดึงรายการโพสต์สิ่งของทั้งหมดในระบบสำหรับการตรวจสอบและจัดการเนื้อหา (Item Management)
-    
-    กระบวนการทำงาน:
-    - ทำการเชื่อมโยงข้อมูล (LEFT JOIN) ระหว่างตารางโพสต์สินค้า (item) และตารางสมาชิก (member) 
-      เพื่อให้ทราบข้อมูลรายละเอียดของเจ้าของโพสต์
-    - จัดเรียงลำดับตามวันที่โพสต์ (PostDate) ล่าสุดขึ้นก่อน
-    """
     conn = get_connection()
     cursor = conn.cursor()
     
-    # ดึงข้อมูลสินค้าพร้อมข้อมูลเจ้าของโพสต์
+    # ✅ เพิ่ม m.ProfileImage เข้าไปใน SELECT ด้านล่างนี้
     cursor.execute("""
         SELECT
             i.ItemID,
@@ -175,6 +166,7 @@ def items():
             i.PostDate,
             m.MemberID,
             m.DisplayName,
+            m.ProfileImage,
             i.CategoryID
         FROM item i
         LEFT JOIN member m ON i.MemberID = m.MemberID
@@ -299,32 +291,23 @@ def resolve_report(problem_id):
 # ==========================================
 @admin_bp.route("/users/<int:member_id>/suspend", methods=["PUT"])
 def suspend_user(member_id):
-    """
-    API Endpoint: PUT /users/<member_id>/suspend
-    คำอธิบาย: ระงับสิทธิ์การใช้งานบัญชีผู้ใช้ (Account Suspension) 
-             รองรับทั้งการแบนแบบชั่วคราว (กำหนดจำนวนวัน) และแบบถาวร พร้อมระบุเหตุผล
-    
-    กระบวนการทำงาน:
-    1. รับค่าพารามิเตอร์ประเภทการแบน (type), จำนวนวัน (days), และเหตุผล (reason) จาก Request Body
-    2. คำนวณวันเวลาสิ้นสุดการแบน (SuspendedUntil) หากเป็นการระงับชั่วคราว
-    3. อัปเดตสถานะสมาชิกในตาราง member เป็น 'Suspended' พร้อมบันทึกข้อมูลเวลาสิ้นสุดและเหตุผล
-    4. ส่งข้อความแจ้งเตือนรายละเอียดการระงับสิทธิ์ไปยังผู้ใช้งานผ่านระบบ Notification
-    """
     data = request.json or {}
     suspend_type = data.get("type", "permanent")
-    days = data.get("days", 0)
+    until_date_str = data.get("until_date")
     reason = data.get("reason", "ละเมิดเงื่อนไขข้อตกลงของระบบ")
 
-    # คำนวณวันสิ้นสุดการแบนกรณีเลือกแบบชั่วคราว (Temporary Suspension)
     suspended_until = None
-    if suspend_type == "temporary" and days:
-        suspended_until = datetime.datetime.now() + datetime.timedelta(days=int(days))
+    if suspend_type == "temporary" and until_date_str:
+        try:
+            suspended_until = datetime.datetime.strptime(until_date_str, "%Y-%m-%d")
+            suspended_until = suspended_until.replace(hour=23, minute=59, second=59)
+        except ValueError:
+            pass
 
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     
     try:
-        # อัปเดตสถานะบัญชีผู้ใช้เป็นถูกระงับสิทธิ์
         cursor.execute("""
             UPDATE member 
             SET MemberStatus = 'Suspended', 
@@ -334,14 +317,12 @@ def suspend_user(member_id):
         """, (suspended_until, reason, member_id))
         conn.commit()
 
-        # จัดเตรียมข้อความอธิบายเหตุผลและกำหนดการแบนสำหรับแจ้งเตือนผู้ใช้
         message = f"บัญชีของคุณถูกระงับเนื่องจาก: {reason}"
         if suspended_until:
             message += f"\nจะสามารถใช้งานได้อีกครั้งในวันที่ {suspended_until.strftime('%d/%m/%Y %H:%M น.')}"
         else:
             message += "\n(ระงับแบบถาวร)"
 
-        # ส่งการแจ้งเตือนไปยังผู้ใช้
         notify_user(
             member_id=member_id,
             title="แจ้งเตือนการระงับสิทธิ์ใช้งาน",
@@ -412,21 +393,15 @@ def unsuspend_user(member_id):
 # ==========================================
 @admin_bp.route("/items/<int:item_id>", methods=["DELETE"])
 def delete_item_by_admin(item_id):
-    """
-    API Endpoint: DELETE /items/<item_id>
-    คำอธิบาย: ลบโพสต์สินค้าออกจากระบบโดยอำนาจของผู้ดูแลระบบ (กรณีโพสต์ละเมิดกฎระเบียบ)
-    
-    กระบวนการทำงาน:
-    1. ตรวจสอบว่ามีโพสต์สินค้านี้อยู่จริง พร้อมดึงข้อมูลรหัสเจ้าของโพสต์ (MemberID) และชื่อสินค้า (ItemName)
-    2. ดำเนินการลบข้อมูลสินค้าออกจากตาราง item
-    3. ส่งการแจ้งเตือนไปยังเจ้าของโพสต์ เพื่อแจ้งให้ทราบว่าโพสต์ดังกล่าวถูกลบเนื่องจากเหตุผลใด
-    4. จัดการ Transaction Commit/Rollback และปิด Connection ให้อัตโนมัติ
-    """
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     
     try:
-        # ตรวจสอบการมีอยู่ของโพสต์และดึงข้อมูลเจ้าของเพื่อส่งแจ้งเตือนภายหลัง
+        # รับค่าเหตุผลการลบจาก Frontend
+        data = request.json or {}
+        reason = data.get("reason", "ผิดเงื่อนไขการใช้งานของระบบ")
+
+        # ตรวจสอบการมีอยู่ของโพสต์และดึงข้อมูลเจ้าของ
         cursor.execute("SELECT MemberID, ItemName FROM item WHERE ItemID = %s", (item_id,))
         item = cursor.fetchone()
 
@@ -437,21 +412,117 @@ def delete_item_by_admin(item_id):
         cursor.execute("DELETE FROM item WHERE ItemID = %s", (item_id,))
         conn.commit()
 
-        # ส่งข้อความแจ้งเตือนเหตุผลการลบโพสต์หาเจ้าของสินค้า
+        # ส่งข้อความแจ้งเตือนหาเจ้าของสินค้าพร้อมระบุเหตุผลที่รับมา
         if item.get("MemberID"):
             notify_user(
                 member_id=item["MemberID"],
                 title="แจ้งเตือนการลบโพสต์",
-                message=f"โพสต์เรื่อง '{item.get('ItemName', 'สิ่งของของคุณ')}' ถูกลบโดยผู้ดูแลระบบ เนื่องจากไม่ตรงตามเงื่อนไขการใช้งาน",
-                link="/my-items"
+                message=f"โพสต์ '{item.get('ItemName', 'สิ่งของของคุณ')}' ถูกลบโดยผู้ดูแลระบบ เนื่องจาก: {reason}",
             )
 
-        return jsonify({"success": True, "message": "ลบโพสต์เรียบร้อยแล้ว"}), 200
+        return jsonify({"success": True, "message": "ลบโพสต์และส่งแจ้งเตือนเรียบร้อยแล้ว"}), 200
         
     except Exception as e:
         conn.rollback()
         print(f"❌ Error deleting item {item_id}: {str(e)}")
         return jsonify({"success": False, "message": str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+        
+# ==========================================
+# 9. GET USER STATS & REVIEWS API
+# ==========================================
+@admin_bp.route("/users/<int:member_id>/stats", methods=["GET"])
+def get_user_stats(member_id):
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    try:
+        cursor.execute("""
+            SELECT COUNT(*) AS total 
+            FROM exchange 
+            WHERE (MemberID = %s OR TargetMemberID = %s) 
+              AND (ExchangeStatus = 'Completed' OR ExchangerResult = 'Success')
+        """, (member_id, member_id))
+        success_row = cursor.fetchone()
+        successful_exchanges = success_row["total"] if success_row else 0
+
+        cursor.execute("""
+            SELECT COUNT(*) AS total 
+            FROM exchange 
+            WHERE (MemberID = %s OR TargetMemberID = %s) 
+              AND (ExchangeStatus = 'Cancelled' OR ExchangerResult = 'Failed')
+        """, (member_id, member_id))
+        failed_row = cursor.fetchone()
+        failed_exchanges = failed_row["total"] if failed_row else 0
+
+        cursor.execute("""
+            SELECT 
+                e.ExchangeID,
+                e.Score,
+                e.Comment,
+                e.PartnerScore,
+                e.PartnerComment,
+                e.SuccessDate,
+                e.StartDate,
+                e.MemberID,
+                e.TargetMemberID,
+                m1.DisplayName AS SenderName,
+                m2.DisplayName AS TargetName
+            FROM exchange e
+            LEFT JOIN member m1 ON e.MemberID = m1.MemberID
+            LEFT JOIN member m2 ON e.TargetMemberID = m2.MemberID
+            WHERE (e.MemberID = %s OR e.TargetMemberID = %s)
+        """, (member_id, member_id))
+        raw_reviews = cursor.fetchall()
+
+        reviews = []
+        total_score = 0
+        score_count = 0
+
+        for row in raw_reviews:
+            is_member = (int(row["MemberID"]) == int(member_id))
+            
+            if is_member:
+                comment = row.get("PartnerComment")
+                score = row.get("PartnerScore")
+                reviewer_name = row.get("TargetName") or "ผู้ใช้งานระบบ"
+            else:
+                comment = row.get("Comment")
+                score = row.get("Score")
+                reviewer_name = row.get("SenderName") or "ผู้ใช้งานระบบ"
+
+            if score is not None:
+                total_score += float(score)
+                score_count += 1
+
+            if comment or score is not None:
+                rev_date = row.get("SuccessDate") or row.get("StartDate")
+                reviews.append({
+                    "id": row["ExchangeID"],
+                    "comment": comment or "ไม่มีความคิดเห็น",
+                    "rating": int(score or 0),
+                    "reviewerName": reviewer_name,
+                    "date": rev_date.strftime('%d/%m/%Y %H:%M') if isinstance(rev_date, datetime.datetime) else ""
+                })
+
+        average_rating = (total_score / score_count) if score_count > 0 else 0.0
+
+        return jsonify({
+            "success": True,
+            "data": {
+                "totalItems": 0,
+                "successfulExchanges": successful_exchanges,
+                "failedExchanges": failed_exchanges,
+                "rating": round(average_rating, 1),
+                "reviews": reviews
+            }
+        }), 200
+
+    except Exception as e:
+        print(f"❌ Error fetching stats for user {member_id}: {str(e)}")
+        return jsonify({"success": False, "message": str(e), "data": {"successfulExchanges": 0, "failedExchanges": 0, "rating": 0.0, "reviews": []}}), 500
     finally:
         cursor.close()
         conn.close()
