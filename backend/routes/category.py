@@ -13,29 +13,22 @@ def get_categories():
     """
     API Endpoint: GET /api/categories
     คำอธิบาย: ดึงข้อมูลหมวดหมู่สินค้าทั้งหมดพร้อมทั้งคำนวณจำนวนสินค้าที่อยู่ในแต่ละหมวดหมู่
-    
-    รายละเอียดการทำงาน:
-    - เชื่อมต่อฐานข้อมูลและสร้าง Cursor แบบ Dictionary
-    - ดึงข้อมูลหมวดหมู่ทั้งหมดจากตาราง category และทำ LEFT JOIN กับตาราง item
-      เพื่อคำนวณนับจำนวนสินค้า (ItemCount) ที่อยู่ภายใต้แต่ละหมวดหมู่
-    - จัดกลุ่มข้อมูลตาม CategoryID, CategoryName, และ IconName เรียงตาม CategoryID จากน้อยไปมาก
-    - ส่งผลลัพธ์ข้อมูลกลับในรูปแบบ JSON พร้อมรหัสสถานะ 200 หรือแจ้งข้อผิดพลาดสถานะ 500
     """
     try:
         conn = get_connection()
         cursor = conn.cursor(dictionary=True)
 
-        # คำสั่ง SQL สำหรับดึงข้อมูลหมวดหมู่และนับจำนวนสินค้าในแต่ละหมวดหมู่
+        # แก้ไขโดยใส่เครื่องหมาย " " ครอบชื่อคอลัมน์ เพื่อรองรับตัวพิมพ์ใหญ่-เล็กใน PostgreSQL
         cursor.execute("""
             SELECT 
-                c.CategoryID, 
-                c.CategoryName, 
-                c.IconName,
-                COUNT(i.ItemID) AS ItemCount
+                c."CategoryID", 
+                c."CategoryName", 
+                c."IconName",
+                COUNT(i."ItemID") AS ItemCount
             FROM category c
-            LEFT JOIN item i ON c.CategoryID = i.CategoryID
-            GROUP BY c.CategoryID, c.CategoryName, c.IconName
-            ORDER BY c.CategoryID
+            LEFT JOIN item i ON c."CategoryID" = i."CategoryID"
+            GROUP BY c."CategoryID", c."CategoryName", c."IconName"
+            ORDER BY c."CategoryID"
         """)
         data = cursor.fetchall()
 
@@ -47,7 +40,6 @@ def get_categories():
     except Exception as e:
         print("❌ Error in get_categories:", e) 
         return jsonify({"error": str(e)}), 500
-
 
 # =========================================================================
 # 2. ฟังก์ชันเพิ่มหมวดหมู่ใหม่ (POST /api/categories)
