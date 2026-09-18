@@ -24,7 +24,11 @@ app = Flask(__name__)
 CORS(app) # เปิดใช้งาน Cross-Origin Resource Sharing เพื่ออนุญาตให้ Frontend (ต่างโดเมนหรือพอร์ต) สามารถเรียกใช้งาน API ได้อย่างอิสระ
 
 # ดึงค่าคอนฟิกูเรชันฐานข้อมูลจาก Environment Variable
-database_url = os.environ.get('DATABASE_URL')
+database_url = os.environ.get("DATABASE_URL")
+if database_url and database_url.startswith("postgres://"):
+    database_url = database_url.replace("postgres://", "postgresql://", 1)
+
+app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 
 # กำหนด Secret Key สำหรับความปลอดภัย การเข้ารหัส และการสร้าง JWT Token
 app.config['SECRET_KEY'] = os.getenv('JWT_SECRET', 'supersecret123')
