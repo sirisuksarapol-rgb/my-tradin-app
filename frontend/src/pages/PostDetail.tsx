@@ -161,25 +161,35 @@ export default function PostDetail() {
   }, [id, toast]);
 
   if (isLoading) {
-    return (
-      <AppLayout>
-        <div className="flex flex-col items-center justify-center h-64 gap-3">
-          <div className="animate-spin h-10 w-10 border-4 border-primary rounded-full border-t-transparent" />
-          <p className="text-sm text-muted-foreground animate-pulse">
-            กำลังดึงข้อมูลจากฐานข้อมูล...
-          </p>
-        </div>
-      </AppLayout>
+    const loadingContent = (
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
+        <div className="animate-spin h-10 w-10 border-4 border-primary rounded-full border-t-transparent" />
+        <p className="text-sm text-muted-foreground animate-pulse">
+          กำลังดึงข้อมูลจากฐานข้อมูล...
+        </p>
+      </div>
+    );
+    
+    // ถ้ามาจาก Admin ไม่ต้องแสดง Navbar
+    return fromAdmin ? (
+      <div className="min-h-screen bg-background">{loadingContent}</div>
+    ) : (
+      <AppLayout>{loadingContent}</AppLayout>
     );
   }
 
   if (!post) {
-    return (
-      <AppLayout>
-        <div className="flex items-center justify-center h-64">
-          <p className="text-muted-foreground">ไม่พบโพสต์นี้ในระบบฐานข้อมูล</p>
-        </div>
-      </AppLayout>
+    const notFoundContent = (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-muted-foreground">ไม่พบโพสต์นี้ในระบบฐานข้อมูล</p>
+      </div>
+    );
+
+    // ถ้ามาจาก Admin ไม่ต้องแสดง Navbar
+    return fromAdmin ? (
+      <div className="min-h-screen bg-background">{notFoundContent}</div>
+    ) : (
+      <AppLayout>{notFoundContent}</AppLayout>
     );
   }
 
@@ -284,24 +294,12 @@ export default function PostDetail() {
     }
   }
 
-  /**
-   * ฟังก์ชัน: nextImage
-   * มีไว้สำหรับ: เปลี่ยนภาพแกลเลอรีไปยังรูปถัดไป วนกลับมาภาพแรกสุดหากอยู่ที่ภาพสุดท้าย
-   */
   const nextImage = () =>
     setCurrentImageIndex((p) => (p === images.length - 1 ? 0 : p + 1));
 
-  /**
-   * ฟังก์ชัน: prevImage
-   * มีไว้สำหรับ: เปลี่ยนภาพแกลเลอรีกลับไปยังรูปก่อนหน้า วนไปภาพสุดท้ายสุดหากอยู่ที่ภาพแรก
-   */
   const prevImage = () =>
     setCurrentImageIndex((p) => (p === 0 ? images.length - 1 : p - 1));
 
-  /**
-   * ฟังก์ชัน: handleReport
-   * มีไว้สำหรับ: ตรวจสอบเหตุผลการรายงาน ส่งข้อมูลรายงานปัญหาโพสต์ไปยัง API พร้อมแสดงการแจ้งเตือนสถานะความสำเร็จ
-   */
   const handleReport = async () => {
     if (!reportReason.trim()) {
       toast({
@@ -335,8 +333,9 @@ export default function PostDetail() {
     }
   };
 
-  return (
-    <AppLayout>
+  // ✅ 1. จัดเก็บเนื้อหาทั้งหมดไว้ในตัวแปร mainContent
+  const mainContent = (
+    <>
       <section className="py-8 sm:py-12">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <div className="flex items-center justify-between mb-8">
@@ -443,8 +442,8 @@ export default function PostDetail() {
                     {title}
                   </h1>
                   <Badge variant="secondary" className="shrink-0 text-xs bg-primary/10 hover:bg-primary/10">
-    {category}
-  </Badge>
+                    {category}
+                  </Badge>
                 </div>
                 {createdAt && (
                   <p className="text-sm text-muted-foreground">{createdAt}</p>
@@ -591,6 +590,18 @@ export default function PostDetail() {
         targetId={itemId}
         targetTitle={title}
       />
+    </>
+  );
+
+  // ✅ 2. ตรวจสอบว่าเปิดมาจากหน้า Admin หรือไม่ ถ้าใช่ให้ครอบด้วย <div> ธรรมดาแทน <AppLayout>
+  return fromAdmin ? (
+    <div className="min-h-screen bg-background overflow-y-auto w-full">
+      {mainContent}
+    </div>
+  ) : (
+    <AppLayout>
+      {mainContent}
     </AppLayout>
   );
 }
+
