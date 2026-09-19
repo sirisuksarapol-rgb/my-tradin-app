@@ -52,10 +52,12 @@ def register():
     current_time = datetime.now()
 
     conn = get_connection()
-    cursor = conn.cursor(buffered=True)  # 👈 เพิ่ม buffered=True ตรงนี้
+    # เอา buffered=True ออก เพราะ PostgreSQL ไม่รองรับพารามิเตอร์นี้ (ใช้ได้เฉพาะ MySQL)
+    cursor = conn.cursor() 
 
     try:
-        cursor.execute("SELECT MemberID, EmailVerified FROM member WHERE Email = %s", (email,))
+        # เปลี่ยนชื่อคอลัมน์เป็นตัวพิมพ์เล็กทั้งหมด
+        cursor.execute("SELECT memberid, emailverified FROM member WHERE email = %s", (email,))
         existing_user = cursor.fetchone()
 
         if existing_user:
@@ -67,11 +69,12 @@ def register():
                     "message": "อีเมลนี้ถูกใช้งานและยืนยันตัวตนในระบบแล้ว"
                 }), 400
             
+            # เปลี่ยนชื่อคอลัมน์เป็นตัวพิมพ์เล็กทั้งหมด
             cursor.execute("""
                 UPDATE member 
-                SET Password = %s, DisplayName = %s, ProfileImage = %s, 
-                    VerifyCode = %s, VerifyExpire = %s, RegisterDate = %s
-                WHERE MemberID = %s
+                SET password = %s, displayname = %s, profileimage = %s, 
+                    verifycode = %s, verifyexpire = %s, registerdate = %s
+                WHERE memberid = %s
             """, (
                 password_hash,
                 display_name,
@@ -82,10 +85,11 @@ def register():
                 member_id
             ))
         else:
+            # เปลี่ยนชื่อคอลัมน์เป็นตัวพิมพ์เล็กทั้งหมด
             cursor.execute("""
                 INSERT INTO member (
-                    Email, Password, DisplayName, ProfileImage,
-                    VerifyCode, VerifyExpire, EmailVerified, RegisterDate, MemberStatus
+                    email, password, displayname, profileimage,
+                    verifycode, verifyexpire, emailverified, registerdate, memberstatus
                 )
                 VALUES (%s, %s, %s, %s, %s, %s, 0, %s, 'Pending')
             """, (

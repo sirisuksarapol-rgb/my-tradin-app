@@ -4,7 +4,6 @@ from db import get_connection
 # ==========================================
 # REPORT SYSTEM BLUEPRINT CONFIGURATION
 # ==========================================
-# สร้าง Blueprint สำหรับจัดกลุ่มเส้นทาง API ที่เกี่ยวข้องกับการรายงานปัญหาและข้อเสนอแนะ (Report Management)
 report_bp = Blueprint("report_bp", __name__)
 
 
@@ -16,14 +15,6 @@ def create_report():
     """
     API Endpoint: POST /api/reports
     คำอธิบาย: บันทึกรายงานปัญหา ข้อเสนอแนะ หรือการแจ้งเบาะแสใหม่เข้าสู่ระบบ
-    
-    รายละเอียดการทำงาน:
-    1. รับข้อมูล JSON Request Body (ItemID, MemberID, ReportedMemberID, ProblemType, HelpCenterData)
-    2. ตรวจสอบข้อมูลผู้แจ้ง (MemberID) หากไม่พบจะคืนค่าข้อผิดพลาดสถานะ 400
-    3. ตรวจสอบเนื้อหารายงาน (HelpCenterData) ว่ามีการระบุรายละเอียดหรือไม่
-    4. ตรวจสอบเงื่อนไขตามประเภทปัญหา (Validation) หากไม่ใช่ประเภทระบบหรือข้อเสนอแนะทั่วไป จะต้องระบุไอเทมหรือสมาชิกที่ถูกรายงานด้วย
-    5. เชื่อมต่อฐานข้อมูลและบันทึกข้อมูลลงในตาราง problem โดยกำหนดสถานะเริ่มต้นเป็น 'รอดำเนินการ' และบันทึกเวลาปัจจุบัน (NOW())
-    6. ทำการ commit ข้อมูลและคืนค่า ProblemID พร้อมข้อความสำเร็จกลับไปในรูปแบบ JSON (สถานะ 201)
     """
     try:
         data = request.get_json() or {}
@@ -34,22 +25,18 @@ def create_report():
         problem_type = data.get("ProblemType")
         help_center = data.get("HelpCenterData")
 
-        # 1. ตรวจสอบข้อมูลผู้แจ้ง
         if not member_id:
             return jsonify({
                 "success": False,
                 "message": "ไม่พบข้อมูลผู้แจ้ง กรุณาเข้าสู่ระบบก่อนทำรายการ"
             }), 400
 
-        # 2. ตรวจสอบเนื้อหารายงาน
         if not help_center or not str(help_center).strip():
             return jsonify({
                 "success": False,
                 "message": "กรุณาระบุรายละเอียดปัญหาหรือข้อเสนอแนะ"
             }), 400
 
-        # 3. Validation ตามประเภทปัญหา
-        # หากไม่ใช่ประเภทแจ้งปัญหาระบบหรือข้อเสนอแนะ จะต้องระบุ Target (Item หรือ Member) อย่างใดอย่างหนึ่ง
         system_report_types = ["bug", "suggestion", "other", "แจ้งปัญหาระบบ", "ข้อเสนอแนะ", "อื่น ๆ"]
         if problem_type not in system_report_types and not item_id and not reported_member_id:
             return jsonify({
@@ -60,20 +47,21 @@ def create_report():
         conn = get_connection()
         cursor = conn.cursor(dictionary=True)
 
+        # ใช้ตัวพิมพ์เล็กในชื่อตารางและคอลัมน์ และใช้ RETURNING สำหรับดึง ID ล่าสุด (PostgreSQL)
         sql = """
             INSERT INTO problem (
-                ItemID,
-                MemberID,
-                ReportedMemberID,
-                ReportStatus,
-                HelpCenterData,
-                ReportDate,
-                ProblemType
+                itemid,
+                memberid,
+                reportedmemberid,
+                reportstatus,
+                helpcenterdata,
+                reportdate,
+                problemtype
             )
             VALUES (%s, %s, %s, 'รอดำเนินการ', %s, NOW(), %s)
+            RETURNING problemid
         """
 
-        # แปลงค่าไอดีให้อยู่ในรูปแบบ Integer หรือ None สำหรับ MySQL
         clean_item_id = int(item_id) if item_id else None
         clean_reported_member_id = int(reported_member_id) if reported_member_id else None
 
@@ -84,9 +72,10 @@ def create_report():
             help_center.strip(),
             problem_type
         ))
-
+        
+        inserted_row = cursor.fetchone()
+        problem_id = inserted_row['problemid'] if inserted_row else cursor.lastrowid
         conn.commit()
-        problem_id = cursor.lastrowid
 
         cursor.close()
         conn.close()
@@ -98,6 +87,8 @@ def create_report():
         }), 201
 
     except Exception as e:
+        if 'conn' in locals() and conn:
+            conn.rollback()
         print("Create Report Error:", e)
         return jsonify({
             "success": False,
@@ -113,31 +104,34 @@ def get_reports():
     """
     API Endpoint: GET /api/reports
     คำอธิบาย: ดึงรายการรายงานปัญหาและข้อเสนอแนะทั้งหมดในระบบสำหรับหน้าจอจัดการของผู้ดูแลระบบ (Admin)
-    
-    รายละเอียดการทำงาน:
-    1. เชื่อมต่อฐานข้อมูลและสร้าง Cursor แบบปกติ
-    2. ดึงข้อมูลจากตาราง problem พร้อมทำ LEFT JOIN กับตาราง item, member (ทั้งผู้แจ้งและผู้ถูกรายงาน) และตาราง admin
-    3. จัดเรียงลำดับรายการจากวันที่รายงานล่าสุดไปหาเก่าที่สุด (ReportDate DESC)
-    4. แปลงข้อมูลผลลัพธ์ให้อยู่ในรูปแบบ List ของ Dictionary และส่งคืนในรูปแบบ JSON (สถานะ 200)
     """
     try:
         conn = get_connection()
         cursor = conn.cursor()
 
+        # ใช้ตัวพิมพ์เล็กและกำหนด AS เพื่อคงรูปแบบพิมพ์ใหญ่-เล็กส่งกลับให้ Frontend
         sql = """
             SELECT
-                p.ProblemID, p.ItemID, p.MemberID, p.ReportedMemberID,
-                p.ReportStatus, p.ReportDate, p.ResolveDate, p.ProblemType, p.HelpCenterData,
-                i.ItemName, i.ItemImage,
-                reporter.DisplayName AS ReporterName,
-                reported.DisplayName AS ReportedMemberName,
-                a.AdminName
+                p.problemid AS "ProblemID", 
+                p.itemid AS "ItemID", 
+                p.memberid AS "MemberID", 
+                p.reportedmemberid AS "ReportedMemberID",
+                p.reportstatus AS "ReportStatus", 
+                p.reportdate AS "ReportDate", 
+                p.resolvedate AS "ResolveDate", 
+                p.problemtype AS "ProblemType", 
+                p.helpcenterdata AS "HelpCenterData",
+                i.itemname AS "ItemName", 
+                i.itemimage AS "ItemImage",
+                reporter.displayname AS "ReporterName",
+                reported.displayname AS "ReportedMemberName",
+                a.adminname AS "AdminName"
             FROM problem p
-            LEFT JOIN item i ON p.ItemID = i.ItemID
-            LEFT JOIN member reporter ON p.MemberID = reporter.MemberID
-            LEFT JOIN member reported ON p.ReportedMemberID = reported.MemberID
-            LEFT JOIN admin a ON p.AdminID = a.AdminID
-            ORDER BY p.ReportDate DESC
+            LEFT JOIN item i ON p.itemid = i.itemid
+            LEFT JOIN member reporter ON p.memberid = reporter.memberid
+            LEFT JOIN member reported ON p.reportedmemberid = reported.memberid
+            LEFT JOIN admin a ON p.adminid = a.adminid
+            ORDER BY p.reportdate DESC
         """
 
         cursor.execute(sql)
@@ -162,31 +156,34 @@ def get_report(id):
     """
     API Endpoint: GET /api/reports/<int:id>
     คำอธิบาย: ดึงข้อมูลรายละเอียดเชิงลึกของรายงานปัญหาเฉพาะเจาะจงตามรหัส ProblemID
-    
-    รายละเอียดการทำงาน:
-    1. รับค่ารหัสปัญหา (id) ผ่าน URL Path Parameter
-    2. ค้นหาข้อมูลในตาราง problem พร้อมเชื่อมโยงข้อมูลรายละเอียดสินค้า สมาชิก และแอดมินที่เกี่ยวข้อง
-    3. ตรวจสอบว่าพบข้อมูลหรือไม่ หากพบจะแปลงเป็น Dictionary แล้วส่งคืนในรูปแบบ JSON (สถานะ 200)
-    4. หากไม่พบข้อมูลจะคืนค่าข้อผิดพลาดสถานะ 404
     """
     try:
         conn = get_connection()
         cursor = conn.cursor()
 
+        # ใช้ตัวพิมพ์เล็กและกำหนด AS เพื่อคงรูปแบบพิมพ์ใหญ่-เล็กส่งกลับให้ Frontend
         sql = """
             SELECT
-                p.*,
-                i.ItemName,
-                i.ItemImage,
-                reporter.DisplayName AS ReporterName,
-                reported.DisplayName AS ReportedMemberName,
-                a.AdminName
+                p.problemid AS "ProblemID", 
+                p.itemid AS "ItemID", 
+                p.memberid AS "MemberID", 
+                p.reportedmemberid AS "ReportedMemberID",
+                p.reportstatus AS "ReportStatus", 
+                p.reportdate AS "ReportDate", 
+                p.resolvedate AS "ResolveDate", 
+                p.problemtype AS "ProblemType", 
+                p.helpcenterdata AS "HelpCenterData",
+                i.itemname AS "ItemName", 
+                i.itemimage AS "ItemImage",
+                reporter.displayname AS "ReporterName",
+                reported.displayname AS "ReportedMemberName",
+                a.adminname AS "AdminName"
             FROM problem p
-            LEFT JOIN item i ON p.ItemID = i.ItemID
-            LEFT JOIN member reporter ON p.MemberID = reporter.MemberID
-            LEFT JOIN member reported ON p.ReportedMemberID = reported.MemberID
-            LEFT JOIN admin a ON p.AdminID = a.AdminID
-            WHERE p.ProblemID = %s
+            LEFT JOIN item i ON p.itemid = i.itemid
+            LEFT JOIN member reporter ON p.memberid = reporter.memberid
+            LEFT JOIN member reported ON p.reportedmemberid = reported.memberid
+            LEFT JOIN admin a ON p.adminid = a.adminid
+            WHERE p.problemid = %s
         """
 
         cursor.execute(sql, (id,))
@@ -215,13 +212,7 @@ def get_report(id):
 def update_report(id):
     """
     API Endpoint: PUT /api/reports/<int:id>
-    คำอธิบาย: อัปเดตสถานะการจัดการรายงานปัญหา (เช่น เปลี่ยนเป็น 'กำลังดำเนินการ', 'แก้ไขแล้ว' ฯลฯ) โดยผู้ดูแลระบบ
-    
-    รายละเอียดการทำงาน:
-    1. รับรหัสรายงาน (id) ผ่าน URL Path Parameter และรับข้อมูล ReportStatus กับ AdminID ผ่าน JSON Request Body
-    2. ตรวจสอบความครบถ้วนของข้อมูล หากไม่ครบจะคืนค่าสถานะ 400
-    3. ทำการอัปเดตสถานะ ReportStatus, บันทึกเวลาที่แก้ไขเสร็จ (ResolveDate เป็น NOW()) และบันทึกรหัสแอดมินผู้จัดการ (AdminID)
-    4. ทำการ commit ฐานข้อมูลและส่งข้อความแจ้งความสำเร็จกลับไปในรูปแบบ JSON (สถานะ 200)
+    คำอธิบาย: อัปเดตสถานะการจัดการรายงานปัญหา
     """
     try:
         data = request.get_json() or {}
@@ -240,10 +231,10 @@ def update_report(id):
         sql = """
             UPDATE problem
             SET
-                ReportStatus = %s,
-                ResolveDate = NOW(),
-                AdminID = %s
-            WHERE ProblemID = %s
+                reportstatus = %s,
+                resolvedate = NOW(),
+                adminid = %s
+            WHERE problemid = %s
         """
 
         cursor.execute(sql, (status, admin_id, id))
@@ -255,6 +246,8 @@ def update_report(id):
         return jsonify({"success": True, "message": "อัปเดตสถานะการจัดการเรียบร้อยแล้ว"}), 200
 
     except Exception as e:
+        if 'conn' in locals() and conn:
+            conn.rollback()
         print("Update Report Error:", e)
         return jsonify({
             "success": False,

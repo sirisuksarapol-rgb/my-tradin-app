@@ -5,7 +5,6 @@ from db import get_connection
 # ==========================================
 # VERIFY EMAIL BLUEPRINT CONFIGURATION
 # ==========================================
-# สร้าง Blueprint สำหรับจัดกลุ่มเส้นทาง API ที่เกี่ยวข้องกับการยืนยันอีเมลด้วยรหัส OTP
 verify_bp = Blueprint(
     "verify",
     __name__,
@@ -21,30 +20,13 @@ def verify_email():
     """
     API Endpoint: POST /api/verify-email
     คำอธิบาย: ตรวจสอบและยืนยันตัวตนผู้ใช้งานด้วยรหัส OTP ผ่านทางอีเมล พร้อมเปิดใช้งานบัญชีผู้ใช้
-    
-    รายละเอียดการทำงานเชิงลึก:
-    1. รับข้อมูล JSON หรือ Form Data (อีเมลและรหัส OTP) ที่ส่งมาจากฝั่งไคลเอนต์
-    2. ตรวจสอบความครบถ้วนของข้อมูลสำคัญ หากไม่มีอีเมลหรือรหัส OTP จะคืนค่าสถานะ 400
-    3. เชื่อมต่อฐานข้อมูล MySQL และค้นหาข้อมูลสมาชิกจากอีเมล (เรียงลำดับตาม MemberID ล่าสุด)
-    4. ตรวจสอบว่าพบอีเมลในระบบหรือไม่ หากไม่พบจะคืนค่าสถานะ 404
-    5. ทำความสะอาดสตริงของรหัส OTP ทั้งจากฐานข้อมูลและที่ผู้ใช้กรอกด้วย .strip() แล้วนำมาเปรียบเทียบกัน
-    6. ตรวจสอบเวลาหมดอายุของรหัส OTP (VerifyExpire) ว่าเกินเวลาปัจจุบันหรือไม่ หากหมดอายุจะคืนค่าสถานะ 400
-    7. หากข้อมูลถูกต้องทั้งหมด ทำการอัปเดตสถานะในฐานข้อมูล:
-       - เปลี่ยน EmailVerified เป็น 1 (ยืนยันตัวตนสำเร็จ)
-       - ล้างค่า VerifyCode และ VerifyExpire เป็น NULL
-       - เปลี่ยน MemberStatus เป็น 'Active' (เปิดใช้งานบัญชีผู้ใช้)
-    8. บันทึกข้อมูล (commit) และคืนค่าข้อความสำเร็จในรูปแบบ JSON (สถานะ 200)
-    9. จัดการข้อผิดพลาด (Exception) ด้วยการ rollback และปิดการเชื่อมต่อฐานข้อมูลในบล็อก finally อย่างปลอดภัย
     """
-    
-    # 1. รับค่าข้อมูลจาก Request (รองรับทั้ง JSON และ Form Data)
     data = request.get_json(silent=True) or request.form
     email = data.get("email")
     code = data.get("code")
 
     print(f"🔍 [DEBUG] รับค่าจาก Client - Email: {email}, Code: {code}")
 
-    # ตรวจสอบความครบถ้วนของข้อมูลสำคัญ
     if not email or not code:
         print("❌ [DEBUG] ข้อมูลไม่ครบถ้วน")
         return jsonify({
@@ -53,20 +35,23 @@ def verify_email():
         }), 400
 
     conn = get_connection()
-    cursor = conn.cursor(dictionary=True, buffered=True)
+    # ❌ เอาคำสั่ง buffered=True ออก เพื่อให้ใช้งานกับ PostgreSQL (psycopg2) ได้โดยไม่เกิด Error
+    cursor = conn.cursor(dictionary=True)
 
     try:
-        # 2. ค้นหาข้อมูลผู้ใช้จาก Email (เลือกรายการล่าสุดด้วย ORDER BY MemberID DESC)
+        # ใช้ AS "..." เพื่อรักษารูปแบบคีย์ใหญ่-เล็ก ให้โค้ดเดิมด้านล่างยังคงอ่านค่าผ่าน Dictionary ได้
         cursor.execute("""
-            SELECT MemberID, VerifyCode, VerifyExpire 
+            SELECT 
+                memberid AS "MemberID", 
+                verifycode AS "VerifyCode", 
+                verifyexpire AS "VerifyExpire" 
             FROM member 
-            WHERE Email = %s
-            ORDER BY MemberID DESC 
+            WHERE email = %s
+            ORDER BY memberid DESC 
         """, (email,))
         
         user = cursor.fetchone()
 
-        # ตรวจสอบว่ามีอีเมลนี้อยู่ในระบบหรือไม่
         if not user:
             print("❌ [DEBUG] ไม่พบอีเมลนี้ในระบบ")
             return jsonify({
@@ -76,11 +61,9 @@ def verify_email():
 
         print(f"🔍 [DEBUG] ข้อมูลใน DB - VerifyCode: {user['VerifyCode']}, Expire: {user['VerifyExpire']}")
 
-        # 3. ทำความสะอาดข้อมูลรหัส OTP ก่อนทำการเปรียบเทียบ (ลบช่องว่างซ้ายขวาและแปลงเป็น String)
         db_code = str(user["VerifyCode"]).strip() if user["VerifyCode"] else ""
         req_code = str(code).strip()
 
-        # ตรวจสอบว่ารหัส OTP ตรงกันหรือไม่
         if db_code != req_code: 
             print(f"❌ [DEBUG] รหัสไม่ตรงกัน! DB: '{db_code}' vs Client: '{req_code}'")
             return jsonify({
@@ -88,7 +71,6 @@ def verify_email():
                 "message": "รหัส OTP ไม่ถูกต้อง"
             }), 400
 
-        # ตรวจสอบว่ารหัส OTP หมดอายุแล้วหรือยัง
         if user["VerifyExpire"] and datetime.now() > user["VerifyExpire"]:
             print("❌ [DEBUG] รหัส OTP หมดอายุแล้ว")
             return jsonify({
@@ -96,15 +78,15 @@ def verify_email():
                 "message": "รหัส OTP หมดอายุแล้ว กรุณาขอรหัสใหม่"
             }), 400
 
-        # 4. หากข้อมูลถูกต้องทั้งหมด ทำการอัปเดตสถานะการยืนยันตัวตนในฐานข้อมูล
+        # ใช้ตัวพิมพ์เล็กในคำสั่ง UPDATE
         cursor.execute("""
             UPDATE member 
             SET 
-                EmailVerified = 1, 
-                VerifyCode = NULL, 
-                VerifyExpire = NULL,
-                MemberStatus = 'Active'
-            WHERE MemberID = %s
+                emailverified = 1, 
+                verifycode = NULL, 
+                verifyexpire = NULL,
+                memberstatus = 'Active'
+            WHERE memberid = %s
         """, (user["MemberID"],))
         
         conn.commit()
@@ -116,7 +98,6 @@ def verify_email():
         }), 200
 
     except Exception as e:
-        # ยกเลิกการเปลี่ยนแปลงทั้งหมดในฐานข้อมูลหากเกิดข้อผิดพลาด
         conn.rollback()
         print(f"❌ [DEBUG] Database Error (Verify): {str(e)}")
         return jsonify({
@@ -125,6 +106,5 @@ def verify_email():
         }), 500
         
     finally:
-        # ปิด Cursor และการเชื่อมต่อฐานข้อมูลทุกครั้งเพื่อความปลอดภัยและคืนทรัพยากร
         cursor.close()
         conn.close()

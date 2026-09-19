@@ -7,10 +7,7 @@ from db import get_connection
 # ==========================================
 # USERS BLUEPRINT CONFIGURATION
 # ==========================================
-# สร้าง Blueprint สำหรับจัดกลุ่มเส้นทาง API ที่เกี่ยวข้องกับการจัดการข้อมูลส่วนตัวผู้ใช้งาน (User Management)
 users_bp = Blueprint("users", __name__)
-
-# กำหนดเส้นทางโฟลเดอร์สำหรับจัดเก็บไฟล์รูปโปรไฟล์ที่ผู้ใช้อัปโหลดเข้ามาในระบบ
 UPLOAD_FOLDER = "uploads"
 
 
@@ -21,48 +18,31 @@ UPLOAD_FOLDER = "uploads"
 def update_user(user_id):
     """
     API Endpoint: PUT /api/users/<int:user_id>
-    คำอธิบาย: อัปเดตข้อมูลส่วนตัวของผู้ใช้งานในระบบ (รองรับการแก้ไขชื่อที่แสดง, เปลี่ยนรหัสผ่าน, และอัปโหลดรูปโปรไฟล์ใหม่)
-    
-    รายละเอียดการทำงานเชิงลึก:
-    1. ดึงข้อมูลฟอร์ม (FormData) ได้แก่ DisplayName, OldPassword, NewPassword และไฟล์รูปภาพ profile_image
-    2. ตรวจสอบความถูกต้องว่ามีรหัสผู้ใช้งาน (user_id) นี้อยู่ในฐานข้อมูลจริงหรือไม่ หากไม่พบจะส่งค่าสถานะ 404 กลับไป
-    3. ตรวจสอบและประมวลผลกรณีที่มีการขอเปลี่ยนรหัสผ่านใหม่:
-       - ตรวจสอบว่ามีการกรอกรหัสผ่านเดิม (OldPassword) มาด้วยหรือไม่
-       - ตรวจสอบความถูกต้องของรหัสผ่านเดิมกับค่าที่จัดเก็บไว้ในฐานข้อมูล (รองรับทั้งแบบ Hash และ Plain text)
-       - ทำการเข้ารหัสรหัสผ่านใหม่ (Password Hashing) ด้วย werkzeug.security เพื่อความปลอดภัยสูงสุด
-    4. ตรวจสอบและจัดการไฟล์รูปโปรไฟล์ใหม่:
-       - หากมีการแนบไฟล์มา จะใช้ฟังก์ชัน secure_filename เพื่อความปลอดภัยของชื่อไฟล์
-       - ตรวจสอบและสร้างโฟลเดอร์ UPLOAD_FOLDER หากยังไม่มี และบันทึกไฟล์ลงเซิร์ฟเวอร์
-    5. สร้างชุดคำสั่ง SQL แบบ Dynamic เพื่ออัปเดตเฉพาะฟิลด์ที่มีการเปลี่ยนแปลงจริงลงในตาราง member
-    6. ทำการ commit ข้อมูลลงฐานข้อมูล MySQL และดึงข้อมูลล่าสุดของผู้ใช้ที่ถูกอัปเดตแล้วส่งกลับในรูปแบบ JSON (สถานะ 200)
-    7. จัดการบล็อก Exception ด้วยการ Rollback ข้อมูลเมื่อเกิดข้อผิดพลาด และปิดการเชื่อมต่อฐานข้อมูลในบล็อก Finally เสมอ
+    คำอธิบาย: อัปเดตข้อมูลส่วนตัวของผู้ใช้งานในระบบ
     """
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
 
     try:
-        # ขั้นตอนที่ 1: ดึงข้อมูลฟอร์มที่ส่งมาจาก Client
         display_name = request.form.get("DisplayName")
         old_password = request.form.get("OldPassword")
         new_password = request.form.get("NewPassword")
         profile_image = None
 
-        # ขั้นตอนที่ 2: ตรวจสอบข้อมูลผู้ใช้เดิมในฐานข้อมูล
-        cursor.execute("SELECT * FROM member WHERE MemberID = %s", (user_id,))
+        cursor.execute("SELECT * FROM member WHERE memberid = %s", (user_id,))
         current_user = cursor.fetchone()
 
         if not current_user:
             return jsonify({"success": False, "message": "ไม่พบข้อมูลผู้ใช้งานในระบบ"}), 404
 
-        # ขั้นตอนที่ 3: ตรวจสอบและจัดการกระบวนการเปลี่ยนรหัสผ่านใหม่
         hashed_new_password = None
         if new_password:
             if not old_password:
                 return jsonify({"success": False, "message": "กรุณากรอกรหัสผ่านเดิมเพื่อยืนยัน"}), 400
 
-            stored_pw = current_user.get("Password", "")
+            # ดึงค่าจากคีย์ตัวพิมพ์เล็ก เพราะใช้ SELECT * ใน PostgreSQL
+            stored_pw = current_user.get("password", "")
             
-            # ตรวจสอบรหัสผ่านเดิม (รองรับทั้งแฮช pbkdf2/scrypt หรือข้อความธรรมดา)
             is_valid = False
             if stored_pw.startswith("pbkdf2:") or stored_pw.startswith("scrypt:"):
                 is_valid = check_password_hash(stored_pw, old_password)
@@ -72,10 +52,8 @@ def update_user(user_id):
             if not is_valid:
                 return jsonify({"success": False, "message": "รหัสผ่านเดิมไม่ถูกต้อง"}), 400
 
-            # เข้ารหัสรหัสผ่านใหม่ก่อนบันทึกลงฐานข้อมูล
             hashed_new_password = generate_password_hash(new_password)
 
-        # ขั้นตอนที่ 4: จัดการอัปโหลดและบันทึกไฟล์รูปภาพโปรไฟล์ใหม่
         if "profile_image" in request.files:
             file = request.files["profile_image"]
             if file.filename != "":
@@ -85,32 +63,39 @@ def update_user(user_id):
                 file.save(filepath)
                 profile_image = filename
 
-        # ขั้นตอนที่ 5: รวบรวมฟิลด์ที่ต้องการอัปเดตลงฐานข้อมูลแบบ Dynamic
+        # อัปเดตเป็นตัวพิมพ์เล็ก
         update_fields = []
         params = []
 
         if display_name:
-            update_fields.append("DisplayName = %s")
+            update_fields.append("displayname = %s")
             params.append(display_name)
 
         if profile_image:
-            update_fields.append("ProfileImage = %s")
+            update_fields.append("profileimage = %s")
             params.append(profile_image)
 
         if hashed_new_password:
-            update_fields.append("Password = %s")
+            update_fields.append("password = %s")
             params.append(hashed_new_password)
 
-        # หากมีรายการที่ต้องอัปเดต ให้ประมวลผลคำสั่ง SQL
         if update_fields:
-            sql = f"UPDATE member SET {', '.join(update_fields)} WHERE MemberID = %s"
+            sql = f"UPDATE member SET {', '.join(update_fields)} WHERE memberid = %s"
             params.append(user_id)
             cursor.execute(sql, tuple(params))
             conn.commit()
 
-        # ขั้นตอนที่ 6: ดึงข้อมูลผู้ใช้งานล่าสุดที่อัปเดตแล้วส่งกลับไปยัง Frontend
+        # ดึงข้อมูลกลับโดยใช้ AS เพื่อคงโครงสร้างคีย์ตัวพิมพ์ใหญ่-เล็ก ให้ Frontend ใช้งานได้ต่อ
         cursor.execute(
-            "SELECT MemberID, DisplayName, Email, ProfileImage, MemberStatus FROM member WHERE MemberID = %s",
+            """
+            SELECT 
+                memberid AS "MemberID", 
+                displayname AS "DisplayName", 
+                email AS "Email", 
+                profileimage AS "ProfileImage", 
+                memberstatus AS "MemberStatus" 
+            FROM member WHERE memberid = %s
+            """,
             (user_id,)
         )
         updated_user = cursor.fetchone()
@@ -122,13 +107,11 @@ def update_user(user_id):
         }), 200
 
     except Exception as e:
-        # ยกเลิกการเปลี่ยนแปลงทั้งหมด (Rollback) หากเกิดข้อผิดพลาด
         conn.rollback()
         print(f"❌ Update User Error: {str(e)}")
         return jsonify({"success": False, "message": str(e)}), 500
 
     finally:
-        # ปิด Cursor และการเชื่อมต่อฐานข้อมูลเพื่อความปลอดภัยของระบบ
         cursor.close()
         conn.close()
         
@@ -145,20 +128,19 @@ def get_user_stats(user_id):
     cursor = conn.cursor(dictionary=True)
 
     try:
-        # 1. คำนวณจำนวนการแลกเปลี่ยนสำเร็จ และคะแนนรีวิวเฉลี่ย
         sql_stats = """
             SELECT 
-                COUNT(CASE WHEN ExchangeStatus IN ('accepted', 'completed') THEN 1 END) AS successfulExchanges,
+                COUNT(CASE WHEN exchangestatus IN ('accepted', 'completed') THEN 1 END) AS "successfulExchanges",
                 COALESCE(AVG(
                     CASE 
-                        WHEN MemberID = %s THEN PartnerScore 
-                        WHEN TargetMemberID = %s THEN Score 
+                        WHEN memberid = %s THEN partnerscore 
+                        WHEN targetmemberid = %s THEN score 
                     END
-                ), 0) AS reviewScore
+                ), 0) AS "reviewScore"
             FROM exchange
-            WHERE (MemberID = %s OR TargetMemberID = %s) 
-              AND ExchangeStatus IN ('accepted', 'completed')
-              AND (PartnerScore IS NOT NULL OR Score IS NOT NULL)
+            WHERE (memberid = %s OR targetmemberid = %s) 
+              AND exchangestatus IN ('accepted', 'completed')
+              AND (partnerscore IS NOT NULL OR score IS NOT NULL)
         """
         cursor.execute(sql_stats, (user_id, user_id, user_id, user_id))
         stats = cursor.fetchone()
@@ -166,27 +148,26 @@ def get_user_stats(user_id):
         successful_exchanges = stats['successfulExchanges'] if stats else 0
         review_score = float(stats['reviewScore']) if stats and stats['reviewScore'] is not None else 0.0
 
-        # 2. ดึงรายการรีวิวและความคิดเห็น พร้อมรูปโปรไฟล์และชื่อของผู้รีวิว
         sql_reviews = """
             SELECT
-                e.ExchangeID,
-                e.SuccessDate AS ReviewDate,
-                CASE WHEN e.MemberID = %s THEN e.PartnerScore ELSE e.Score END AS Rating,
-                CASE WHEN e.MemberID = %s THEN e.PartnerComment ELSE e.Comment END AS Comment,
+                e.exchangeid AS "ExchangeID",
+                e.successdate AS "ReviewDate",
+                CASE WHEN e.memberid = %s THEN e.partnerscore ELSE e.score END AS "Rating",
+                CASE WHEN e.memberid = %s THEN e.partnercomment ELSE e.comment END AS "Comment",
                 CASE 
-                    WHEN e.MemberID = %s THEN COALESCE(target_member.DisplayName, 'ผู้ใช้งานทั่วไป')
-                    ELSE COALESCE(requester_member.DisplayName, 'ผู้ใช้งานทั่วไป')
-                END AS ReviewerName,
+                    WHEN e.memberid = %s THEN COALESCE(target_member.displayname, 'ผู้ใช้งานทั่วไป')
+                    ELSE COALESCE(requester_member.displayname, 'ผู้ใช้งานทั่วไป')
+                END AS "ReviewerName",
                 CASE 
-                    WHEN e.MemberID = %s THEN target_member.ProfileImage
-                    ELSE requester_member.ProfileImage
-                END AS ReviewerProfileImage
+                    WHEN e.memberid = %s THEN target_member.profileimage
+                    ELSE requester_member.profileimage
+                END AS "ReviewerProfileImage"
             FROM exchange e
-            LEFT JOIN member requester_member ON e.MemberID = requester_member.MemberID
-            LEFT JOIN member target_member ON e.TargetMemberID = target_member.MemberID
-            WHERE ((e.MemberID = %s AND e.PartnerScore IS NOT NULL) OR (e.TargetMemberID = %s AND e.Score IS NOT NULL))
-              AND e.ExchangeStatus IN ('accepted', 'completed')
-            ORDER BY e.SuccessDate DESC
+            LEFT JOIN member requester_member ON e.memberid = requester_member.memberid
+            LEFT JOIN member target_member ON e.targetmemberid = target_member.memberid
+            WHERE ((e.memberid = %s AND e.partnerscore IS NOT NULL) OR (e.targetmemberid = %s AND e.score IS NOT NULL))
+              AND e.exchangestatus IN ('accepted', 'completed')
+            ORDER BY e.successdate DESC
         """
         cursor.execute(sql_reviews, (user_id, user_id, user_id, user_id, user_id, user_id))
         reviews = cursor.fetchall()
