@@ -1,5 +1,7 @@
 import os
-import requests
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
 
 # โหลดตัวแปรสภาพแวดล้อม (Environment Variables) จากไฟล์ .env (กรณีรันโลคอล)
@@ -7,43 +9,41 @@ load_dotenv()
 
 
 # ==========================================
-# 1. ฟังก์ชันกลางสำหรับส่งอีเมลผ่าน Resend HTTP API
+# 1. ฟังก์ชันกลางสำหรับส่งอีเมลผ่าน Gmail SMTP
 # ==========================================
 def send_notification_email(to_email, subject, body_text, custom_html=None):
     """
-    ฟังก์ชันตัวช่วย (Helper Function): จัดการระบบส่งอีเมลกลางผ่าน Resend HTTP API (พอร์ต 443 HTTPS)
-    แก้ปัญหาพอร์ต SMTP ถูกบล็อกบน Render
+    ฟังก์ชันตัวช่วย: ส่งอีเมลผ่าน Gmail SMTP โดยใช้ App Password ฟรี
     """
-    # ดึง API Key แบบไดนามิกภายในฟังก์ชัน ป้องกันปัญหาค่าว่างขณะ Import โมดูล
-    resend_api_key = os.getenv("RESEND_API_KEY")
+    email_user = os.getenv("EMAIL_USER")
+    email_pass = os.getenv("EMAIL_PASS")
     
-    if not to_email or not resend_api_key:
-        print("⚠️ ขาด API Key ของ Resend หรืออีเมลผู้รับ")
+    if not to_email or not email_user or not email_pass:
+        print("⚠️ ขาดข้อมูลตั้งค่าอีเมล (EMAIL_USER/EMAIL_PASS) หรืออีเมลผู้รับ")
         return
 
     html_content = custom_html if custom_html else f"<p>{body_text.replace(chr(10), '<br>')}</p>"
 
-    url = "https://api.resend.com/emails"
-    headers = {
-        "Authorization": f"Bearer {resend_api_key}",
-        "Content-Type": "application/json"
-    }
-    
-    payload = {
-        "from": "Tradin <onboarding@resend.dev>",
-        "to": [to_email],
-        "subject": subject,
-        "html": html_content
-    }
+    # สร้างโครงสร้างอีเมล
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = f"Tradin System <{email_user}>"
+    msg["To"] = to_email
+
+    # แนบเนื้อหา HTML
+    part = MIMEText(html_content, "html", "utf-8")
+    msg.attach(part)
 
     try:
-        response = requests.post(url, json=payload, headers=headers)
-        if response.status_code == 200:
-            print(f"✅ ส่งอีเมลสำเร็จไปยัง {to_email}")
-        else:
-            print(f"⚠️ ส่งอีเมลผ่าน Resend ไม่สำเร็จ: {response.status_code} - {response.text}")
+        # เชื่อมต่อกับ Gmail SMTP Server (พอร์ต 587 สำหรับ TLS)
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()  # เข้ารหัสความปลอดภัย
+        server.login(email_user, email_pass)  # ล็อกอินด้วย App Password
+        server.sendmail(email_user, to_email, msg.as_string())  # ส่งอีเมล
+        server.quit()  # ปิดการเชื่อมต่อ
+        print(f"✅ ส่งอีเมลผ่าน Gmail สำเร็จไปยัง {to_email}")
     except Exception as e:
-        print(f"❌ เกิดข้อผิดพลาดในการเชื่อมต่อ Resend API: {str(e)}")
+        print(f"❌ เกิดข้อผิดพลาดในการส่งอีเมลผ่าน Gmail SMTP: {str(e)}")
 
 
 # ==========================================
