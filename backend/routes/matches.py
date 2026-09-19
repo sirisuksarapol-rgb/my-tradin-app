@@ -15,29 +15,17 @@ match_bp = Blueprint('match', __name__)
 def get_item_with_details(item_id):
     """
     ฟังก์ชันตัวช่วย (Helper Function): ดึงข้อมูลสิ่งของพร้อมรายละเอียดทั้งหมดจากฐานข้อมูลตามรหัสสินค้าที่ระบุ
+    
+    รายละเอียดการทำงาน:
+    - เชื่อมต่อฐานข้อมูลและสร้าง Cursor แบบ Dictionary เพื่อให้สามารถเข้าถึงข้อมูลด้วยชื่อคอลัมน์ได้
+    - ค้นหาข้อมูลในตาราง item ตาม ItemID ที่รับเข้ามา
+    - ปิดการเชื่อมต่อฐานข้อมูลและส่งคืนข้อมูลสินค้า (Dictionary) หรือ None หากเกิดข้อผิดพลาด
     """
     try:
         connection = get_connection()
         cursor = connection.cursor(dictionary=True)
         
-        # แก้ไข: ระบุคอลัมน์ด้วยพิมพ์เล็กและใช้ AS เพื่อคงคีย์พิมพ์ใหญ่-เล็กให้ Python นำไปใช้ต่อได้
-        query = """
-            SELECT 
-                itemid AS "ItemID", 
-                itemname AS "ItemName", 
-                itemdescription AS "ItemDescription", 
-                desireditem AS "DesiredItem", 
-                itemimage AS "ItemImage", 
-                itemstatus AS "ItemStatus", 
-                postdate AS "PostDate", 
-                canceldate AS "CancelDate", 
-                meetinglocation AS "MeetingLocation", 
-                locationlink AS "LocationLink", 
-                categoryid AS "CategoryID", 
-                memberid AS "MemberID"
-            FROM item 
-            WHERE itemid = %s
-        """
+        query = "SELECT * FROM item WHERE ItemID = %s"
         cursor.execute(query, (item_id,))
         item = cursor.fetchone()
         
@@ -57,6 +45,15 @@ def get_matches(item_id):
     """
     API Endpoint: GET /api/matches/<int:item_id>
     คำอธิบาย: ค้นหาและแนะนำรายการจับคู่สิ่งของสำหรับการแลกเปลี่ยนโดยอาศัยระบบค้นหาเชิงความหมาย (Semantic Search)
+    
+    รายละเอียดการทำงาน:
+    1. รับรหัสสินค้า (item_id) ผ่าน URL Path Parameter
+    2. เรียกฟังก์ชัน get_item_with_details เพื่อดึงข้อมูลสินค้าของตนเอง (my_item) ออกมา
+    3. ตรวจสอบว่ามีข้อมูลสินค้าหรือไม่ หากไม่พบจะคืนค่าสถานะ 404
+    4. ตรวจสอบว่ามีการระบุสิ่งของที่ต้องการแลกเปลี่ยน (DesiredItem) หรือไม่ หากไม่มีจะคืนค่ารายการว่างพร้อมคำแนะนำ
+    5. นำข้อมูลสินค้าของตนเองส่งเข้าสู่ระบบ semantic_search เพื่อหาไอเทมที่เหมาะสม
+    6. กรองรายการที่เป็นของเจ้าของเดียวกันออก เพื่อป้องกันไม่ให้แนะนำสินค้าของตัวเอง
+    7. ส่งผลลัพธ์ข้อมูลสินค้าของตนเองและรายการแนะนำที่คัดกรองแล้ว (จำกัดไม่เกิน 6 รายการ) กลับไปในรูปแบบ JSON
     """
     try:
         # 1. ดึงข้อมูล my_item ออกมาเป็น Dictionary

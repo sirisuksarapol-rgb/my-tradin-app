@@ -1,32 +1,26 @@
 import axios from 'axios';
 
 // =========================================================================
-// 📌 CONFIGURATION & CONSTANTS (การตั้งค่า URL พื้นฐานสำหรับเชื่อมต่อ Backend)
+// 📌 CONFIGURATION & CONSTANTS (การตั้งค่า URL พื้นฐานและตัวช่วยค้นหาผู้ใช้)
 // =========================================================================
 
+/**
+ * ฟังก์ชันสำหรับตรวจสอบและกำหนดค่า Base URL อัตโนมัติตามสภาพแวดล้อมที่ใช้งาน
+ * - รองรับการรันผ่าน VS Code DevTunnels (แปลงพอร์ตอัตโนมัติและบังคับใช้ HTTPS)
+ * - รองรับการรันผ่าน Localhost หรือ IP Address ภายในเครือข่าย Wi-Fi ทั่วไป
+ * 
+ * @returns {string} ค่า Base URL ของเซิร์ฟเวอร์ Backend
+ */
 const getBaseUrl = () => {
-  // 1. ถ้าอยู่บน Vercel หรือมีการกำหนดค่า Environment Variable ไว้ ให้ใช้ URL ของ Render ทันที
-  // (ถ้าใช้ Vite ให้ใช้ import.meta.env.VITE_API_URL / ถ้าใช้ Create React App ให้ใช้ process.env.REACT_APP_API_URL)
-  const productionUrl = import.meta.env.VITE_API_URL; 
-  if (productionUrl) {
-    return productionUrl;
-  }
-
-  // 2. รองรับการรันผ่าน VS Code DevTunnels
   const { hostname, protocol } = window.location;
+
   if (hostname.includes('devtunnels.ms')) {
     const backendHostname = hostname.replace(/-\d+\./, '-5000.');
     return `https://${backendHostname}`;
   }
 
-  // 3. กรณีรันในเครื่องทั่วไป (Localhost)
   return `${protocol}//${hostname}:5000`;
 };
-
-const API = axios.create({
-  baseURL: getBaseUrl(),
-  withCredentials: true,
-});
 
 const BASE_URL = getBaseUrl();
 export const IMAGE_BASE_URL = BASE_URL;

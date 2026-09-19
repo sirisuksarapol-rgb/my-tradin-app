@@ -24,11 +24,7 @@ app = Flask(__name__)
 CORS(app) # เปิดใช้งาน Cross-Origin Resource Sharing เพื่ออนุญาตให้ Frontend (ต่างโดเมนหรือพอร์ต) สามารถเรียกใช้งาน API ได้อย่างอิสระ
 
 # ดึงค่าคอนฟิกูเรชันฐานข้อมูลจาก Environment Variable
-database_url = os.environ.get("DATABASE_URL")
-if database_url and database_url.startswith("postgres://"):
-    database_url = database_url.replace("postgres://", "postgresql://", 1)
-
-app.config["SQLALCHEMY_DATABASE_URI"] = database_url
+database_url = os.environ.get('DATABASE_URL')
 
 # กำหนด Secret Key สำหรับความปลอดภัย การเข้ารหัส และการสร้าง JWT Token
 app.config['SECRET_KEY'] = os.getenv('JWT_SECRET', 'supersecret123')
@@ -78,9 +74,6 @@ app.register_blueprint(match_bp)
 # =========================================================================
 # จุดเริ่มต้นการรันเซิร์ฟเวอร์แอปพลิเคชัน (Application Entry Point)
 # =========================================================================
-if __name__ == '__main__':
-    # ดึงค่า Port จาก Render ถ้าไม่มี (รันในเครื่อง) ให้ใช้ 5000
-    port = int(os.environ.get("PORT", 5000))
-    
-    # บังคับ host='0.0.0.0' เพื่อให้ระบบภายนอกหรือ Cloud สามารถชี้เข้ามาได้
-    app.run(host='0.0.0.0', port=port, debug=False)
+if __name__ == "__main__":
+    # เริ่มต้นรัน Flask Development Server บน IP 0.0.0.0 พอร์ต 5000 พร้อมเปิดใช้งานโหมด Debug สำหรับตรวจจับข้อผิดพลาดระหว่างพัฒนา
+    app.run(host="0.0.0.0", port=5000, debug=True)

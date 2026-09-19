@@ -22,6 +22,15 @@ def login():
     """
     API Endpoint: POST /api/login
     คำอธิบาย: จัดการกระบวนการเข้าสู่ระบบ (Authentication) สำหรับทั้งผู้ใช้งานทั่วไป (Member) และผู้ดูแลระบบ (Admin)
+    
+    รายละเอียดการทำงาน:
+    1. รับข้อมูล JSON Request (อีเมลและรหัสผ่าน) และตรวจสอบความครบถ้วนเบื้องต้น
+    2. ค้นหาข้อมูลในตาราง member หากพบจะตรวจสอบรหัสผ่าน (รองรับทั้งแบบ Hash และ Plain text)
+    3. หากรหัสผ่านถูกต้อง จะสร้าง JWT Token (อายุการใช้งาน 24 ชั่วโมง) พร้อมกำหนดสิทธิ์ role เป็น 'member' และส่งคืนข้อมูลผู้ใช้
+    4. หากไม่พบข้อมูลในตาราง member จะทำการค้นหาต่อในตาราง admin (ผู้ดูแลระบบ)
+    5. หากพบในตาราง admin และรหัสผ่านถูกต้อง จะสร้าง JWT Token พร้อมกำหนดสิทธิ์ role เป็น 'admin' และส่งคืนข้อมูล
+    6. หากไม่พบข้อมูลในทั้งสองตารางหรือรหัสผ่านไม่ถูกต้อง จะคืนค่าสถานะ 401
+    7. จัดการข้อผิดพลาดของระบบด้วย Try-Except และปิดการเชื่อมต่อฐานข้อมูลในบล็อก Finally อย่างปลอดภัย
     """
     # 1. รับและตรวจสอบข้อมูลเบื้องต้นจาก Request Body
     data = request.get_json(silent=True)
@@ -50,19 +59,18 @@ def login():
         # =====================================================
         # 2. ตรวจสอบข้อมูลในตาราง Member (ผู้ใช้งานทั่วไป)
         # =====================================================
-        # แก้ไขคำสั่ง SQL ให้ใช้ตัวพิมพ์เล็ก และใช้ AS เพื่อคงคีย์ตัวพิมพ์ใหญ่-เล็กให้ Python/React
         cursor.execute("""
             SELECT
-                memberid AS "MemberID",
-                email AS "Email",
-                displayname AS "DisplayName",
-                profileimage AS "ProfileImage",
-                password AS "Password",
-                memberstatus AS "MemberStatus",
-                suspendeduntil AS "SuspendedUntil",
-                suspendreason AS "SuspendReason"
+                MemberID,
+                Email,
+                DisplayName,
+                ProfileImage,
+                Password,
+                MemberStatus,
+                SuspendedUntil,
+                SuspendReason
             FROM member
-            WHERE email = %s
+            WHERE Email = %s
         """, (email,))
 
         member = cursor.fetchone()
@@ -126,12 +134,12 @@ def login():
         # =====================================================
         cursor.execute("""
             SELECT
-                adminid AS "AdminID",
-                adminname AS "AdminName",
-                email AS "Email",
-                password AS "Password"
+                AdminID,
+                AdminName,
+                Email,
+                Password
             FROM admin
-            WHERE email = %s
+            WHERE Email = %s
         """, (email,))
 
         admin = cursor.fetchone()
