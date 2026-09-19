@@ -7,3 +7,4 @@ pythainlp
 sentence-transformers
 requests
 gunicorn
+cloudinary
