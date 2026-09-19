@@ -1,14 +1,21 @@
 import os
 from flask import Blueprint, request, jsonify
-from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
+import cloudinary
+import cloudinary.uploader
 from db import get_connection
 
 # ==========================================
 # USERS BLUEPRINT CONFIGURATION
 # ==========================================
 users_bp = Blueprint("users", __name__)
-UPLOAD_FOLDER = "uploads"
+
+# ตั้งค่า Cloudinary โดยดึงค่าจาก Environment Variables บน Render
+cloudinary.config(
+    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.getenv("CLOUDINARY_API_KEY"),
+    api_secret=os.getenv("CLOUDINARY_API_SECRET")
+)
 
 
 # =========================================================================
@@ -18,7 +25,7 @@ UPLOAD_FOLDER = "uploads"
 def update_user(user_id):
     """
     API Endpoint: PUT /api/users/<int:user_id>
-    คำอธิบาย: อัปเดตข้อมูลส่วนตัวของผู้ใช้งานในระบบ
+    คำอธิบาย: อัปเดตข้อมูลส่วนตัวของผู้ใช้งานในระบบ พร้อมรองรับการอัปโหลดรูปโปรไฟล์ขึ้น Cloudinary
     """
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
@@ -40,7 +47,7 @@ def update_user(user_id):
             if not old_password:
                 return jsonify({"success": False, "message": "กรุณากรอกรหัสผ่านเดิมเพื่อยืนยัน"}), 400
 
-            # ดึงค่าจากคีย์ตัวพิมพ์เล็ก เพราะใช้ SELECT * ใน PostgreSQL
+            # ดึงค่าจากคีย์ตัวพิมพ์เล็ก เพราะใช้ SELECT * ใน PostgreSQL[cite: 18]
             stored_pw = current_user.get("password", "")
             
             is_valid = False
@@ -54,16 +61,17 @@ def update_user(user_id):
 
             hashed_new_password = generate_password_hash(new_password)
 
+        # เปลี่ยนจากการบันทึกไฟล์ลงเซิร์ฟเวอร์ เป็นอัปโหลดขึ้น Cloudinary
         if "profile_image" in request.files:
             file = request.files["profile_image"]
             if file.filename != "":
-                filename = secure_filename(file.filename)
-                os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-                filepath = os.path.join(UPLOAD_FOLDER, filename)
-                file.save(filepath)
-                profile_image = filename
+                try:
+                    upload_result = cloudinary.uploader.upload(file)
+                    profile_image = upload_result.get("secure_url")
+                except Exception as e:
+                    print(f"❌ Cloudinary Upload Error: {str(e)}")
 
-        # อัปเดตเป็นตัวพิมพ์เล็ก
+        # อัปเดตเป็นตัวพิมพ์เล็กในฐานข้อมูล[cite: 18]
         update_fields = []
         params = []
 
@@ -85,7 +93,7 @@ def update_user(user_id):
             cursor.execute(sql, tuple(params))
             conn.commit()
 
-        # ดึงข้อมูลกลับโดยใช้ AS เพื่อคงโครงสร้างคีย์ตัวพิมพ์ใหญ่-เล็ก ให้ Frontend ใช้งานได้ต่อ
+        # ดึงข้อมูลกลับโดยใช้ AS เพื่อคงโครงสร้างคีย์ตัวพิมพ์ใหญ่-เล็ก ให้ Frontend ใช้งานได้ต่อ[cite: 18]
         cursor.execute(
             """
             SELECT 
@@ -122,7 +130,7 @@ def update_user(user_id):
 def get_user_stats(user_id):
     """
     API Endpoint: GET /api/users/<int:user_id>/stats
-    คำอธิบาย: ดึงข้อมูลสถิติการแลกเปลี่ยนสำเร็จ, คะแนนรีวิวเฉลี่ย และรายการรีวิวพร้อมรูปโปรไฟล์ผู้รีวิว
+    คำอธิบาย: ดึงข้อมูลสถิติการแลกเปลี่ยนสำเร็จ, คะแนนรีวิวเฉลี่ย และรายการรีวิวพร้อมรูปโปรไฟล์ผู้รีวิว[cite: 18]
     """
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)

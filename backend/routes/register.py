@@ -1,9 +1,10 @@
 import os
 import random
 from datetime import datetime, timedelta
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify
 from werkzeug.security import generate_password_hash
-from werkzeug.utils import secure_filename
+import cloudinary
+import cloudinary.uploader
 
 from db import get_connection
 from services.email_service import send_verify_email
@@ -11,12 +12,17 @@ from services.email_service import send_verify_email
 # ==========================================
 # REGISTER BLUEPRINT CONFIGURATION
 # ==========================================
-# สร้าง Blueprint สำหรับจัดกลุ่มเส้นทาง API ที่เกี่ยวข้องกับการสมัครสมาชิก (Registration Module)
-# กำหนด URL Prefix พื้นฐานเป็น /api/register เพื่อความสะอาดและเป็นระเบียบของสถาปัตยกรรมระบบ
 register_bp = Blueprint(
     "register",
     __name__,
     url_prefix="/api/register"
+)
+
+# ตั้งค่า Cloudinary โดยดึงค่าจาก Environment Variables บน Render
+cloudinary.config(
+    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.getenv("CLOUDINARY_API_KEY"),
+    api_secret=os.getenv("CLOUDINARY_API_SECRET")
 )
 
 
@@ -38,25 +44,23 @@ def register():
 
     password_hash = generate_password_hash(password)
 
-    filename = "default.png"
+    # เปลี่ยนจากการเซฟไฟล์ลงเครื่อง มาอัปโหลดขึ้น Cloudinary แทน
+    profile_image_url = "default.png"
     if file and file.filename != "":
-        filename = secure_filename(file.filename)
-        upload_path = os.path.join(
-            current_app.config["UPLOAD_FOLDER"],
-            filename
-        )
-        file.save(upload_path)
+        try:
+            upload_result = cloudinary.uploader.upload(file)
+            profile_image_url = upload_result.get("secure_url", "default.png")
+        except Exception as e:
+            print("❌ Cloudinary Upload Error:", str(e))
 
     verify_code = str(random.randint(100000, 999999))
     expire = datetime.now() + timedelta(minutes=30)
     current_time = datetime.now()
 
     conn = get_connection()
-    # เอา buffered=True ออก เพราะ PostgreSQL ไม่รองรับพารามิเตอร์นี้ (ใช้ได้เฉพาะ MySQL)
     cursor = conn.cursor() 
 
     try:
-        # เปลี่ยนชื่อคอลัมน์เป็นตัวพิมพ์เล็กทั้งหมด
         cursor.execute("SELECT memberid, emailverified FROM member WHERE email = %s", (email,))
         existing_user = cursor.fetchone()
 
@@ -69,7 +73,6 @@ def register():
                     "message": "อีเมลนี้ถูกใช้งานและยืนยันตัวตนในระบบแล้ว"
                 }), 400
             
-            # เปลี่ยนชื่อคอลัมน์เป็นตัวพิมพ์เล็กทั้งหมด
             cursor.execute("""
                 UPDATE member 
                 SET password = %s, displayname = %s, profileimage = %s, 
@@ -78,14 +81,13 @@ def register():
             """, (
                 password_hash,
                 display_name,
-                filename,
+                profile_image_url,
                 verify_code,
                 expire,
                 current_time,
                 member_id
             ))
         else:
-            # เปลี่ยนชื่อคอลัมน์เป็นตัวพิมพ์เล็กทั้งหมด
             cursor.execute("""
                 INSERT INTO member (
                     email, password, displayname, profileimage,
@@ -96,7 +98,7 @@ def register():
                 email,
                 password_hash,
                 display_name,
-                filename,
+                profile_image_url,
                 verify_code,
                 expire,
                 current_time
