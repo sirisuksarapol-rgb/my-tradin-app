@@ -2,11 +2,8 @@ import os
 import requests
 from dotenv import load_dotenv
 
-# โหลดตัวแปรสภาพแวดล้อม (Environment Variables) จากไฟล์ .env
+# โหลดตัวแปรสภาพแวดล้อม (Environment Variables) จากไฟล์ .env (กรณีรันโลคอล)
 load_dotenv()
-
-# ดึง Resend API Key จาก Environment Variable
-RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 
 
 # ==========================================
@@ -17,7 +14,10 @@ def send_notification_email(to_email, subject, body_text, custom_html=None):
     ฟังก์ชันตัวช่วย (Helper Function): จัดการระบบส่งอีเมลกลางผ่าน Resend HTTP API (พอร์ต 443 HTTPS)
     แก้ปัญหาพอร์ต SMTP ถูกบล็อกบน Render
     """
-    if not to_email or not RESEND_API_KEY:
+    # ดึง API Key แบบไดนามิกภายในฟังก์ชัน ป้องกันปัญหาค่าว่างขณะ Import โมดูล
+    resend_api_key = os.getenv("RESEND_API_KEY")
+    
+    if not to_email or not resend_api_key:
         print("⚠️ ขาด API Key ของ Resend หรืออีเมลผู้รับ")
         return
 
@@ -25,7 +25,7 @@ def send_notification_email(to_email, subject, body_text, custom_html=None):
 
     url = "https://api.resend.com/emails"
     headers = {
-        "Authorization": f"Bearer {RESEND_API_KEY}",
+        "Authorization": f"Bearer {resend_api_key}",
         "Content-Type": "application/json"
     }
     
