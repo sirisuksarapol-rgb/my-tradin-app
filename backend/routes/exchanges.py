@@ -163,17 +163,21 @@ def create_exchange():
 
         # ดึงข้อมูลชื่อผู้ส่งและชื่อสิ่งของสำหรับใส่ในข้อความแจ้งเตือน
         sender_name, sender_item_name, receiver_item_name = "ผู้ใช้งานระบบ", "สิ่งของชิ้นใหม่", "สิ่งของของคุณ"
-        cursor.execute("SELECT DisplayName FROM member WHERE MemberID = %s", (member_id,))
+        cursor.execute("SELECT * FROM member WHERE MemberID = %s", (member_id,))
         m_res = cursor.fetchone()
-        if m_res: sender_name = m_res['DisplayName']
+        if m_res: 
+            sender_name = m_res.get('DisplayName') or m_res.get('displayname') or m_res.get('username') or "ผู้ใช้งานระบบ"
         
-        cursor.execute("SELECT ItemName FROM item WHERE ItemID = %s", (my_item_id,))
+        cursor.execute("SELECT * FROM item WHERE ItemID = %s", (my_item_id,))
         i_res1 = cursor.fetchone()
-        if i_res1: sender_item_name = i_res1['ItemName']
+        if i_res1: 
+            sender_item_name = i_res1.get('ItemName') or i_res1.get('itemname') or "สิ่งของชิ้นใหม่"
         
-        cursor.execute("SELECT ItemName FROM item WHERE ItemID = %s", (their_item_id,))
+        cursor.execute("SELECT * FROM item WHERE ItemID = %s", (their_item_id,))
         i_res2 = cursor.fetchone()
-        if i_res2: receiver_item_name = i_res2['ItemName']
+        if i_res2: 
+            receiver_item_name = i_res2.get('ItemName') or i_res2.get('itemname') or "สิ่งของของคุณ"
+
 
         conn.commit()
 
