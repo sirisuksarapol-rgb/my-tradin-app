@@ -192,12 +192,15 @@ def create_exchange():
 
         # ส่งอีเมลแจ้งเตือนไปยังผู้รับ
         try:
-            cursor.execute("SELECT Email FROM member WHERE MemberID = %s", (target_member_id,))
+            cursor.execute("SELECT * FROM member WHERE MemberID = %s", (target_member_id,))
             target_user = cursor.fetchone()
             
-            if target_user and target_user['Email']:
+            # ใช้ .get() เพื่อดักทั้งคอลัมน์ 'Email' และ 'email'
+            target_email = target_user.get('Email') or target_user.get('email') if target_user else None
+            
+            if target_email:
                 send_notification_email(
-                    to_email=target_user['Email'], 
+                    to_email=target_email, 
                     subject="Tradin: มีคำขอแลกเปลี่ยนใหม่เข้ามา!", 
                     body=msg
                 )
