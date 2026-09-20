@@ -1,10 +1,9 @@
 import os
 import random
 from datetime import datetime, timedelta
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from werkzeug.security import generate_password_hash
-import cloudinary
-import cloudinary.uploader
+from werkzeug.utils import secure_filename
 
 from db import get_connection
 from services.email_service import send_verify_email
@@ -12,17 +11,12 @@ from services.email_service import send_verify_email
 # ==========================================
 # REGISTER BLUEPRINT CONFIGURATION
 # ==========================================
+# สร้าง Blueprint สำหรับจัดกลุ่มเส้นทาง API ที่เกี่ยวข้องกับการสมัครสมาชิก (Registration Module)
+# กำหนด URL Prefix พื้นฐานเป็น /api/register เพื่อความสะอาดและเป็นระเบียบของสถาปัตยกรรมระบบ
 register_bp = Blueprint(
     "register",
     __name__,
     url_prefix="/api/register"
-)
-
-# ตั้งค่า Cloudinary โดยดึงค่าจาก Environment Variables บน Render
-cloudinary.config(
-    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
-    api_key=os.getenv("CLOUDINARY_API_KEY"),
-    api_secret=os.getenv("CLOUDINARY_API_SECRET")
 )
 
 
@@ -44,24 +38,24 @@ def register():
 
     password_hash = generate_password_hash(password)
 
-    # เปลี่ยนจากการเซฟไฟล์ลงเครื่อง มาอัปโหลดขึ้น Cloudinary แทน
-    profile_image_url = "default.png"
+    filename = "default.png"
     if file and file.filename != "":
-        try:
-            upload_result = cloudinary.uploader.upload(file)
-            profile_image_url = upload_result.get("secure_url", "default.png")
-        except Exception as e:
-            print("❌ Cloudinary Upload Error:", str(e))
+        filename = secure_filename(file.filename)
+        upload_path = os.path.join(
+            current_app.config["UPLOAD_FOLDER"],
+            filename
+        )
+        file.save(upload_path)
 
     verify_code = str(random.randint(100000, 999999))
     expire = datetime.now() + timedelta(minutes=30)
     current_time = datetime.now()
 
     conn = get_connection()
-    cursor = conn.cursor() 
+    cursor = conn.cursor(buffered=True)  # 👈 เพิ่ม buffered=True ตรงนี้
 
     try:
-        cursor.execute("SELECT memberid, emailverified FROM member WHERE email = %s", (email,))
+        cursor.execute("SELECT MemberID, EmailVerified FROM member WHERE Email = %s", (email,))
         existing_user = cursor.fetchone()
 
         if existing_user:
@@ -75,13 +69,13 @@ def register():
             
             cursor.execute("""
                 UPDATE member 
-                SET password = %s, displayname = %s, profileimage = %s, 
-                    verifycode = %s, verifyexpire = %s, registerdate = %s
-                WHERE memberid = %s
+                SET Password = %s, DisplayName = %s, ProfileImage = %s, 
+                    VerifyCode = %s, VerifyExpire = %s, RegisterDate = %s
+                WHERE MemberID = %s
             """, (
                 password_hash,
                 display_name,
-                profile_image_url,
+                filename,
                 verify_code,
                 expire,
                 current_time,
@@ -90,15 +84,15 @@ def register():
         else:
             cursor.execute("""
                 INSERT INTO member (
-                    email, password, displayname, profileimage,
-                    verifycode, verifyexpire, emailverified, registerdate, memberstatus
+                    Email, Password, DisplayName, ProfileImage,
+                    VerifyCode, VerifyExpire, EmailVerified, RegisterDate, MemberStatus
                 )
                 VALUES (%s, %s, %s, %s, %s, %s, 0, %s, 'Pending')
             """, (
                 email,
                 password_hash,
                 display_name,
-                profile_image_url,
+                filename,
                 verify_code,
                 expire,
                 current_time

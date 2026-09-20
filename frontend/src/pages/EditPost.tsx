@@ -6,13 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem as SelectOption,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem as SelectOption, SelectTrigger, SelectValue } from "@/components/ui/select";
 import AppLayout from "@/components/AppLayout";
 import { useToast } from "@/hooks/use-toast";
 import { getItems, updateItem, getCategories, IMAGE_BASE_URL } from "@/api/api";
@@ -48,30 +42,15 @@ interface DBCategory {
 }
 
 // คอมโพเนนต์ช่วยเรนเดอร์ไอคอนแบบไดนามิกจากฐานข้อมูล (รองรับ Lucide Icon, URL/Image และ Emoji โดยไม่มีการใช้ any)
-const DynamicIcon = ({
-  name,
-  className,
-  style,
-}: {
-  name?: string;
-  className?: string;
-  style?: React.CSSProperties;
-}) => {
+const DynamicIcon = ({ name, className, style }: { name?: string; className?: string; style?: React.CSSProperties }) => {
   if (!name) return null;
   if (name.startsWith("http") || name.startsWith("/")) {
     return <img src={name} alt="" className={className} style={style} />;
   }
   if (name.length <= 2) {
-    return (
-      <span className={className} style={style}>
-        {name}
-      </span>
-    );
+    return <span className={className} style={style}>{name}</span>;
   }
-  const iconsMap = LucideIcons as unknown as Record<
-    string,
-    React.ComponentType<{ className?: string; style?: React.CSSProperties }>
-  >;
+  const iconsMap = LucideIcons as unknown as Record<string, React.ComponentType<{ className?: string; style?: React.CSSProperties }>>;
   const IconComponent = iconsMap[name] || LucideIcons.Folder;
   return <IconComponent className={className} style={style} />;
 };
@@ -80,14 +59,14 @@ const DynamicIcon = ({
 // COMPONENT: EditPost (หน้าจอสำหรับแก้ไขโพสต์สินค้าหรือสิ่งของที่เคยลงประกาศไว้)
 // =========================================================================
 export default function EditPost() {
-  const { postId } = useParams<{ postId: string }>();
+  const { postId } = useParams<{ postId: string }>(); 
   const navigate = useNavigate();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // States สำหรับเก็บข้อมูลฟอร์มและจัดการสถานะการทำงาน
-  const [images, setImages] = useState<string[]>([]);
-  const [imageFiles, setImageFiles] = useState<(File | string)[]>([]);
+  const [images, setImages] = useState<string[]>([]); 
+  const [imageFiles, setImageFiles] = useState<(File | string)[]>([]); 
   const [categoriesList, setCategoriesList] = useState<DBCategory[]>([]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -107,19 +86,19 @@ export default function EditPost() {
   useEffect(() => {
     const fetchCategoriesData = async () => {
       try {
-        const res = await getCategories();
+        const res = await getCategories(); 
         setCategoriesList(res.data || []);
       } catch (error) {
         console.error("Error fetching categories:", error);
       }
     };
-
+    
     fetchCategoriesData();
   }, []);
 
   // กรองหมวดหมู่ "ทั้งหมด" ออกจากการเลือก
   const filteredCategories = categoriesList.filter(
-    (cat: DBCategory) => cat.CategoryName !== "ทั้งหมด",
+    (cat: DBCategory) => cat.CategoryName !== "ทั้งหมด"
   );
 
   // =====================================================================
@@ -131,10 +110,8 @@ export default function EditPost() {
         setLoading(true);
         const res = await getItems();
         const items: DBItemDetail[] = res.data || [];
-
-        const currentPost = items.find(
-          (p: DBItemDetail) => String(p.ItemID) === String(postId),
-        );
+        
+        const currentPost = items.find((p: DBItemDetail) => String(p.ItemID) === String(postId));
 
         if (currentPost) {
           setTitle(currentPost.ItemName || "");
@@ -147,17 +124,13 @@ export default function EditPost() {
           setCategory(currentPost.CategoryName || "");
 
           if (currentPost.ItemImage) {
-            const rawNames = currentPost.ItemImage.split(",")
+            const rawNames = currentPost.ItemImage
+              .split(",")
               .map((name: string) => name.trim())
               .filter((name: string) => name !== "");
-
-            // เช็กว่าถ้าลิงก์ขึ้นต้นด้วย http (Cloudinary) ให้ใช้ลิงก์นั้นเลย ถ้าไม่ใช่ค่อยเติม /uploads/
-            const imageUrls = rawNames.map((name: string) =>
-              name.startsWith("http")
-                ? name
-                : `${IMAGE_BASE_URL}/uploads/${name}`,
-            );
-
+            
+            const imageUrls = rawNames.map((name: string) => `${IMAGE_BASE_URL}/uploads/${name}`);
+            
             setImages(imageUrls);
             setImageFiles(rawNames);
           }
@@ -184,7 +157,7 @@ export default function EditPost() {
   // =====================================================================
   useEffect(() => {
     return () => {
-      images.forEach((img) => {
+      images.forEach(img => {
         if (img.startsWith("blob:")) URL.revokeObjectURL(img);
       });
     };
@@ -215,12 +188,12 @@ export default function EditPost() {
 
     const remainingSlots = 6 - images.length;
     const filesArray = Array.from(files).slice(0, remainingSlots);
-    const newImageUrls = filesArray.map((file) => URL.createObjectURL(file));
+    const newImageUrls = filesArray.map(file => URL.createObjectURL(file));
 
-    setImages((prev) => [...prev, ...newImageUrls]);
-    setImageFiles((prev) => [...prev, ...filesArray]);
+    setImages(prev => [...prev, ...newImageUrls]);
+    setImageFiles(prev => [...prev, ...filesArray]); 
 
-    if (errors.images) setErrors((curr) => ({ ...curr, images: "" }));
+    if (errors.images) setErrors(curr => ({ ...curr, images: "" }));
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -232,8 +205,8 @@ export default function EditPost() {
     if (targetImage.startsWith("blob:")) {
       URL.revokeObjectURL(targetImage);
     }
-    setImages((prev) => prev.filter((_, i) => i !== index));
-    setImageFiles((prev) => prev.filter((_, i) => i !== index));
+    setImages(prev => prev.filter((_, i) => i !== index));
+    setImageFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   // =====================================================================
@@ -245,8 +218,7 @@ export default function EditPost() {
     if (images.length < 3) newErrors.images = "กรุณาลงรูปสินค้าอย่างน้อย 3 รูป";
     if (!title.trim()) newErrors.title = "กรุณาระบุชื่อสิ่งของ";
     if (!category) newErrors.category = "กรุณาเลือกหมวดหมู่สิ่งของ";
-    if (!description.trim())
-      newErrors.description = "กรุณาระบุรายละเอียดสิ่งของ";
+    if (!description.trim()) newErrors.description = "กรุณาระบุรายละเอียดสิ่งของ";
     if (!wantedItem.trim()) newErrors.wantedItem = "กรุณาระบุสิ่งที่ต้องการแลก";
     if (!location.trim()) newErrors.location = "กรุณาระบุสถานที่นัดรับ";
 
@@ -286,14 +258,14 @@ export default function EditPost() {
           existingImages.push(file);
         }
       });
-
+      
       formData.append("existing_images", existingImages.join(","));
 
       if (postId) {
         await updateItem(Number(postId), formData);
-        toast({
+        toast({ 
           title: "สำเร็จ",
-          description: "บันทึกการแก้ไขเรียบร้อยแล้ว",
+          description: "บันทึกการแก้ไขเรียบร้อยแล้ว" 
         });
         navigate("/my-posts");
       }
@@ -311,9 +283,7 @@ export default function EditPost() {
   if (loading) {
     return (
       <AppLayout>
-        <div className="px-4 py-12 text-center text-muted-foreground animate-pulse">
-          กำลังโหลดข้อมูลโพสต์...
-        </div>
+        <div className="px-4 py-12 text-center text-muted-foreground animate-pulse">กำลังโหลดข้อมูลโพสต์...</div>
       </AppLayout>
     );
   }
@@ -461,7 +431,7 @@ export default function EditPost() {
                     onValueChange={(val) => {
                       setCategoryId(Number(val));
                       const selectedCat = categoriesList.find(
-                        (cat: DBCategory) => String(cat.CategoryID) === val,
+                        (cat: DBCategory) => String(cat.CategoryID) === val
                       );
                       if (selectedCat) {
                         setCategory(selectedCat.CategoryName);
@@ -474,40 +444,28 @@ export default function EditPost() {
                       className={`h-11 ${errors.category ? "border-red-500 ring-red-500" : ""}`}
                     >
                       <SelectValue placeholder="เลือกหมวดหมู่">
-                        {categoryId &&
-                          (() => {
-                            const currentCat = categoriesList.find(
-                              (c: DBCategory) =>
-                                String(c.CategoryID) === String(categoryId),
-                            );
-                            if (!currentCat) return "เลือกหมวดหมู่";
-                            const iconName = currentCat.IconName;
-                            const iconColor =
-                              currentCat.Color ||
-                              currentCat.CategoryColor ||
-                              currentCat.color ||
-                              currentCat.icon_color;
-                            return (
-                              <span className="inline-flex items-center gap-2">
-                                <DynamicIcon
-                                  name={iconName}
-                                  className="w-4 h-4 shrink-0"
-                                  style={{ color: iconColor || undefined }}
-                                />
-                                <span>{currentCat.CategoryName}</span>
-                              </span>
-                            );
-                          })()}
+                        {categoryId && (() => {
+                          const currentCat = categoriesList.find((c: DBCategory) => String(c.CategoryID) === String(categoryId));
+                          if (!currentCat) return "เลือกหมวดหมู่";
+                          const iconName = currentCat.IconName;
+                          const iconColor = currentCat.Color || currentCat.CategoryColor || currentCat.color || currentCat.icon_color;
+                          return (
+                            <span className="inline-flex items-center gap-2">
+                              <DynamicIcon 
+                                name={iconName} 
+                                className="w-4 h-4 shrink-0" 
+                                style={{ color: iconColor || undefined }} 
+                              />
+                              <span>{currentCat.CategoryName}</span>
+                            </span>
+                          );
+                        })()}
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {filteredCategories.map((cat: DBCategory) => {
                         const iconName = cat.IconName;
-                        const iconColor =
-                          cat.Color ||
-                          cat.CategoryColor ||
-                          cat.color ||
-                          cat.icon_color;
+                        const iconColor = cat.Color || cat.CategoryColor || cat.color || cat.icon_color;
                         return (
                           <SelectOption
                             key={cat.CategoryID}
@@ -515,10 +473,10 @@ export default function EditPost() {
                             className="hover:bg-slate-200/60 dark:hover:bg-zinc-800/60 hover:text-black dark:hover:text-black focus:bg-slate-200/60 dark:focus:bg-zinc-800/60 focus:text-black dark:focus:text-black cursor-pointer"
                           >
                             <span className="inline-flex items-center gap-2">
-                              <DynamicIcon
-                                name={iconName}
-                                className="w-4 h-4 shrink-0"
-                                style={{ color: iconColor || undefined }}
+                              <DynamicIcon 
+                                name={iconName} 
+                                className="w-4 h-4 shrink-0" 
+                                style={{ color: iconColor || undefined }} 
                               />
                               <span>{cat.CategoryName}</span>
                             </span>

@@ -6,6 +6,8 @@ from services.notification_service import notify_user
 # ==========================================
 # ADMIN BLUEPRINT CONFIGURATION
 # ==========================================
+# สร้าง Blueprint สำหรับจัดกลุ่มเส้นทาง API ทั้งหมดที่อยู่ภายใต้สิทธิ์ผู้ดูแลระบบ (Admin Panel)
+# ช่วยให้สามารถจัดการ Route, Middleware หรือ Prefix ร่วมกันได้อย่างเป็นระบบ (เช่น /api/admin/...)
 admin_bp = Blueprint("admin", __name__)
 
 
@@ -16,21 +18,39 @@ def format_cursor_data(cursor, data, is_single=False):
     """
     ฟังก์ชันตัวช่วย (Helper Function) สำหรับแปลงข้อมูลดิบ (Raw Data) ที่ได้จาก Database Cursor 
     ให้เป็นโครงสร้างข้อมูลประเภท Dictionary หรือ List of Dictionary ที่พร้อมสำหรับการแปลงเป็น JSON Response
+    
+    หน้าที่หลัก:
+    1. แม็ปปิ้งชื่อคอลัมน์จาก cursor.description เข้ากับข้อมูลแต่ละแถว (กรณีข้อมูลเป็น Tuple)
+    2. แปลงวัตถุประเภทวันที่และเวลา (datetime.datetime, datetime.date) ให้เป็น ISO 8601 String 
+       เพื่อป้องกันปัญหา TypeError เมื่อ Flask พยายามแปลงข้อมูลดังกล่าวเป็น JSON
+    
+    Parameters:
+        cursor (pymysql.cursors.Cursor): Database cursor ที่ใช้รันคำสั่ง Query เพื่อดึงโครงสร้างคอลัมน์
+        data (tuple | list | dict | None): ข้อมูลดิบที่ได้จากการ fetch ผ่านคำสั่ง fetchall() หรือ fetchone()
+        is_single (bool): กำหนดเป็น True หากต้องการแปลงข้อมูลชุดเดี่ยว (fetchone) หรือ False สำหรับหลายรายการ (fetchall)
+        
+    Returns:
+        dict | list | None: โครงสร้างข้อมูลที่ผ่านการแปลงรูปแบบและ serialize เรียบร้อยแล้ว
     """
     if not cursor.description or data is None:
         return data if not is_single else None
     
+    # ดึงชื่อคอลัมน์ทั้งหมดจากคำอธิบายของ cursor เพื่อใช้เป็น Key ใน Dictionary
     columns = [col[0] for col in cursor.description]
     
     def serialize_item(val):
+        # ตรวจสอบและแปลงประเภทข้อมูลทางเวลา (Datetime/Date) ให้เป็นรูปแบบมาตรฐาน ISO String
         if isinstance(val, (datetime.datetime, datetime.date)):
             return val.isoformat()
         return val
 
+    # กรณีที่ต้องการข้อมูลชุดเดี่ยว (Single Record)
     if is_single:
         if isinstance(data, dict):
             return {k: serialize_item(v) for k, v in data.items()}
         return {columns[i]: serialize_item(data[i]) for i in range(len(columns))}
+    
+    # กรณีที่ต้องการข้อมูลหลายรายการ (Multiple Records / List of rows)
     else:
         results = []
         for row in data:
@@ -49,25 +69,36 @@ def dashboard():
     """
     API Endpoint: GET /dashboard
     คำอธิบาย: รวบรวมและดึงข้อมูลสถิติภาพรวมระบบ (Metrics & Statistics) สำหรับแสดงผลบนหน้าจอ Dashboard ของผู้ดูแลระบบ
+    
+    กระบวนการทำงาน:
+    1. เชื่อมต่อฐานข้อมูลและสร้าง Cursor
+    2. รันคำสั่ง SQL นับจำนวนสมาชิกรวมทั้งหมดในตาราง member
+    3. รันคำสั่ง SQL นับจำนวนโพสต์สิ่งของทั้งหมดในตาราง item
+    4. รันคำสั่ง SQL นับจำนวนรายงานปัญหาที่มีสถานะค้างดำเนินการ ('Pending') ในตาราง problem
+    5. ปิดการเชื่อมต่อและส่งคืนข้อมูลในรูปแบบ JSON Object
     """
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT COUNT(*) AS total FROM member")
+    # ดึงจำนวนสมาชิกทั้งหมดในระบบ
+    cursor.execute("SELECT COUNT(*) total FROM member")
     row = cursor.fetchone()
     total_users = row["total"] if isinstance(row, dict) else row[0]
 
-    cursor.execute("SELECT COUNT(*) AS total FROM item")
+    # ดึงจำนวนสินค้าหรือโพสต์ทั้งหมดในระบบ
+    cursor.execute("SELECT COUNT(*) total FROM item")
     row = cursor.fetchone()
     total_items = row["total"] if isinstance(row, dict) else row[0]
 
-    cursor.execute("SELECT COUNT(*) AS total FROM problem WHERE reportstatus = 'Pending'")
+    # ดึงจำนวนรายงานปัญหาที่ยังอยู่ในสถานะรอดำเนินการ (Pending)
+    cursor.execute("SELECT COUNT(*) total FROM problem WHERE ReportStatus='Pending'")
     row = cursor.fetchone()
     total_reports = row["total"] if isinstance(row, dict) else row[0]
 
     cursor.close()
     conn.close()
 
+    # ส่งออกผลลัพธ์ข้อมูลสรุปเชิงสถิติกลับไปยัง Client
     return jsonify({
         "users": total_users,
         "items": total_items,
@@ -82,27 +113,31 @@ def dashboard():
 def users():
     """
     API Endpoint: GET /users
-    คำอธิบาย: ดึงรายชื่อบัญชีผู้ใช้งานทั้งหมดในระบบเพื่อใช้ในหน้าบริหารจัดการสมาชิก
+    คำอธิบาย: ดึงรายชื่อบัญชีผู้ใช้งานทั้งหมดในระบบเพื่อใช้ในหน้าบริหารจัดการสมาชิก (User Management)
+    
+    ฟีเจอร์เด่น:
+    - ใช้ Subquery เพื่อคำนวณจำนวนโพสต์สินค้า (PostCount) ของสมาชิกแต่ละรายแบบเรียลไทม์
+    - จัดเรียงข้อมูลตามวันที่สมัครสมาชิก (RegisterDate) จากใหม่ล่าสุดไปหาเก่าที่สุด (DESC)
     """
     conn = get_connection()
     cursor = conn.cursor()
     
-    # ใช้ AS "..." เพื่อคงรูปแบบพิมพ์ใหญ่-เล็กส่งกลับให้ Frontend
+    # ดึงข้อมูลโปรไฟล์ผู้ใช้ พร้อมทำ Subquery นับจำนวนโพสต์ของแต่ละ User
     cursor.execute("""
         SELECT
-            m.memberid AS "MemberID",
-            m.displayname AS "DisplayName",
-            m.email AS "Email",
-            m.profileimage AS "ProfileImage",
-            m.registerdate AS "RegisterDate",
-            m.memberstatus AS "MemberStatus",
+            m.MemberID,
+            m.DisplayName,
+            m.Email,
+            m.ProfileImage,
+            m.RegisterDate,
+            m.MemberStatus,
             (
                 SELECT COUNT(*)
                 FROM item i
-                WHERE i.memberid = m.memberid
-            ) AS "PostCount"
+                WHERE i.MemberID = m.MemberID
+            ) AS PostCount
         FROM member m
-        ORDER BY m.registerdate DESC
+        ORDER BY m.RegisterDate DESC
     """)
     raw_data = cursor.fetchall()
     data = format_cursor_data(cursor, raw_data)
@@ -120,21 +155,22 @@ def items():
     conn = get_connection()
     cursor = conn.cursor()
     
+    # ✅ เพิ่ม m.ProfileImage เข้าไปใน SELECT ด้านล่างนี้
     cursor.execute("""
         SELECT
-            i.itemid AS "ItemID",
-            i.itemname AS "ItemName",
-            i.itemdescription AS "ItemDescription",
-            i.itemimage AS "ItemImage",
-            i.itemstatus AS "ItemStatus",
-            i.postdate AS "PostDate",
-            m.memberid AS "MemberID",
-            m.displayname AS "DisplayName",
-            m.profileimage AS "ProfileImage",
-            i.categoryid AS "CategoryID"
+            i.ItemID,
+            i.ItemName,
+            i.ItemDescription,
+            i.ItemImage,
+            i.ItemStatus,
+            i.PostDate,
+            m.MemberID,
+            m.DisplayName,
+            m.ProfileImage,
+            i.CategoryID
         FROM item i
-        LEFT JOIN member m ON i.memberid = m.memberid
-        ORDER BY i.postdate DESC
+        LEFT JOIN member m ON i.MemberID = m.MemberID
+        ORDER BY i.PostDate DESC
     """)
     raw_data = cursor.fetchall()
     data = format_cursor_data(cursor, raw_data)
@@ -151,26 +187,32 @@ def items():
 def reports():
     """
     API Endpoint: GET /reports
-    คำอธิบาย: ดึงรายการแจ้งปัญหาทั้งหมดที่ผู้ใช้งานส่งเข้ามาในระบบ
+    คำอธิบาย: ดึงรายการแจ้งปัญหาทั้งหมดที่ผู้ใช้งานส่งเข้ามาในระบบ (Report Management)
+    
+    กระบวนการทำงาน:
+    - เชื่อมโยงตารางรายงานปัญหา (problem) เข้ากับตารางสินค้า (item) และตารางสมาชิก (member) 
+      เพื่อให้แอดมินเห็นบริบทว่าปัญหานั้นเกี่ยวข้องกับสินค้าชิ้นไหนและใครเป็นผู้แจ้ง
+    - เรียงลำดับจากวันที่แจ้งล่าสุด (ReportDate DESC)
     """
     conn = get_connection()
     cursor = conn.cursor()
     
+    # ดึงข้อมูลรายงานปัญหาพร้อมเชื่อมโยงข้อมูลสินค้าและผู้แจ้ง
     cursor.execute("""
         SELECT
-            p.problemid AS "ProblemID",
-            p.reportstatus AS "ReportStatus",
-            p.reportdate AS "ReportDate",
-            p.problemtype AS "ProblemType",
-            p.helpcenterdata AS "HelpCenterData",
-            i.itemid AS "ItemID",
-            i.itemname AS "ItemName",
-            m.memberid AS "MemberID",
-            m.displayname AS "DisplayName"
+            p.ProblemID,
+            p.ReportStatus,
+            p.ReportDate,
+            p.ProblemType,
+            p.HelpCenterData,
+            i.ItemID,
+            i.ItemName,
+            m.MemberID,
+            m.DisplayName
         FROM problem p
-        LEFT JOIN item i ON p.itemid = i.itemid
-        LEFT JOIN member m ON p.memberid = m.memberid
-        ORDER BY p.reportdate DESC
+        LEFT JOIN item i ON p.ItemID = i.ItemID
+        LEFT JOIN member m ON p.MemberID = m.MemberID
+        ORDER BY p.ReportDate DESC
     """)
     raw_data = cursor.fetchall()
     data = format_cursor_data(cursor, raw_data)
@@ -187,31 +229,38 @@ def reports():
 def resolve_report(problem_id):
     """
     API Endpoint: PUT /reports/<problem_id>
-    คำอธิบาย: อัปเดตสถานะของเคสรายงานปัญหาให้เป็น 'Resolved' พร้อมส่งแจ้งเตือนหาผู้ใช้
+    คำอธิบาย: อัปเดตสถานะของเคสรายงานปัญหาให้เป็น 'Resolved' (แก้ไข/ปิดเคสแล้ว) พร้อมส่งแจ้งเตือนหาผู้ใช้
+    
+    กระบวนการทำงาน:
+    1. ตรวจสอบว่ามี ProblemID นี้อยู่จริงในระบบหรือไม่ พร้อมดึงข้อมูลเจ้าของปัญหาและประเภทปัญหา
+    2. ทำการอัปเดตสถานะในตาราง problem เป็น 'Resolved' และบันทึกธุรกรรม (commit)
+    3. ส่งระบบแจ้งเตือน (Notification) ไปยังสมาชิกเจ้าของปัญหา เพื่อแจ้งผลการตรวจสอบ
+    4. มีระบบจัดการข้อผิดพลาด (Try-Except-Finally) พร้อม Rollback ข้อมูลหากเกิดความผิดพลาดระหว่างทาง
     """
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     
     try:
-        # ใช้ตัวพิมพ์เล็กในคำสั่ง SQL เพื่อป้องกันปัญหากับ PostgreSQL
+        # ตรวจสอบความถูกต้องและค้นหาข้อมูลรายงานปัญหาก่อนดำเนินการ
         cursor.execute("""
-            SELECT memberid, problemtype 
+            SELECT MemberID, ProblemType 
             FROM problem 
-            WHERE problemid = %s
+            WHERE ProblemID = %s
         """, (problem_id,))
         report = cursor.fetchone()
 
         if not report:
             return jsonify({"success": False, "message": "ไม่พบข้อมูลรายงานปัญหานี้"}), 404
 
-        update_sql = "UPDATE problem SET reportstatus = 'Resolved' WHERE problemid = %s"
+        # เปลี่ยนสถานะรายงานปัญหาเป็น Resolved
+        update_sql = "UPDATE problem SET ReportStatus = 'Resolved' WHERE ProblemID = %s"
         cursor.execute(update_sql, (problem_id,))
         conn.commit()
 
-        # ดึงค่าจาก Dictionary เป็นตัวพิมพ์เล็ก
-        if report.get("memberid"):
-            member_id = report["memberid"]
-            problem_type = report["problemtype"] or "ปัญหาที่คุณแจ้ง"
+        # ส่งการแจ้งเตือนหาผู้ใช้งาน หากเคสดังกล่าวมีระบุตัวตนผู้แจ้ง
+        if report.get("MemberID"):
+            member_id = report["MemberID"]
+            problem_type = report["ProblemType"] or "ปัญหาที่คุณแจ้ง"
             
             title = "อัปเดตสถานะการรายงานปัญหา"
             message = f"แอดมินได้ตรวจสอบและแก้ไข '{problem_type}' เรียบร้อยแล้ว ขอบคุณที่ช่วยทำให้ชุมชน Tradin ของเราน่าอยู่ขึ้นครับ!"
@@ -261,10 +310,10 @@ def suspend_user(member_id):
     try:
         cursor.execute("""
             UPDATE member 
-            SET memberstatus = 'Suspended', 
-                suspendeduntil = %s, 
-                suspendreason = %s 
-            WHERE memberid = %s
+            SET MemberStatus = 'Suspended', 
+                SuspendedUntil = %s, 
+                SuspendReason = %s 
+            WHERE MemberID = %s
         """, (suspended_until, reason, member_id))
         conn.commit()
 
@@ -299,21 +348,28 @@ def suspend_user(member_id):
 def unsuspend_user(member_id):
     """
     API Endpoint: PUT /users/<member_id>/unsuspend
-    คำอธิบาย: คืนสิทธิ์การใช้งาน (Unsuspend) ให้กับบัญชีผู้ใช้ที่เคยถูกระงับ
+    คำอธิบาย: คืนสิทธิ์การใช้งาน (Unsuspend) ให้กับบัญชีผู้ใช้ที่เคยถูกระงับ เพื่อให้กลับมาใช้งานระบบได้ตามปกติ
+    
+    กระบวนการทำงาน:
+    1. ปรับสถานะ MemberStatus ในตาราง member กลับเป็น 'Active'
+    2. ล้างข้อมูลระยะเวลาและเหตุผลการแบน (ตั้งค่า SuspendedUntil และ SuspendReason เป็น NULL)
+    3. บันทึกฐานข้อมูลและส่งการแจ้งเตือนคืนสิทธิ์ไปยังผู้ใช้งาน
     """
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     
     try:
+        # รีเซ็ตสถานะผู้ใช้กลับเป็นปกติ
         cursor.execute("""
             UPDATE member 
-            SET memberstatus = 'Active', 
-                suspendeduntil = NULL, 
-                suspendreason = NULL 
-            WHERE memberid = %s
+            SET MemberStatus = 'Active', 
+                SuspendedUntil = NULL, 
+                SuspendReason = NULL 
+            WHERE MemberID = %s
         """, (member_id,))
         conn.commit()
 
+        # ส่งข้อความแจ้งเตือนว่าบัญชีได้รับการปลดแบนแล้ว
         notify_user(
             member_id=member_id,
             title="แจ้งเตือนการคืนสิทธิ์ใช้งาน",
@@ -341,24 +397,27 @@ def delete_item_by_admin(item_id):
     cursor = conn.cursor(dictionary=True)
     
     try:
+        # รับค่าเหตุผลการลบจาก Frontend
         data = request.json or {}
         reason = data.get("reason", "ผิดเงื่อนไขการใช้งานของระบบ")
 
-        cursor.execute("SELECT memberid, itemname FROM item WHERE itemid = %s", (item_id,))
+        # ตรวจสอบการมีอยู่ของโพสต์และดึงข้อมูลเจ้าของ
+        cursor.execute("SELECT MemberID, ItemName FROM item WHERE ItemID = %s", (item_id,))
         item = cursor.fetchone()
 
         if not item:
             return jsonify({"success": False, "message": "ไม่พบรายการโพสต์นี้"}), 404
 
-        cursor.execute("DELETE FROM item WHERE itemid = %s", (item_id,))
+        # ลบโพสต์ออกจากฐานข้อมูล
+        cursor.execute("DELETE FROM item WHERE ItemID = %s", (item_id,))
         conn.commit()
 
-        # อ่านค่าจากคีย์ตัวพิมพ์เล็ก
-        if item.get("memberid"):
+        # ส่งข้อความแจ้งเตือนหาเจ้าของสินค้าพร้อมระบุเหตุผลที่รับมา
+        if item.get("MemberID"):
             notify_user(
-                member_id=item["memberid"],
+                member_id=item["MemberID"],
                 title="แจ้งเตือนการลบโพสต์",
-                message=f"โพสต์ '{item.get('itemname', 'สิ่งของของคุณ')}' ถูกลบโดยผู้ดูแลระบบ เนื่องจาก: {reason}",
+                message=f"โพสต์ '{item.get('ItemName', 'สิ่งของของคุณ')}' ถูกลบโดยผู้ดูแลระบบ เนื่องจาก: {reason}",
             )
 
         return jsonify({"success": True, "message": "ลบโพสต์และส่งแจ้งเตือนเรียบร้อยแล้ว"}), 200
@@ -383,8 +442,8 @@ def get_user_stats(member_id):
         cursor.execute("""
             SELECT COUNT(*) AS total 
             FROM exchange 
-            WHERE (memberid = %s OR targetmemberid = %s) 
-              AND (exchangestatus = 'Completed' OR exchangeresult = 'Success')
+            WHERE (MemberID = %s OR TargetMemberID = %s) 
+              AND (ExchangeStatus = 'Completed' OR ExchangerResult = 'Success')
         """, (member_id, member_id))
         success_row = cursor.fetchone()
         successful_exchanges = success_row["total"] if success_row else 0
@@ -392,30 +451,29 @@ def get_user_stats(member_id):
         cursor.execute("""
             SELECT COUNT(*) AS total 
             FROM exchange 
-            WHERE (memberid = %s OR targetmemberid = %s) 
-              AND (exchangestatus = 'Cancelled' OR exchangeresult = 'Failed')
+            WHERE (MemberID = %s OR TargetMemberID = %s) 
+              AND (ExchangeStatus = 'Cancelled' OR ExchangerResult = 'Failed')
         """, (member_id, member_id))
         failed_row = cursor.fetchone()
         failed_exchanges = failed_row["total"] if failed_row else 0
 
-        # ใช้ AS "..." ให้ Frontend ได้รับข้อมูลรูปแบบเดิม
         cursor.execute("""
             SELECT 
-                e.exchangeid AS "ExchangeID",
-                e.score AS "Score",
-                e.comment AS "Comment",
-                e.partnerscore AS "PartnerScore",
-                e.partnercomment AS "PartnerComment",
-                e.successdate AS "SuccessDate",
-                e.startdate AS "StartDate",
-                e.memberid AS "MemberID",
-                e.targetmemberid AS "TargetMemberID",
-                m1.displayname AS "SenderName",
-                m2.displayname AS "TargetName"
+                e.ExchangeID,
+                e.Score,
+                e.Comment,
+                e.PartnerScore,
+                e.PartnerComment,
+                e.SuccessDate,
+                e.StartDate,
+                e.MemberID,
+                e.TargetMemberID,
+                m1.DisplayName AS SenderName,
+                m2.DisplayName AS TargetName
             FROM exchange e
-            LEFT JOIN member m1 ON e.memberid = m1.memberid
-            LEFT JOIN member m2 ON e.targetmemberid = m2.memberid
-            WHERE (e.memberid = %s OR e.targetmemberid = %s)
+            LEFT JOIN member m1 ON e.MemberID = m1.MemberID
+            LEFT JOIN member m2 ON e.TargetMemberID = m2.MemberID
+            WHERE (e.MemberID = %s OR e.TargetMemberID = %s)
         """, (member_id, member_id))
         raw_reviews = cursor.fetchall()
 

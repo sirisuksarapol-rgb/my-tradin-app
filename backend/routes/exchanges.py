@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify
 from db import get_connection
 from services.notification_service import notify_user
-from services.email_service import send_exchange_verify_email, send_notification_email
+from services.email_service import send_exchange_verify_email
 
 # ==========================================
 # EXCHANGES BLUEPRINT CONFIGURATION
@@ -124,7 +124,6 @@ def create_exchange():
     - บันทึกข้อมูลคำขอลงในตาราง exchange ด้วยสถานะเริ่มต้นเป็น 'pending' พร้อมบันทึกคะแนนความเหมาะสม (MatchScore)
     - ดึงชื่อผู้ส่งและชื่อสิ่งของของทั้งสองฝ่ายเพื่อนำไปสร้างข้อความแจ้งเตือนที่ชัดเจน
     - เรียกใช้งานฟังก์ชัน `notify_user` เพื่อส่งการแจ้งเตือนไปยังผู้รับ (Target Member) ทันที
-    - ส่งอีเมลแจ้งเตือนไปยังผู้รับ (หากมีข้อมูลอีเมลในระบบ)
     """
     data = request.json or {}
     member_id = data.get('member_id')
@@ -133,7 +132,7 @@ def create_exchange():
     their_item_id = data.get('their_item_id')
     location = data.get('location') or 'นัดเจอตามตกลง'
     phone_number = data.get('phone_number') or ''
-    match_score = data.get('match_score', 0)
+    match_score = data.get('match_score', 0) # 👈 รับค่า match_score จาก Frontend (ถ้าไม่มีให้เป็น 0)
 
     if not all([member_id, target_member_id, my_item_id, their_item_id]):
         return jsonify({"success": False, "message": "ข้อมูลไม่ครบถ้วน"}), 400
@@ -143,14 +142,15 @@ def create_exchange():
         target_member_id = int(target_member_id)
         my_item_id = int(my_item_id)
         their_item_id = int(their_item_id)
-        match_score = float(match_score) 
+        match_score = float(match_score) # 👈 แปลงค่าเป็นตัวเลขทศนิยม
     except (ValueError, TypeError) as e:
         return jsonify({"success": False, "message": f"รูปแบบข้อมูลไม่ถูกต้อง: {str(e)}"}), 400
 
     conn = get_connection()
     cursor = conn.cursor(dictionary=True) 
-    exchange_type = data.get('exchange_type', 'manual') 
+    exchange_type = data.get('exchange_type', 'manual') # รับค่า ถ้าไม่มีให้ default เป็น manual
     try:
+        # 👈 แก้ไขคำสั่ง SQL เพื่อบันทึก MatchScore ลงฐานข้อมูล
         sql_exchange = """
     INSERT INTO exchange (
         ExchangeLocation, ExchangeStatus, MemberID, TargetMemberID, 
@@ -158,30 +158,27 @@ def create_exchange():
     )
     VALUES (%s, 'pending', %s, %s, %s, %s, %s, NOW(), %s, %s) 
 """
+        # 👈 เพิ่มตัวแปร match_score ต่อท้ายในข้อมูลที่จะ Execute
         cursor.execute(sql_exchange, (location, member_id, target_member_id, my_item_id, their_item_id, phone_number, match_score, exchange_type))
         exchange_id = cursor.lastrowid
 
         # ดึงข้อมูลชื่อผู้ส่งและชื่อสิ่งของสำหรับใส่ในข้อความแจ้งเตือน
         sender_name, sender_item_name, receiver_item_name = "ผู้ใช้งานระบบ", "สิ่งของชิ้นใหม่", "สิ่งของของคุณ"
-        cursor.execute("SELECT * FROM member WHERE MemberID = %s", (member_id,))
+        cursor.execute("SELECT DisplayName FROM member WHERE MemberID = %s", (member_id,))
         m_res = cursor.fetchone()
-        if m_res: 
-            sender_name = m_res.get('DisplayName') or m_res.get('displayname') or m_res.get('username') or "ผู้ใช้งานระบบ"
+        if m_res: sender_name = m_res['DisplayName']
         
-        cursor.execute("SELECT * FROM item WHERE ItemID = %s", (my_item_id,))
+        cursor.execute("SELECT ItemName FROM item WHERE ItemID = %s", (my_item_id,))
         i_res1 = cursor.fetchone()
-        if i_res1: 
-            sender_item_name = i_res1.get('ItemName') or i_res1.get('itemname') or "สิ่งของชิ้นใหม่"
+        if i_res1: sender_item_name = i_res1['ItemName']
         
-        cursor.execute("SELECT * FROM item WHERE ItemID = %s", (their_item_id,))
+        cursor.execute("SELECT ItemName FROM item WHERE ItemID = %s", (their_item_id,))
         i_res2 = cursor.fetchone()
-        if i_res2: 
-            receiver_item_name = i_res2.get('ItemName') or i_res2.get('itemname') or "สิ่งของของคุณ"
-
+        if i_res2: receiver_item_name = i_res2['ItemName']
 
         conn.commit()
 
-        # ส่งการแจ้งเตือนไปยังผู้รับผ่านระบบกระดิ่ง
+        # ส่งการแจ้งเตือนไปยังผู้รับ (Target Member) ว่ามีคำขอใหม่เข้ามา
         msg = f"คุณได้รับคำเสนอแลกเปลี่ยนสิ่งของชิ้นใหม่! จาก {sender_name} ต้องการแลก {sender_item_name} กับ {receiver_item_name}"
         notify_user(
             member_id=target_member_id,
@@ -189,23 +186,6 @@ def create_exchange():
             message=msg,
             link=f"/incoming-requests?id={exchange_id}"
         )
-
-        # ส่งอีเมลแจ้งเตือนไปยังผู้รับ
-        try:
-            cursor.execute("SELECT * FROM member WHERE MemberID = %s", (target_member_id,))
-            target_user = cursor.fetchone()
-            
-            # ใช้ .get() เพื่อดักทั้งคอลัมน์ 'Email' และ 'email'
-            target_email = target_user.get('Email') or target_user.get('email') if target_user else None
-            
-            if target_email:
-                send_notification_email(
-                    to_email=target_email, 
-                    subject="Tradin: มีคำขอแลกเปลี่ยนใหม่เข้ามา!", 
-                    body=msg
-                )
-        except Exception as email_err:
-            print(f"⚠️ ส่งอีเมลแจ้งเตือนไม่สำเร็จ: {str(email_err)}")
 
         return jsonify({"success": True, "message": "ส่งคำขอแลกเปลี่ยนสำเร็จเรียบร้อยแล้ว!"}), 201
         
@@ -215,7 +195,6 @@ def create_exchange():
     finally:
         cursor.close()
         conn.close()
-
 
 # ==========================================
 # 3. API: ตอบรับ หรือ ปฏิเสธการแลกเปลี่ยน (PUT)
@@ -374,17 +353,6 @@ def cancel_exchange(exchange_id):
 # ==========================================
 @exchanges_bp.route('/api/exchanges/<int:exchange_id>/complete', methods=['PUT'])
 def complete_exchange(exchange_id):
-    """
-    API Endpoint: PUT /api/exchanges/<exchange_id>/complete
-    คำอธิบาย: ยืนยันการได้รับสิ่งของและบันทึกคะแนนรีวิวความคิดเห็นของผู้ใช้งานหลังทำรายการเสร็จสิ้น
-    
-    รายละเอียดการทำงาน:
-    - รับค่าคะแนน (score), ความคิดเห็น (comment) และรหัสผู้ใช้งาน (user_id) ผ่าน JSON Body
-    - ตรวจสอบว่าผู้ทำรายการเป็น MemberID หรือ TargetMemberID เพื่อบันทึกสถานะการรับของฝั่งนั้น พร้อมบันทึกคะแนนรีวิว
-    - ตรวจสอบเงื่อนไขว่าทั้งสองฝ่ายกดยืนยันรับของครบทั้งคู่แล้วหรือยัง (IsMemberReceived == 1 และ IsTargetMemberReceived == 1)
-    - หากครบทั้งสองฝ่าย: เปลี่ยนสถานะภาพรวมเป็น 'completed', อัปเดตสถานะสิ่งของทั้งคู่ในตาราง item เป็น 'exchanged' (เพื่อซ่อนจากฟีด) และเคลียร์รายการที่ค้าง
-    - หากยังไม่ครบทั้งสองฝ่าย: ส่งการแจ้งเตือนให้อีกฝ่ายรับทราบว่าคู่สนทนากดยืนยันรับของแล้ว
-    """
     data = request.json or {}
     score = data.get('score')
     comment = data.get('comment', '')
@@ -433,21 +401,20 @@ def complete_exchange(exchange_id):
             """, (exchange_id, ex_data['MyItemID'], ex_data['TargetItemID'], ex_data['MyItemID'], ex_data['TargetItemID']))
             competing_requests = cursor.fetchall()
 
-            # 4. 🧹 กวาดล้างคำขอเหล่านั้นให้กลายเป็น auto_cancelled ทันที
-            if competing_requests:
-                cursor.execute("""
-                    UPDATE exchange 
-                    SET ExchangeStatus = 'auto_cancelled', 
-                        CancelDate = NOW(), 
-                        CancelReason = 'สินค้าชิ้นนี้ถูกแลกเปลี่ยนสำเร็จในรายการอื่นไปแล้ว'
-                    WHERE ExchangeID != %s
-                    AND ExchangeStatus IN ('pending', 'accepted', 'in_progress')
-                    AND (MyItemID IN (%s, %s) OR TargetItemID IN (%s, %s))
-                """, (
-                    exchange_id, 
-                    ex_data['MyItemID'], ex_data['TargetItemID'], 
-                    ex_data['MyItemID'], ex_data['TargetItemID']
-                ))
+            # 4. 🧹 กวาดล้างคำขอเหล่านั้นให้กลายเป็น failed ทันที
+            cursor.execute("""
+                UPDATE exchange 
+                SET ExchangeStatus = 'auto_cancelled', 
+                    CancelDate = NOW(), 
+                    CancelReason = 'สินค้าชิ้นนี้ถูกแลกเปลี่ยนสำเร็จในรายการอื่นไปแล้ว'
+                WHERE ExchangeID != %s
+                AND ExchangeStatus IN ('pending', 'accepted', 'in_progress')
+                AND (MyItemID IN (%s, %s) OR TargetItemID IN (%s, %s))
+            """, (
+                exchange_id, 
+                ex_data['MyItemID'], ex_data['TargetItemID'], 
+                ex_data['MyItemID'], ex_data['TargetItemID']
+            ))
 
             conn.commit()
 
@@ -471,6 +438,81 @@ def complete_exchange(exchange_id):
                 message="คู่แลกเปลี่ยนของคุณได้กดยืนยันว่าได้รับสิ่งของแล้ว กรุณากดยืนยันการรับของเพื่อทำรายการให้เสร็จสมบูรณ์",
             )
             msg = "บันทึกรีวิวแล้ว! กรุณารอให้อีกฝ่ายกดยืนยันได้รับสิ่งของ"
+            
+        return jsonify({"success": True, "message": msg}), 200
+        
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"success": False, "message": f"เกิดข้อผิดพลาดในการบันทึกข้อมูล: {str(e)}"}), 500
+    finally:
+        cursor.close()
+        conn.close()
+    """
+    API Endpoint: PUT /api/exchanges/<exchange_id>/complete
+    คำอธิบาย: ยืนยันการได้รับสิ่งของและบันทึกคะแนนรีวิวความคิดเห็นของผู้ใช้งานหลังทำรายการเสร็จสิ้น
+    
+    รายละเอียดการทำงาน:
+    - รับค่าคะแนน (score), ความคิดเห็น (comment) และรหัสผู้ใช้งาน (user_id) ผ่าน JSON Body
+    - ตรวจสอบว่าผู้ทำรายการเป็น MemberID หรือ TargetMemberID เพื่อบันทึกสถานะการรับของฝั่งนั้น พร้อมบันทึกคะแนนรีวิว
+    - ตรวจสอบเงื่อนไขว่าทั้งสองฝ่ายกดยืนยันรับของครบทั้งคู่แล้วหรือยัง (IsMemberReceived == 1 และ IsTargetMemberReceived == 1)
+    - หากครบทั้งสองฝ่าย: เปลี่ยนสถานะภาพรวมเป็น 'completed', อัปเดตสถานะสิ่งของทั้งคู่ในตาราง item เป็น 'exchanged' (เพื่อซ่อนจากฟีด) และส่งแจ้งเตือนความสำเร็จให้ทั้งคู่
+    - หากยังไม่ครบทั้งสองฝ่าย: บันทึกข้อมูลและส่งการแจ้งเตือนให้อีกฝ่ายรับทราบว่าคู่สนทนากดยืนยันรับของแล้ว
+    """
+    data = request.json or {}
+    score = data.get('score')
+    comment = data.get('comment', '')
+    user_id = data.get('user_id') 
+
+    if not user_id:
+        return jsonify({"success": False, "message": "ไม่พบข้อมูลผู้ใช้งาน (กรุณาแนบ user_id)"}), 400
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    try:
+        cursor.execute("SELECT MemberID, TargetMemberID, IsMemberReceived, IsTargetMemberReceived, MyItemID, TargetItemID FROM exchange WHERE ExchangeID = %s", (exchange_id,))
+        ex_data = cursor.fetchone()
+        if not ex_data:
+            return jsonify({"success": False, "message": "ไม่พบรายการแลกเปลี่ยนนี้"}), 404
+            
+        # ตรวจสอบสิทธิ์ว่าผู้ทำรายการคือฝั่งไหน และอัปเดตสถานะฝั่งนั้น
+        if int(user_id) == ex_data['MemberID']:
+            cursor.execute("UPDATE exchange SET IsMemberReceived = 1, Score = %s, Comment = %s WHERE ExchangeID = %s", (score, comment, exchange_id))
+            is_member_rec = 1
+            is_target_rec = ex_data['IsTargetMemberReceived']
+            partner_id = ex_data['TargetMemberID']
+        elif int(user_id) == ex_data['TargetMemberID']:
+            cursor.execute("UPDATE exchange SET IsTargetMemberReceived = 1, PartnerScore = %s, PartnerComment = %s WHERE ExchangeID = %s", (score, comment, exchange_id))
+            is_member_rec = ex_data['IsMemberReceived']
+            is_target_rec = 1
+            partner_id = ex_data['MemberID']
+        else:
+            return jsonify({"success": False, "message": "คุณไม่มีสิทธิ์ทำรายการนี้"}), 403
+
+        # ตรวจสอบว่ากดยืนยันรับของครบทั้ง 2 ฝ่ายหรือยัง
+        if is_member_rec == 1 and is_target_rec == 1:
+            # ปิดจ็อบการแลกเปลี่ยนสำเร็จสมบูรณ์
+            cursor.execute("UPDATE exchange SET ExchangeStatus = 'completed', SuccessDate = NOW() WHERE ExchangeID = %s", (exchange_id,))
+            cursor.execute("UPDATE item SET ItemStatus = 'exchanged' WHERE ItemID IN (%s, %s)", (ex_data['MyItemID'], ex_data['TargetItemID']))
+            conn.commit()
+
+            # แจ้งเตือนทั้งสองฝ่ายว่าการแลกเปลี่ยนเสร็จสมบูรณ์
+            success_msg = f"การแลกเปลี่ยนรหัส #{exchange_id} เสร็จสมบูรณ์แล้ว! ขอบคุณที่ร่วมแลกเปลี่ยนสิ่งของ"
+            notify_user(ex_data['MemberID'], "การแลกเปลี่ยนเสร็จสมบูรณ์! 🎉", success_msg)
+            notify_user(ex_data['TargetMemberID'], "การแลกเปลี่ยนเสร็จสมบูรณ์! 🎉", success_msg)
+
+            msg = "ทำรายการสำเร็จ! การแลกเปลี่ยนเสร็จสมบูรณ์และซ่อนสิ่งของจากหน้าฟีดแล้ว"
+        else:
+            conn.commit()
+
+            # แจ้งเตือนคู่แลกเปลี่ยนให้อีกฝ่ายรับทราบว่าฝ่ายนี้กดรับของแล้ว
+            notify_user(
+                member_id=partner_id,
+                title="คู่แลกเปลี่ยนยืนยันได้รับของแล้ว 📦",
+                message="คู่แลกเปลี่ยนของคุณได้กดยืนยันว่าได้รับสิ่งของแล้ว กรุณากดยืนยันการรับของเพื่อทำรายการให้เสร็จสมบูรณ์",
+            )
+
+            msg = "บันทึกรีวิวแล้ว! กรุณารอให้อีกฝ่ายกดยืนยันได้รับสิ่งของ ระบบจึงจะเปลี่ยนสถานะเป็นสำเร็จ"
             
         return jsonify({"success": True, "message": msg}), 200
         
@@ -725,3 +767,5 @@ def mark_notification_as_read(notification_id):
     finally:
         cursor.close()
         conn.close()
+
+

@@ -1,47 +1,25 @@
-import os
-import psycopg2
-import psycopg2.extras
-from dotenv import load_dotenv
+import mysql.connector
 
-# โหลดตัวแปรจากไฟล์ .env (สำหรับรันบนเครื่อง Local)
-load_dotenv()
-
-class PostgresConnectionWrapper:
-    """
-    Class จำลองตัวเชื่อมต่อ เพื่อให้สามารถใช้คำสั่ง cursor(dictionary=True) 
-    แบบเดิมของ MySQL บน PostgreSQL ได้โดยไม่ต้องแก้โค้ดใน Route อื่นๆ
-    """
-    def __init__(self, conn):
-        self._conn = conn
-
-    def cursor(self, dictionary=False, **kwargs):
-        if dictionary:
-            return self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        return self._conn.cursor(**kwargs)
-
-    def commit(self):
-        return self._conn.commit()
-
-    def rollback(self):
-        return self._conn.rollback()
-
-    def close(self):
-        return self._conn.close()
+# =========================================================================
+# ส่วนจัดการการเชื่อมต่อฐานข้อมูล (Database Connection Module)
+# =========================================================================
 
 def get_connection():
     """
-    ฟังก์ชันเชื่อมต่อฐานข้อมูล:
-    - ถ้ารันบน Local จะอ่านค่า DATABASE_URL จากไฟล์ .env
-    - ถ้ารันบน Render จะอ่านค่า DATABASE_URL จาก Environment Variable ของ Render โดยอัตโนมัติ
-    """
-    database_url = os.getenv('DATABASE_URL')
+    ฟังก์ชันหลัก (Core Connection Function): สร้างและคืนค่าออบเจ็กต์การเชื่อมต่อ (Connection Object) ไปยังฐานข้อมูล MySQL
     
-    if not database_url:
-        raise ValueError("❌ ไม่พบตัวแปร DATABASE_URL กรุณาตรวจสอบไฟล์ .env หรือ Environment Variables บน Render")
-
-    # เชื่อมต่อ PostgreSQL พร้อมเปิดใช้งาน SSL (จำเป็นสำหรับ Render)
-    raw_conn = psycopg2.connect(
-        database_url,
-        sslmode='require'
+    รายละเอียดการทำงานเชิงลึก:
+    - ใช้ไลบรารี mysql.connector เพื่อสร้างช่องทางการสื่อสารกับ MySQL Database Server
+    - กำหนดค่าพารามิเตอร์พื้นฐานสำหรับการเชื่อมต่อประกอบด้วย:
+      - host: ที่อยู่เซิร์ฟเวอร์ฐานข้อมูล ('localhost')
+      - user: ชื่อผู้ใช้งานระบบฐานข้อมูล ('root')
+      - password: รหัสผ่านสำหรับเข้าถึงระบบฐานข้อมูล (ค่าว่าง '')
+      - database: ชื่อฐานข้อมูลเฉพาะที่ระบบใช้งาน ('tradin_db')
+    - คืนค่า Connection Object กลับไปเพื่อให้ส่วนบริการอื่น ๆ ของแอปพลิเคชันนำไปสร้าง Cursor สำหรับประมวลผลคำสั่ง SQL ต่อไป
+    """
+    return mysql.connector.connect(
+        host='localhost',                     
+        user='root',
+        password='',    
+        database='tradin_db'
     )
-    return PostgresConnectionWrapper(raw_conn)

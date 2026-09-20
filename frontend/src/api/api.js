@@ -19,10 +19,6 @@ const getBaseUrl = () => {
     return `https://${backendHostname}`;
   }
 
-  if (hostname.includes('vercel.app') || (hostname !== 'localhost' && hostname !== '127.0.0.1')) {
-    return 'https://my-tradin-app.onrender.com';
-  }
-
   return `${protocol}//${hostname}:5000`;
 };
 
