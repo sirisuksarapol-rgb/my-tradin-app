@@ -68,7 +68,6 @@ def get_all_active_items():
 # 2. ฟังก์ชันค้นหาและจับคู่สินค้าเชิงความหมายแบบสองทาง (SEMANTIC SEARCH / TWO-WAY MATCH)
 # =========================================================================
 def semantic_search(my_item, top_n=5):
-    """ระบบค้นหาและแนะนำสินค้าด้วย AI แบบสองทาง พร้อมสูตร Hybrid Scaling ที่เป็นธรรมชาติ"""
     if not my_item or not my_item.get('DesiredItem'):
         return []
 
@@ -76,13 +75,14 @@ def semantic_search(my_item, top_n=5):
     if not items:
         return []
     
-    my_desired_text = str(my_item['DesiredItem']).strip()
-    my_item_text = f"{my_item.get('CategoryName') or ''} {my_item['ItemName']} {my_item['ItemDescription'] or ''}".strip()
+    # ป้องกันค่า None ด้วยการใช้ string empty "" เสมอ
+    my_desired_text = str(my_item.get('DesiredItem') or '').strip()
+    my_item_text = f"{my_item.get('CategoryName') or ''} {my_item.get('ItemName') or ''} {my_item.get('ItemDescription') or ''}".strip()
     
     my_desired_tokens = set(preprocess_thai_text(my_desired_text))
     
     their_item_texts = [
-        f"{item.get('CategoryName') or ''} {item['ItemName']} {item['ItemDescription'] or ''}".strip()
+        f"{item.get('CategoryName') or ''} {item.get('ItemName') or ''} {item.get('ItemDescription') or ''}".strip()
         for item in items
     ]
     their_desired_texts = [
