@@ -439,10 +439,13 @@ export const adminDeleteItem = (itemId, reason) => {
 };
 
 /**
- * อัปเดตสถานะรายงานปัญหาให้เป็น 'Resolved' (แก้ไขแล้ว/ปิดเคส)
+ * อัปเดตสถานะรายงานปัญหาให้เป็น 'Resolved' (แก้ไขแล้ว/ปิดเคส) พร้อมส่งข้อความแจ้งเตือน
  * @param {Number} problemId - รหัสรายงานปัญหา
+ * @param {String} resolutionMessage - ข้อความแจ้งสิ่งที่ได้ดำเนินการแก้ไขให้ผู้แจ้งทราบ
  */
-export const resolveReport = (problemId) => axios.put(`${API_BASE_URL}/admin/reports/${problemId}`);
-
+export const resolveReport = (problemId, resolutionMessage = "") => 
+  axios.put(`${API_BASE_URL}/admin/reports/${problemId}`, { 
+    resolution_message: resolutionMessage 
+  });
 
 export default API_BASE_URL;

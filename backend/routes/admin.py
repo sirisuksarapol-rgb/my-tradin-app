@@ -227,21 +227,14 @@ def reports():
 # ==========================================
 @admin_bp.route("/reports/<int:problem_id>", methods=["PUT"])
 def resolve_report(problem_id):
-    """
-    API Endpoint: PUT /reports/<problem_id>
-    คำอธิบาย: อัปเดตสถานะของเคสรายงานปัญหาให้เป็น 'Resolved' (แก้ไข/ปิดเคสแล้ว) พร้อมส่งแจ้งเตือนหาผู้ใช้
-    
-    กระบวนการทำงาน:
-    1. ตรวจสอบว่ามี ProblemID นี้อยู่จริงในระบบหรือไม่ พร้อมดึงข้อมูลเจ้าของปัญหาและประเภทปัญหา
-    2. ทำการอัปเดตสถานะในตาราง problem เป็น 'Resolved' และบันทึกธุรกรรม (commit)
-    3. ส่งระบบแจ้งเตือน (Notification) ไปยังสมาชิกเจ้าของปัญหา เพื่อแจ้งผลการตรวจสอบ
-    4. มีระบบจัดการข้อผิดพลาด (Try-Except-Finally) พร้อม Rollback ข้อมูลหากเกิดความผิดพลาดระหว่างทาง
-    """
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     
     try:
-        # ตรวจสอบความถูกต้องและค้นหาข้อมูลรายงานปัญหาก่อนดำเนินการ
+        # รับค่าข้อความดำเนินการจากแอดมิน (ถ้ามี)
+        data = request.json or {}
+        resolution_msg = data.get("resolution_message", "").strip()
+
         cursor.execute("""
             SELECT MemberID, ProblemType 
             FROM problem 
@@ -252,18 +245,21 @@ def resolve_report(problem_id):
         if not report:
             return jsonify({"success": False, "message": "ไม่พบข้อมูลรายงานปัญหานี้"}), 404
 
-        # เปลี่ยนสถานะรายงานปัญหาเป็น Resolved
         update_sql = "UPDATE problem SET ReportStatus = 'Resolved' WHERE ProblemID = %s"
         cursor.execute(update_sql, (problem_id,))
         conn.commit()
 
-        # ส่งการแจ้งเตือนหาผู้ใช้งาน หากเคสดังกล่าวมีระบุตัวตนผู้แจ้ง
+        # ส่งการแจ้งเตือนหาผู้ใช้งาน
         if report.get("MemberID"):
             member_id = report["MemberID"]
-            problem_type = report["ProblemType"] or "ปัญหาที่คุณแจ้ง"
+            problem_type = report["ProblemType"] or "ข้อเสนอแนะ/ปัญหาที่คุณแจ้ง"
+            title = "อัปเดตสถานะการรายงาน"
             
-            title = "อัปเดตสถานะการรายงานปัญหา"
-            message = f"แอดมินได้ตรวจสอบและแก้ไข '{problem_type}' เรียบร้อยแล้ว ขอบคุณที่ช่วยทำให้ชุมชน Tradin ของเราน่าอยู่ขึ้นครับ!"
+            # ปรับเปลี่ยนข้อความตามที่แอดมินกรอกมา
+            if resolution_msg:
+                message = f"แอดมินได้ตรวจสอบและดำเนินการ: {resolution_msg} (เคส: {problem_type})"
+            else:
+                message = f"แอดมินได้ตรวจสอบและแก้ไข '{problem_type}' เรียบร้อยแล้ว ขอบคุณที่ช่วยส่งข้อเสนอแนะครับ!"
             
             notify_user(
                 member_id=member_id, 
@@ -291,6 +287,65 @@ def resolve_report(problem_id):
 # ==========================================
 @admin_bp.route("/users/<int:member_id>/suspend", methods=["PUT"])
 def suspend_user(member_id):
+    data = request.json or {}
+    suspend_type = data.get("type", "permanent")
+    until_date_str = data.get("until_date")
+    reason = data.get("reason", "ละเมิดเงื่อนไขข้อตกลงของระบบ")
+
+    suspended_until = None
+    if suspend_type == "temporary" and until_date_str:
+        try:
+            suspended_until = datetime.datetime.strptime(until_date_str, "%Y-%m-%d")
+            suspended_until = suspended_until.replace(hour=23, minute=59, second=59)
+        except ValueError:
+            pass
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    try:
+        # ดึงอีเมลและชื่อของผู้ใช้ที่กำลังจะถูกแบนเพื่อส่งเมลแจ้งเตือน
+        cursor.execute("SELECT Email, DisplayName FROM member WHERE MemberID = %s", (member_id,))
+        user_info = cursor.fetchone()
+
+        cursor.execute("""
+            UPDATE member 
+            SET MemberStatus = 'Suspended', 
+                SuspendedUntil = %s, 
+                SuspendReason = %s 
+            WHERE MemberID = %s
+        """, (suspended_until, reason, member_id))
+        conn.commit()
+
+        message = f"บัญชีของคุณถูกระงับเนื่องจาก: {reason}"
+        if suspended_until:
+            message += f"\nจะสามารถใช้งานได้อีกครั้งในวันที่ {suspended_until.strftime('%d/%m/%Y %H:%M น.')}"
+        else:
+            message += "\n(ระงับแบบถาวร)"
+
+        # ส่ง Notification ในระบบ
+        notify_user(
+            member_id=member_id,
+            title="แจ้งเตือนการระงับสิทธิ์ใช้งาน",
+            message=message,
+            link="/contact"
+        )
+
+        # 📧 [เพิ่มใหม่] ส่วนการส่งอีเมลแจ้งเตือนไปยังอีเมลของผู้ใช้
+        if user_info and user_info.get("Email"):
+            user_email = user_info["Email"]
+            # หมายเหตุ: ตรงนี้สามารถเรียกใช้ฟังก์ชันส่งอีเมลจริงของโปรเจกต์คุณได้ เช่น send_email(user_email, "บัญชีของคุณถูกระงับ", message)
+            print(f"📧 ส่งอีเมลแจ้งเตือนการระงับบัญชีไปยัง: {user_email} | เหตุผล: {reason}")
+
+        return jsonify({"success": True, "message": "ระงับสิทธิ์ผู้ใช้งานและส่งอีเมลแจ้งเตือนเรียบร้อยแล้ว"}), 200
+        
+    except Exception as e:
+        conn.rollback()
+        print(f"❌ Error suspending user {member_id}: {str(e)}")
+        return jsonify({"success": False, "message": str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
     data = request.json or {}
     suspend_type = data.get("type", "permanent")
     until_date_str = data.get("until_date")

@@ -231,7 +231,7 @@ export default function AdminDashboard() {
   });
   const [suspendForm, setSuspendForm] = useState({
     type: "temporary",
-    days: "7",
+    untilDate: "", // เปลี่ยนจากเก็บเป็น days เป็นเก็บวันที่เลือกจากปฏิทิน
     reason: "",
   });
   const [unsuspendReason, setUnsuspendReason] = useState<string>("");
@@ -246,6 +246,13 @@ export default function AdminDashboard() {
     isOpen: false,
     reason: "",
   });
+
+  const [resolveModal, setResolveModal] = useState({
+    isOpen: false,
+    reportId: "",
+    category: "", // "post", "user", "feedback"
+  });
+  const [resolveMessage, setResolveMessage] = useState("");
 
   const handleOpenManageModal = async (user: DashboardUser): Promise<void> => {
     setManageModal({
@@ -320,16 +327,11 @@ export default function AdminDashboard() {
 
   const handleConfirmSuspend = async (): Promise<void> => {
     try {
-      const daysNum = Number(suspendForm.days) || 7;
-      const untilDate = new Date();
-      untilDate.setDate(untilDate.getDate() + daysNum);
-
+      // ส่งค่า untilDate ที่เลือกจากปฏิทินตรงๆ ไปยัง Backend
       const payload = {
         type: suspendForm.type,
         until_date:
-          suspendForm.type === "temporary"
-            ? untilDate.toISOString().split("T")[0]
-            : undefined,
+          suspendForm.type === "temporary" ? suspendForm.untilDate : undefined,
         reason: suspendForm.reason,
       };
 
@@ -343,14 +345,16 @@ export default function AdminDashboard() {
                 suspended: true,
                 suspendDetails: {
                   type: suspendForm.type as "temporary" | "permanent",
-                  untilDate:
-                    suspendForm.type === "temporary"
-                      ? untilDate.toLocaleDateString("th-TH", {
+                  untilDate: suspendForm.untilDate
+                    ? new Date(suspendForm.untilDate).toLocaleDateString(
+                        "th-TH",
+                        {
                           day: "numeric",
                           month: "short",
                           year: "numeric",
-                        })
-                      : undefined,
+                        },
+                      )
+                    : undefined,
                   reason: suspendForm.reason,
                 },
               }
@@ -386,43 +390,84 @@ export default function AdminDashboard() {
       postId: post.id,
       postTitle: post.title,
     });
-    setDeleteReason(""); // ล้างค่าเหตุผลเก่า
+    setDeleteReason("");
   };
 
-  // ✅ ดำเนินการลบจริง
+  // ✅ ฟังก์ชันสำหรับลบโพสต์ (ที่คุณเผลอลบไป)
   const executeDeletePost = async (): Promise<void> => {
     try {
-      const finalReason = deleteReason.trim() || "ผิดกฎระเบียบของระบบ (ไม่ระบุเหตุผลย่อย)";
-      
-      // ส่ง ID และเหตุผลไปยัง API
+      const finalReason =
+        deleteReason.trim() || "ผิดกฎระเบียบของระบบ (ไม่ระบุเหตุผลย่อย)";
+
       await adminDeleteItem(deletePostModal.postId, finalReason);
 
-      // นำโพสต์ออกจาก State
       setPosts((prev) => prev.filter((p) => p.id !== deletePostModal.postId));
 
-      // ปิด Pop-up ยืนยัน แล้วเปิด Pop-up สำเร็จ
       setDeletePostModal({ isOpen: false, postId: "", postTitle: "" });
       setDeleteSuccessModal({
         isOpen: true,
         reason: finalReason,
       });
-      setDeleteReason(""); // ล้างค่าเหตุผล
-      
+      setDeleteReason("");
     } catch (error: unknown) {
       console.error("Error deleting post:", error);
-      
-      // ตรวจสอบ Type ของ error อย่างปลอดภัยโดยไม่ใช้ any
+
       let errorMessage = "ไม่สามารถลบโพสต์ได้";
       if (error instanceof Error) {
         errorMessage = error.message;
-      } else if (typeof error === "object" && error !== null && "response" in error) {
-        // กรณีเป็น Axios Error
+      } else if (
+        typeof error === "object" &&
+        error !== null &&
+        "response" in error
+      ) {
         errorMessage = "เซิร์ฟเวอร์ปฏิเสธการลบโพสต์";
       }
 
       toast({
         title: "เกิดข้อผิดพลาด",
         description: errorMessage,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // ✅ ฟังก์ชันสำหรับตอบกลับตอนปิดเคส
+  const executeResolve = async () => {
+    try {
+      await resolveReport(resolveModal.reportId, resolveMessage);
+
+      if (resolveModal.category === "post") {
+        setReports((prev) =>
+          prev.map((r) =>
+            r.id === resolveModal.reportId ? { ...r, status: "resolved" } : r,
+          ),
+        );
+      } else if (resolveModal.category === "user") {
+        setUserReports((prev) =>
+          prev.map((r) =>
+            r.id === resolveModal.reportId ? { ...r, status: "resolved" } : r,
+          ),
+        );
+      } else if (resolveModal.category === "feedback") {
+        setFeedbacks((prev) =>
+          prev.map((r) =>
+            r.id === resolveModal.reportId ? { ...r, status: "resolved" } : r,
+          ),
+        );
+      }
+
+      toast({
+        title: "จัดการรายงานเรียบร้อย",
+        description: "ระบบได้บันทึกและส่งแจ้งเตือนให้ผู้รายงานแล้ว",
+      });
+
+      setResolveModal({ isOpen: false, reportId: "", category: "" });
+      setResolveMessage("");
+    } catch (error) {
+      console.error("Error resolving:", error);
+      toast({
+        title: "เกิดข้อผิดพลาด",
+        description: "ไม่สามารถอัปเดตสถานะรายงานได้",
         variant: "destructive",
       });
     }
@@ -602,6 +647,7 @@ export default function AdminDashboard() {
   const pendingFeedbacks = feedbacks.filter((f) => f.status === "pending");
   const totalIssues = pendingReports.length + pendingUserReports.length;
 
+  // สำหรับฟังก์ชันปิดเคสอันเก่า (เหลือไว้เผื่อเรียกใช้บางจุด)
   const handleResolveReport = async (id: string): Promise<void> => {
     try {
       await resolveReport(id);
@@ -638,41 +684,6 @@ export default function AdminDashboard() {
       toast({
         title: "เกิดข้อผิดพลาด",
         description: "ไม่สามารถปิดเคสได้",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleResolveFeedback = async (id: string): Promise<void> => {
-    try {
-      await resolveReport(id);
-      setFeedbacks((prev) =>
-        prev.map((f) =>
-          f.id === id ? { ...f, status: "resolved" as const } : f,
-        ),
-      );
-      toast({ title: "บันทึกสถานะเรียบร้อย" });
-    } catch (error: unknown) {
-      console.error("Error resolving feedback:", error);
-      toast({
-        title: "เกิดข้อผิดพลาด",
-        description: "ไม่สามารถบันทึกสถานะได้",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleDeletePost = async (id: string): Promise<void> => {
-    if (!window.confirm("คุณแน่ใจหรือไม่ว่าต้องการลบโพสต์นี้?")) return;
-    try {
-      await adminDeleteItem(id);
-      setPosts((prev) => prev.filter((p) => p.id !== id));
-      toast({ title: "ลบโพสต์สำเร็จ", variant: "destructive" });
-    } catch (error: unknown) {
-      console.error("Error deleting post:", error);
-      toast({
-        title: "เกิดข้อผิดพลาด",
-        description: "ไม่สามารถลบโพสต์ได้",
         variant: "destructive",
       });
     }
@@ -1098,24 +1109,29 @@ export default function AdminDashboard() {
                       key={post.id}
                       className="border-border/40 shadow-sm hover:shadow-md hover:border-primary/30 transition-all duration-300 group overflow-hidden flex flex-col"
                     >
-                      {/* ✅ เปลี่ยนจาก h-[130px] เป็น min-h-[130px] เพื่อไม่ให้บีบปุ่มจนกดไม่ได้ */}
                       <div className="flex h-full min-h-[130px]">
                         {/* รูปภาพด้านซ้าย */}
-                        <div 
+                        <div
                           className="w-2/5 shrink-0 cursor-pointer overflow-hidden bg-muted relative"
-                          onClick={() => navigate(`/post/${post.id}`, { state: { fromAdmin: true } })}
+                          onClick={() =>
+                            navigate(`/post/${post.id}`, {
+                              state: { fromAdmin: true },
+                            })
+                          }
                         >
                           <img
                             src={
                               post.image
-                                ? post.image.split(',')[0].startsWith("http")
-                                  ? post.image.split(',')[0]
-                                  : `${IMAGE_BASE_URL}/uploads/${post.image.split(',')[0]}`
+                                ? post.image.split(",")[0].startsWith("http")
+                                  ? post.image.split(",")[0]
+                                  : `${IMAGE_BASE_URL}/uploads/${post.image.split(",")[0]}`
                                 : "/placeholder.jpg"
                             }
                             alt={post.title}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                            onError={(e) => { e.currentTarget.src = "/placeholder.jpg" }}
+                            onError={(e) => {
+                              e.currentTarget.src = "/placeholder.jpg";
+                            }}
                           />
                         </div>
 
@@ -1124,44 +1140,55 @@ export default function AdminDashboard() {
                           <div>
                             <h4
                               className="font-semibold text-foreground line-clamp-2 leading-tight transition-colors cursor-pointer text-sm"
-                              onClick={() => navigate(`/post/${post.id}`, { state: { fromAdmin: true } })}
+                              onClick={() =>
+                                navigate(`/post/${post.id}`, {
+                                  state: { fromAdmin: true },
+                                })
+                              }
                             >
                               {post.title}
                             </h4>
                           </div>
-                          
+
                           {/* โปรไฟล์ & ปุ่มลบ */}
                           <div className="flex items-center justify-between mt-auto pt-3 border-t border-border/40">
                             <div className="flex items-center gap-2 min-w-0">
-                              {post.author.profileImage && post.author.profileImage !== "null" && post.author.profileImage !== "undefined" ? (
-                                <img 
+                              {post.author.profileImage &&
+                              post.author.profileImage !== "null" &&
+                              post.author.profileImage !== "undefined" ? (
+                                <img
                                   src={
-                                    post.author.profileImage.startsWith("http") 
-                                      ? post.author.profileImage 
+                                    post.author.profileImage.startsWith("http")
+                                      ? post.author.profileImage
                                       : `${IMAGE_BASE_URL}/uploads/${post.author.profileImage}`
                                   }
                                   alt={post.author.name}
                                   className="w-6 h-6 rounded-full object-cover shrink-0 border border-border/50"
-                                  onError={(e) => { 
-                                    e.currentTarget.style.display = 'none'; 
-                                    e.currentTarget.nextElementSibling?.classList.remove('hidden'); 
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = "none";
+                                    e.currentTarget.nextElementSibling?.classList.remove(
+                                      "hidden",
+                                    );
                                   }}
                                 />
                               ) : null}
-                              <div className={`w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-[10px] shrink-0 ${post.author.profileImage && post.author.profileImage !== "null" && post.author.profileImage !== "undefined" ? "hidden" : ""}`}>
+                              <div
+                                className={`w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-[10px] shrink-0 ${post.author.profileImage && post.author.profileImage !== "null" && post.author.profileImage !== "undefined" ? "hidden" : ""}`}
+                              >
                                 {post.author.name.charAt(0)}
                               </div>
-                              <span className="text-xs text-muted-foreground truncate">{post.author.name}</span>
+                              <span className="text-xs text-muted-foreground truncate">
+                                {post.author.name}
+                              </span>
                             </div>
-                            
-                            {/* ✅ แก้ปุ่มลบ โดยเพิ่ม relative z-10 และ stopPropagation */}
+
                             <Button
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8 text-muted-foreground hover:bg-destructive/15 hover:text-destructive transition-colors shrink-0 relative z-10"
                               onClick={(e) => {
                                 e.preventDefault();
-                                e.stopPropagation(); // ป้องกันไม่ให้คลิกทะลุ
+                                e.stopPropagation();
                                 confirmDeletePost(post);
                               }}
                             >
@@ -1227,7 +1254,14 @@ export default function AdminDashboard() {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => handleResolveReport(report.id)}
+                                onClick={() => {
+                                  setResolveModal({
+                                    isOpen: true,
+                                    reportId: report.id,
+                                    category: "post",
+                                  });
+                                  setResolveMessage("");
+                                }}
                                 className="w-full sm:w-auto hover:bg-success/10 hover:text-success hover:border-success"
                               >
                                 <CheckCircle className="w-4 h-4 mr-2" />{" "}
@@ -1293,7 +1327,7 @@ export default function AdminDashboard() {
                                       });
                                       setSuspendForm({
                                         type: "temporary",
-                                        days: "7",
+                                        untilDate: "",
                                         reason: "",
                                       });
                                     }}
@@ -1303,9 +1337,15 @@ export default function AdminDashboard() {
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() =>
-                                      handleResolveUserReport(report.id)
-                                    }
+                                    className=" h-10 px-5 text-xs font-bold hover:bg-zinc-200 hover:text-zinc-900"
+                                    onClick={() => {
+                                      setResolveModal({
+                                        isOpen: true,
+                                        reportId: report.id,
+                                        category: "user",
+                                      });
+                                      setResolveMessage("");
+                                    }}
                                   >
                                     ข้าม
                                   </Button>
@@ -1355,10 +1395,17 @@ export default function AdminDashboard() {
                             {fb.status === "pending" && (
                               <Button
                                 size="sm"
-                                onClick={() => handleResolveFeedback(fb.id)}
+                                onClick={() => {
+                                  setResolveModal({
+                                    isOpen: true,
+                                    reportId: fb.id,
+                                    category: "feedback",
+                                  });
+                                  setResolveMessage("");
+                                }}
                                 className="h-8 text-xs bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground"
                               >
-                                รับทราบ
+                                รับทราบ / ดำเนินการ
                               </Button>
                             )}
                           </div>
@@ -1380,9 +1427,9 @@ export default function AdminDashboard() {
         </div>
       </main>
 
-      {/* ===================================================================== */}
-      {/* 📊 MODAL: หน้าต่างจัดการข้อมูลผู้ใช้และสถิติเชิงลึก (Manage User Dialog)    */}
-      {/* ===================================================================== */}
+      {/* ================= MODALS ================= */}
+
+      {/* 1. MANAGE USER DIALOG */}
       <Dialog
         open={manageModal.isOpen}
         onOpenChange={(open) =>
@@ -1390,7 +1437,6 @@ export default function AdminDashboard() {
         }
       >
         <DialogContent className="sm:max-w-[600px] rounded-3xl p-0 overflow-hidden border-border/80 max-h-[90vh] flex flex-col">
-          {/* Header */}
           <div className="bg-primary/10 p-6 flex items-center gap-4 border-b border-primary/10">
             {manageModal.profileImage &&
             manageModal.profileImage.trim() !== "undefined" &&
@@ -1434,7 +1480,6 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* Content Scrollable */}
           <div className="p-6 overflow-y-auto space-y-6 flex-1">
             {manageModal.isLoadingStats ? (
               <div className="flex flex-col items-center justify-center py-12 space-y-3">
@@ -1445,7 +1490,6 @@ export default function AdminDashboard() {
               </div>
             ) : (
               <>
-                {/* สถิติ 4 ช่อง */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div className="bg-muted/30 border border-border/60 rounded-2xl p-3 flex flex-col items-center text-center">
                     <div className="p-2 rounded-xl bg-primary/10 text-primary mb-1.5">
@@ -1510,7 +1554,6 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                {/* ส่วนแสดงความคิดเห็นและรีวิว */}
                 <div className="space-y-4">
                   <h4 className="text-sm font-bold text-foreground flex items-center gap-2">
                     <MessageSquare className="h-5 w-5 text-primary" />{" "}
@@ -1569,7 +1612,6 @@ export default function AdminDashboard() {
 
             <Separator />
 
-            {/* ปุ่มระงับ/คืนสิทธิ์ */}
             <div className="space-y-2 pt-1">
               {!manageModal.suspended ? (
                 <Button
@@ -1584,7 +1626,7 @@ export default function AdminDashboard() {
                     });
                     setSuspendForm({
                       type: "temporary",
-                      days: "7",
+                      untilDate: "",
                       reason: "",
                     });
                   }}
@@ -1612,7 +1654,54 @@ export default function AdminDashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* ================= LOGOUT CONFIRM MODAL ================= */}
+      {/* 2. RESOLVE REPORT / FEEDBACK DIALOG */}
+      <Dialog
+        open={resolveModal.isOpen}
+        onOpenChange={(open) =>
+          !open &&
+          setResolveModal({ isOpen: false, reportId: "", category: "" })
+        }
+      >
+        <DialogContent className="sm:max-w-[420px] rounded-3xl p-0 overflow-hidden border-border/80">
+          <div className="bg-primary/10 p-6 flex flex-col items-center text-center border-b border-primary/10">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white dark:bg-zinc-900 text-primary shadow-sm mb-3">
+              <CheckCircle className="h-6 w-6" />
+            </div>
+            <DialogTitle className="text-lg font-bold text-primary">
+              ดำเนินการ / ปิดเคส
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground mt-1">
+              ข้อความนี้จะถูกส่งแจ้งเตือนไปยังผู้รายงาน
+              เพื่อแจ้งให้ทราบว่าระบบได้ดำเนินการแก้ไขอย่างไร
+            </DialogDescription>
+          </div>
+
+          <div className="p-6 space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-foreground">
+                รายละเอียดการดำเนินการ (ไม่บังคับ)
+              </label>
+              <textarea
+                className="flex min-h-[80px] w-full rounded-xl border border-input bg-muted/30 p-3 text-xs focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                placeholder="เช่น ได้ทำการแก้ไขบั๊กตามที่แจ้งแล้ว ขอบคุณครับ..."
+                value={resolveMessage}
+                onChange={(e) => setResolveMessage(e.target.value)}
+              />
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button
+                className="flex-1 rounded-xl h-10 text-xs font-bold shadow-md"
+                onClick={executeResolve}
+              >
+                ยืนยันการดำเนินการ
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 3. LOGOUT CONFIRM MODAL */}
       {showLogoutConfirm && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
           <div
@@ -1636,7 +1725,7 @@ export default function AdminDashboard() {
             <div className="flex gap-2.5 w-full">
               <Button
                 variant="outline"
-                className="flex-1 rounded-xl h-10 text-xs font-bold whitespace-nowrap"
+                className="rounded-xl h-10 px-5 text-xs font-bold hover:bg-zinc-200 hover:text-zinc-900"
                 onClick={() => setShowLogoutConfirm(false)}
               >
                 ยกเลิก
@@ -1652,7 +1741,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* ================= SUSPEND MEMBER DIALOG (ปรับเป็นปุ่มเลือกจำนวนวันแบบติกเลือก มืออาชีพ) ================= */}
+      {/* 4. SUSPEND MEMBER DIALOG */}
       <Dialog
         open={suspendModal.isOpen}
         onOpenChange={(open) =>
@@ -1713,26 +1802,20 @@ export default function AdminDashboard() {
             {suspendForm.type === "temporary" && (
               <div className="space-y-2 animate-in fade-in duration-200">
                 <label className="text-xs font-bold text-foreground">
-                  เลือกจำนวนวันระงับ
+                  ระบุวันที่สิ้นสุดการระงับ
                 </label>
-                <div className="grid grid-cols-4 gap-2">
-                  {["3", "7", "15", "30"].map((d) => (
-                    <button
-                      key={d}
-                      type="button"
-                      onClick={() =>
-                        setSuspendForm((prev) => ({ ...prev, days: d }))
-                      }
-                      className={`flex items-center justify-center h-10 rounded-xl text-xs font-bold transition-all border ${
-                        suspendForm.days === d
-                          ? "bg-destructive text-destructive-foreground border-destructive shadow-sm"
-                          : "bg-background text-foreground border-input hover:bg-muted/50"
-                      }`}
-                    >
-                      {d} วัน
-                    </button>
-                  ))}
-                </div>
+                <Input
+                  type="date"
+                  className="rounded-xl bg-muted/30 text-xs"
+                  value={suspendForm.untilDate}
+                  min={new Date().toISOString().split("T")[0]} // ป้องกันไม่ให้เลือกวันที่ย้อนหลัง
+                  onChange={(e) =>
+                    setSuspendForm((prev) => ({
+                      ...prev,
+                      untilDate: e.target.value,
+                    }))
+                  }
+                />
               </div>
             )}
 
@@ -1755,15 +1838,6 @@ export default function AdminDashboard() {
 
             <div className="flex gap-2 pt-2">
               <Button
-                variant="outline"
-                className="flex-1 rounded-xl h-10 text-xs font-bold"
-                onClick={() =>
-                  setSuspendModal((prev) => ({ ...prev, isOpen: false }))
-                }
-              >
-                ยกเลิก
-              </Button>
-              <Button
                 variant="destructive"
                 className="flex-1 rounded-xl h-10 text-xs font-bold shadow-md shadow-destructive/20"
                 disabled={!suspendForm.reason.trim()}
@@ -1776,7 +1850,7 @@ export default function AdminDashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* ================= UNSUSPEND MEMBER DIALOG (โค้ดเดิมของคุณ) ================= */}
+      {/* 5. UNSUSPEND MEMBER DIALOG */}
       <Dialog
         open={unsuspendModal.isOpen}
         onOpenChange={(open) =>
@@ -1784,12 +1858,33 @@ export default function AdminDashboard() {
           setUnsuspendModal({ isOpen: false, userId: "", userName: "" })
         }
       >
+        <DialogContent className="sm:max-w-[420px] rounded-3xl p-6 border-border/80 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 mb-4">
+            <CheckCircle className="h-6 w-6" />
+          </div>
+          <DialogTitle className="text-lg font-bold text-foreground">
+            ยืนยันการคืนสิทธิ์ใช้งาน
+          </DialogTitle>
+          <DialogDescription className="text-xs text-muted-foreground mt-2">
+            คุณต้องการปลดการระงับบัญชีของ {unsuspendModal.userName} ใช่หรือไม่?
+          </DialogDescription>
+          <div className="mt-4 flex gap-2">
+            <Button
+              className="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white"
+              onClick={handleConfirmUnsuspend}
+            >
+              ยืนยันคืนสิทธิ์
+            </Button>
+          </div>
+        </DialogContent>
       </Dialog>
-      {/* ================= DELETE POST DIALOG (ยืนยันและระบุเหตุผล) ================= */}
+
+      {/* 6. DELETE POST DIALOG */}
       <Dialog
         open={deletePostModal.isOpen}
         onOpenChange={(open) =>
-          !open && setDeletePostModal({ isOpen: false, postId: "", postTitle: "" })
+          !open &&
+          setDeletePostModal({ isOpen: false, postId: "", postTitle: "" })
         }
       >
         <DialogContent className="sm:max-w-[420px] rounded-3xl p-0 overflow-hidden border-border/80">
@@ -1801,7 +1896,11 @@ export default function AdminDashboard() {
               ยืนยันการลบโพสต์
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground mt-1">
-              คุณแน่ใจหรือไม่ว่าต้องการลบโพสต์: <span className="font-bold text-foreground">{deletePostModal.postTitle}</span> ?
+              คุณแน่ใจหรือไม่ว่าต้องการลบโพสต์:{" "}
+              <span className="font-bold text-foreground">
+                {deletePostModal.postTitle}
+              </span>{" "}
+              ?
             </DialogDescription>
           </div>
 
@@ -1831,7 +1930,7 @@ export default function AdminDashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* ================= DELETE SUCCESS DIALOG ================= */}
+      {/* 7. DELETE SUCCESS DIALOG */}
       <Dialog
         open={deleteSuccessModal.isOpen}
         onOpenChange={(open) =>
@@ -1846,8 +1945,12 @@ export default function AdminDashboard() {
             ลบโพสต์สำเร็จ
           </DialogTitle>
           <div className="bg-muted/50 rounded-xl p-4 w-full mb-4">
-            <p className="text-sm font-semibold text-foreground mb-1">เหตุผลที่ลบ:</p>
-            <p className="text-xs text-muted-foreground">{deleteSuccessModal.reason}</p>
+            <p className="text-sm font-semibold text-foreground mb-1">
+              เหตุผลที่ลบ:
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {deleteSuccessModal.reason}
+            </p>
           </div>
           <Button
             className="w-full rounded-xl h-10 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-500/20"
