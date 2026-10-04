@@ -68,7 +68,11 @@ interface ExchangeItem {
   PartnerScore?: number | null;
   Comment?: string | null;
   PartnerComment?: string | null;
-  CancelReason?: string | null; // 👈 เพิ่มบรรทัดนี้ เพื่อให้ TypeScript รู้จัก
+  CancelReason?: string | null; 
+  myAuthorName?: string;       
+  theirAuthorName?: string;    
+  myMeetingLocation?: string;   
+  theirMeetingLocation?: string;
 }
 
 interface ErrorResponse {
@@ -171,15 +175,19 @@ export default function ExchangeTracking() {
     comment: "",
     partnerComment: "",
     cancelReasonDb: "",
+    myAuthorName: "",    
+    theirAuthorName: "",
     myItem: {
       title: "กำลังโหลด...",
       image: "",
       description: "ไม่ได้ระบุรายละเอียด",
+      location: "",
     },
     theirItem: {
       title: "กำลังโหลด...",
       image: "",
       description: "ไม่ได้ระบุรายละเอียด",
+      location: "",
     },
     partnerPhone: "-",
     exchangeLocation: "นัดเจอตามตกลง",
@@ -250,24 +258,27 @@ export default function ExchangeTracking() {
             partnerScore: matchData.PartnerScore || null,
             comment: matchData.Comment || "",
             partnerComment: matchData.PartnerComment || "",
-            cancelReasonDb: matchData.CancelReason || "", // 👈 ตรงนี้ก็จะไม่แดง
+            cancelReasonDb: matchData.CancelReason || "",
             matchId: String(matchData.ExchangeID),
             status: (matchData.ExchangeStatus || "pending").toLowerCase(),
             exchangeType: matchData.ExchangeType || "manual",
             matchScore: matchData.MatchScore || 0,
+            
+            // 👇 เพิ่มการเก็บชื่อ
+            myAuthorName: matchData.myAuthorName || currentUser?.DisplayName || "คุณ",
+            theirAuthorName: matchData.theirAuthorName || "คู่แลกเปลี่ยน",
+            
             myItem: {
               title: matchData.myPostTitle || "สิ่งของของคุณ",
               image: matchData.myPostImage || "",
-              description:
-                matchData.myPostDescription ||
-                "รายละเอียดเพิ่มเติมของสิ่งของ...",
+              description: matchData.myPostDescription || "รายละเอียดเพิ่มเติมของสิ่งของ...",
+              location: matchData.myMeetingLocation || matchData.ExchangeLocation || "ไม่ได้ระบุสถานที่", // 👈 ดึงสถานที่ฝั่งเรา
             },
             theirItem: {
               title: matchData.theirPostTitle || "ของที่สนใจแลก",
               image: matchData.theirPostImage || "",
-              description:
-                matchData.theirPostDescription ||
-                "รายละเอียดเพิ่มเติมของสิ่งของ...",
+              description: matchData.theirPostDescription || "รายละเอียดเพิ่มเติมของสิ่งของ...",
+              location: matchData.theirMeetingLocation || matchData.ExchangeLocation || "ไม่ได้ระบุสถานที่", // 👈 ดึงสถานที่ฝั่งคู่แลกเปลี่ยน
             },
             partnerPhone: isMember
               ? matchData.TargetPhoneNumber || matchData.partnerPhone || "-"
@@ -463,9 +474,6 @@ export default function ExchangeTracking() {
               <h1 className="text-2xl font-bold tracking-tight">
                 ติดตามการแลกเปลี่ยน
               </h1>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                ตรวจสอบรายละเอียดและสถานะการแลกเปลี่ยนของทั้งสองฝ่าย
-              </p>
             </div>
           </div>
 
@@ -751,7 +759,7 @@ export default function ExchangeTracking() {
                   <div>
                     <div className={myHeaderClass}>
                       <span className="flex items-center gap-1.5">
-                        <UserCheck className="h-4 w-4" /> ฝั่งของคุณ (ผู้เสนอ)
+                        <UserCheck className="h-4 w-4" /> ของ: คุณ
                       </span>
                     </div>
                     <CardContent className="p-4 space-y-3">
@@ -778,7 +786,7 @@ export default function ExchangeTracking() {
                         <div className="flex items-center gap-2 mt-3 bg-muted p-2.5 rounded-xl border">
                           <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
                           <span className="text-xs font-semibold">
-                            {exchange.exchangeLocation}
+                            {exchange.myItem.location}
                           </span>
                         </div>
                       </div>
@@ -817,7 +825,7 @@ export default function ExchangeTracking() {
                   <div>
                     <div className={theirHeaderClass}>
                       <span className="flex items-center gap-1.5">
-                        <UserCheck className="h-4 w-4" /> ฝั่งคู่แลกเปลี่ยน
+                        <UserCheck className="h-4 w-4" /> ของ: {exchange.theirAuthorName || "คู่แลกเปลี่ยน"}
                       </span>
                     </div>
                     <CardContent className="p-4 space-y-3">
@@ -844,7 +852,7 @@ export default function ExchangeTracking() {
                         <div className="flex items-center gap-2 mt-3 bg-muted p-2.5 rounded-xl border">
                           <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
                           <span className="text-xs font-semibold">
-                            {exchange.exchangeLocation}
+                            {exchange.theirItem.location}
                           </span>
                         </div>
                       </div>

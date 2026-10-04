@@ -29,6 +29,7 @@ import {
   Package,
   ArrowRightLeft,
   XCircle,
+  X
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
@@ -98,6 +99,7 @@ interface UserReview {
   comment: string;
   rating: number;
   reviewerName: string;
+  reviewerProfileImage?: string; // <-- ตรงนี้
   date: string;
 }
 
@@ -121,6 +123,21 @@ interface DashboardUser {
     untilDate?: string;
     reason?: string;
   };
+}
+
+interface ApiReviewData {
+  id?: string | number;
+  ExchangeID?: string | number;
+  comment?: string;
+  Comment?: string;
+  rating?: number | string;
+  Rating?: number | string;
+  reviewerName?: string;
+  ReviewerName?: string;
+  reviewerProfileImage?: string; 
+  ReviewerProfileImage?: string; 
+  date?: string;
+  ReviewDate?: string;
 }
 
 interface ManageUserModalState {
@@ -281,30 +298,48 @@ export default function AdminDashboard() {
       const rawData = responseObj?.data || response;
       const record = rawData as {
         successfulExchanges?: number;
+        SuccessfulExchanges?: number;
         failedExchanges?: number;
+        FailedExchanges?: number;
         rating?: number;
-        reviews?: UserReview[];
+        Rating?: number;
+        reviewScore?: number;  
+        ReviewScore?: number;
+        reviews?: ApiReviewData[];
       };
 
       const reviewsList = Array.isArray(record?.reviews)
         ? record.reviews.map(
-            (rev): UserReview => ({
-              id: String(rev.id || ""),
-              comment: String(rev.comment || "ไม่มีความคิดเห็น"),
-              rating: Number(rev.rating || 0),
-              reviewerName: String(rev.reviewerName || "ผู้ใช้งานระบบ"),
-              date: String(rev.date || ""),
+            (rev: ApiReviewData): UserReview => ({
+              id: String(rev.id || rev.ExchangeID || ""),
+              comment: String(rev.comment || rev.Comment || "ไม่มีความคิดเห็น"),
+              rating: Number(rev.rating || rev.Rating || 0),
+              reviewerName: String(rev.reviewerName || rev.ReviewerName || "ผู้ใช้งานทั่วไป"),
+              reviewerProfileImage: String(rev.reviewerProfileImage || rev.ReviewerProfileImage || ""), 
+              date: String(rev.date || rev.ReviewDate || ""),
             }),
           )
         : [];
 
       const statsData: UserStatsData = {
-        successfulExchanges: Number(record?.successfulExchanges ?? 0),
-        failedExchanges: Number(record?.failedExchanges ?? 0),
-        rating: Number(record?.rating ?? 0),
+        successfulExchanges: Number(
+          record?.successfulExchanges ?? 
+          record?.SuccessfulExchanges ?? 0
+        ),
+        failedExchanges: Number(
+          record?.failedExchanges ?? 
+          record?.FailedExchanges ?? 0
+        ),
+        // ✅ เพิ่มการดึง reviewScore และ ReviewScore จากฐานข้อมูล
+        rating: Number(
+          record?.rating ?? 
+          record?.Rating ?? 
+          record?.reviewScore ?? 
+          record?.ReviewScore ?? 
+          0
+        ),
         reviews: reviewsList,
       };
-
       setManageModal((prev) => ({
         ...prev,
         isLoadingStats: false,
@@ -1438,27 +1473,48 @@ export default function AdminDashboard() {
       >
         <DialogContent className="sm:max-w-[600px] rounded-3xl p-0 overflow-hidden border-border/80 max-h-[90vh] flex flex-col">
           <div className="bg-primary/10 p-6 flex items-center gap-4 border-b border-primary/10">
-            {manageModal.profileImage &&
-            manageModal.profileImage.trim() !== "undefined" &&
-            manageModal.profileImage.trim() !== "null" &&
-            manageModal.profileImage.trim() !== "" ? (
-              <img
-                src={
-                  manageModal.profileImage.trim().startsWith("http")
-                    ? manageModal.profileImage.trim()
-                    : `${IMAGE_BASE_URL}/uploads/${manageModal.profileImage.trim()}`
-                }
-                alt={manageModal.userName}
-                className="w-14 h-14 rounded-full object-cover border-2 border-white shadow-md shrink-0"
-              />
-            ) : (
-              <div className="w-14 h-14 rounded-full bg-primary text-primary-foreground font-bold text-xl flex items-center justify-center shrink-0 shadow-md">
-                {manageModal.userName.charAt(0)}
-              </div>
-            )}
+            {/* ทำให้รูปภาพและชื่อกดเพื่อไปยังหน้า Profile ได้ */}
+            <div 
+              className="cursor-pointer hover:opacity-80 transition-opacity shrink-0"
+              onClick={() => {
+                setManageModal((prev) => ({ ...prev, isOpen: false }));
+                navigate(`/user/${manageModal.userId}`, {
+                  state: { fromAdmin: true, authorName: manageModal.userName, authorEmail: manageModal.userEmail, rawProfileImg: manageModal.profileImage }
+                });
+              }}
+            >
+              {manageModal.profileImage &&
+              manageModal.profileImage.trim() !== "undefined" &&
+              manageModal.profileImage.trim() !== "null" &&
+              manageModal.profileImage.trim() !== "" ? (
+                <img
+                  src={
+                    manageModal.profileImage.trim().startsWith("http")
+                      ? manageModal.profileImage.trim()
+                      : `${IMAGE_BASE_URL}/uploads/${manageModal.profileImage.trim()}`
+                  }
+                  alt={manageModal.userName}
+                  className="w-14 h-14 rounded-full object-cover border-2 border-white shadow-md"
+                />
+              ) : (
+                <div className="w-14 h-14 rounded-full bg-primary text-primary-foreground font-bold text-xl flex items-center justify-center shadow-md">
+                  {manageModal.userName.charAt(0)}
+                </div>
+              )}
+            </div>
+            
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <DialogTitle className="text-lg font-bold text-foreground truncate">
+                <DialogTitle 
+                  className="text-lg font-bold text-foreground truncate cursor-pointer hover:text-primary transition-colors"
+                  onClick={() => {
+                    setManageModal((prev) => ({ ...prev, isOpen: false }));
+                    navigate(`/user/${manageModal.userId}`, {
+                      state: { fromAdmin: true, authorName: manageModal.userName, authorEmail: manageModal.userEmail, rawProfileImg: manageModal.profileImage }
+                    });
+                  }}
+                  title="คลิกเพื่อดูโปรไฟล์"
+                >
                   {manageModal.userName}
                 </DialogTitle>
                 {manageModal.suspended ? (
@@ -1479,6 +1535,7 @@ export default function AdminDashboard() {
               </DialogDescription>
             </div>
           </div>
+    
 
           <div className="p-6 overflow-y-auto space-y-6 flex-1">
             {manageModal.isLoadingStats ? (
@@ -1578,12 +1635,29 @@ export default function AdminDashboard() {
                           <CardContent className="p-4 space-y-3">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
-                                <div className="h-8 w-8 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-semibold">
-                                  {rev.reviewerName
-                                    ? rev.reviewerName.charAt(0).toUpperCase()
-                                    : "U"}
+                                {/* ✅ เพิ่มการแสดงรูปภาพคนรีวิว */}
+                                <div className="h-8 w-8 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-semibold overflow-hidden shrink-0">
+                                  {rev.reviewerProfileImage &&
+                                  rev.reviewerProfileImage.trim() !== "" &&
+                                  rev.reviewerProfileImage !== "null" &&
+                                  rev.reviewerProfileImage !== "undefined" ? (
+                                    <img
+                                      src={
+                                        rev.reviewerProfileImage.trim().startsWith("http")
+                                          ? rev.reviewerProfileImage.trim()
+                                          : `${IMAGE_BASE_URL}/uploads/${rev.reviewerProfileImage.trim()}`
+                                      }
+                                      alt={rev.reviewerName}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    rev.reviewerName
+                                      ? rev.reviewerName.charAt(0).toUpperCase()
+                                      : "U"
+                                  )}
                                 </div>
                                 <div>
+                                  {/* ✅ คืนค่าเป็น Text ปกติ ไม่สามารถกดได้ (ไม่มี cursor-pointer หรือ hover:text-primary) */}
                                   <p className="text-sm font-medium text-foreground">
                                     {rev.reviewerName || "ผู้ใช้งานทั่วไป"}
                                   </p>
@@ -1709,6 +1783,14 @@ export default function AdminDashboard() {
             onClick={() => setShowLogoutConfirm(false)}
           />
           <div className="relative bg-background rounded-2xl p-6 w-full max-w-sm shadow-2xl border border-border/80 space-y-5 animate-in zoom-in-95 duration-200">
+            {/* ปุ่ม X มุมขวาบน */}
+            <button
+              onClick={() => setShowLogoutConfirm(false)}
+              className="absolute top-4 right-4 text-muted-foreground hover:text-foreground p-1 rounded-lg transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
             <div className="flex flex-col items-center text-center space-y-3">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/20 shadow-inner">
                 <AlertTriangle className="h-7 w-7 animate-bounce" />
@@ -1722,16 +1804,10 @@ export default function AdminDashboard() {
                 </p>
               </div>
             </div>
-            <div className="flex gap-2.5 w-full">
+
+            <div className="w-full">
               <Button
-                variant="outline"
-                className="rounded-xl h-10 px-5 text-xs font-bold hover:bg-zinc-200 hover:text-zinc-900"
-                onClick={() => setShowLogoutConfirm(false)}
-              >
-                ยกเลิก
-              </Button>
-              <Button
-                className="flex-1 rounded-2xl h-11 text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 shadow-lg shadow-amber-500/20 transition-all active:scale-95"
+                className="w-full rounded-2xl h-11 text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 shadow-lg shadow-amber-500/20 transition-all active:scale-95"
                 onClick={handleLogout}
               >
                 ออกจากระบบ

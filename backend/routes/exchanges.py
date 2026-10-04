@@ -42,10 +42,10 @@ def get_exchanges():
         # กำหนดเงื่อนไข WHERE และจำนวนพารามิเตอร์ตามประเภทการค้นหา
         if target_member_id and not member_id:
             where_clause = "WHERE e.TargetMemberID = %s"
-            query_params = (current_user_id,) * 12
+            query_params = (current_user_id,) * 13  
         else:
             where_clause = "WHERE e.MemberID = %s OR e.TargetMemberID = %s"
-            query_params = (current_user_id,) * 13
+            query_params = (current_user_id,) * 14  
 
         # SQL Query สำหรับดึงรายละเอียดการแลกเปลี่ยนพร้อมสลับมุมมองข้อมูลฝั่งคู่สนทนาอัตโนมัติ
         sql = f"""
@@ -64,6 +64,7 @@ def get_exchanges():
                 CASE WHEN e.MemberID = %s THEN IFNULL(my_item.ItemName, 'ไม่มีชื่อสิ่งของ') ELSE IFNULL(their_item.ItemName, 'ไม่มีชื่อสิ่งของ') END AS myPostTitle,
                 CASE WHEN e.MemberID = %s THEN IFNULL(their_item.ItemName, 'ไม่มีชื่อสิ่งของ') ELSE IFNULL(my_item.ItemName, 'ไม่มีชื่อสิ่งของ') END AS theirPostTitle,
                 IFNULL(CASE WHEN e.MemberID = %s THEN target_member.DisplayName ELSE requester_member.DisplayName END, 'ผู้ใช้งานระบบ') AS theirAuthorName,
+                IFNULL(CASE WHEN e.MemberID = %s THEN requester_member.DisplayName ELSE target_member.DisplayName END, 'ตัวคุณ') AS myAuthorName,
                 CASE WHEN e.MemberID = %s THEN target_member.ProfileImage ELSE requester_member.ProfileImage END AS theirProfileImage,
                 CASE WHEN e.MemberID = %s THEN IFNULL(my_item.ItemDescription, '') ELSE IFNULL(their_item.ItemDescription, '') END AS myPostDescription,
                 CASE WHEN e.MemberID = %s THEN IFNULL(their_item.ItemDescription, '') ELSE IFNULL(my_item.ItemDescription, '') END AS theirPostDescription,

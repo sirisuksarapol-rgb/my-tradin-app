@@ -280,7 +280,7 @@ export default function MatchResults() {
                       <div className="flex items-center justify-between">
                         <Badge
                           variant="secondary"
-                          className="text-[10px] bg-primary/10"
+                          className="text-[10px] bg-primary text-white"
                         >
                           {match.theirPost.category}
                         </Badge>

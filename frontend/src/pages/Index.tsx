@@ -245,10 +245,6 @@ export default function Index() {
           </div>
 
           <div className="text-center mt-6 z-30 max-w-3xl space-y-3 px-4">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/25 text-xs font-semibold text-black backdrop-blur-md shadow-sm">
-              <div className="w-3.5 h-3.5" />
-              Welcome to Tradin - Your Sustainable Exchange Platform
-            </div>
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight">
               ให้สิ่งของเก่า ได้ชีวิตใหม่กับ{" "}
               <Highlighter action="highlight" color="#a7f3d0" isView={true}>
@@ -272,10 +268,6 @@ export default function Index() {
           <div className="mx-auto max-w-6xl px-4 sm:px-6">
             <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 gap-4">
               <div>
-                <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-primary/10 text-xs font-semibold text-black mb-3">
-                  <Grid3X3 className="w-3.5 h-3.5" />
-                  Categories Overview
-                </div>
                 <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight">
                   <Highlighter action="highlight" color="#a7f3d0" isView={true}>
                     หมวดหมู่สิ่งของ
@@ -341,10 +333,6 @@ export default function Index() {
         <section id="about" className="py-16 sm:py-24">
           <div className="mx-auto max-w-6xl px-4 sm:px-6">
             <div className="text-center max-w-2xl mx-auto mb-16 space-y-4">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-primary/10 text-xs font-semibold text-black">
-                <BookOpen className="w-3.5 h-3.5" />
-                System Overview
-              </div>
               <h2 className="text-3xl font-bold tracking-tight">
                 ออกแบบมาเพื่อให้การแลกเปลี่ยนเป็น{" "}
                 <Highlighter action="highlight" color="#a7f3d0" isView={true}>เรื่องง่าย</Highlighter>

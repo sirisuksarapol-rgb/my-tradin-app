@@ -242,7 +242,7 @@ export function CategoryManagement() {
             </h3>
             <Badge
               variant="secondary"
-              className="rounded-full text-x font-bold px-2.5 bg-primary/20 text-black"
+              className="rounded-full text-x font-bold px-2.5 bg-primary text-white"
             >
               {categories.length} หมวดหมู่
             </Badge>
@@ -260,47 +260,48 @@ export function CategoryManagement() {
 
       {/* แถบค้นหาและปุ่มสลับมุมมองระหว่าง Grid และ Table */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="relative w-full sm:w-80">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="ค้นหาชื่อหมวดหมู่..."
-            value={searchTerm}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-              setSearchTerm(e.target.value)
-            }
-            className="pl-9 bg-card border-border/60 rounded-xl focus-visible:ring-primary h-10 text-xs"
-          />
-        </div>
+  <div className="relative w-full sm:w-80">
+    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+    <Input
+      placeholder="ค้นหาชื่อหมวดหมู่..."
+      value={searchTerm}
+      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+        setSearchTerm(e.target.value)
+      }
+      className="pl-9 bg-card border-border/60 rounded-xl focus-visible:ring-primary h-10 text-xs"
+    />
+  </div>
 
-        <div className="flex items-center gap-1 bg-card p-1 rounded-xl border border-border/60 shadow-sm self-end sm:self-auto">
-          <Button
-            variant={viewMode === "grid" ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setViewMode("grid")}
-            className={`h-8 px-3 text-xs rounded-lg gap-1.5 font-bold hover:bg-zinc-200 hover:text-black ${
-              viewMode === "grid"
-                ? "bg-primary/20 text-black"
-                : "bg-transparent text-muted-foreground"
-            }`}
-          >
-            <LayoutGrid className="w-3.5 h-3.5" />
-            <span>Grid</span>
-          </Button>
-          <Button
-            variant={viewMode === "table" ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setViewMode("table")}
-            className={`h-8 px-3 text-xs rounded-lg gap-1.5 font-bold hover:bg-zinc-200 hover:text-black ${
-              viewMode === "table"
-                ? "bg-primary/20 text-black"
-                : "bg-transparent text-muted-foreground"
-            }`}
-          >
-            <List className="w-3.5 h-3.5" />
-            <span>Table</span>
-          </Button>
-        </div>
-      </div>
+  <div className="flex items-center gap-1 bg-card p-1 rounded-xl border border-border/60 shadow-sm self-end sm:self-auto">
+    <Button
+      variant={viewMode === "grid" ? "secondary" : "ghost"}
+      size="sm"
+      onClick={() => setViewMode("grid")}
+      className={`h-8 px-3 text-xs rounded-lg gap-1.5 font-bold transition-none ${
+        viewMode === "grid"
+          ? "bg-primary text-white hover:bg-primary hover:text-white"
+          : "bg-transparent text-muted-foreground hover:bg-transparent hover:text-muted-foreground"
+      }`}
+    >
+      <LayoutGrid className="w-3.5 h-3.5" />
+      <span>Grid</span>
+    </Button>
+    
+    <Button
+  variant={viewMode === "table" ? "secondary" : "ghost"}
+  size="sm"
+  onClick={() => setViewMode("table")}
+  className={`h-8 px-3 text-xs rounded-lg gap-1.5 font-bold transition-none ${
+    viewMode === "table"
+      ? "bg-primary text-white hover:bg-primary hover:text-white"
+      : "bg-transparent text-muted-foreground hover:bg-transparent hover:text-muted-foreground"
+  }`}
+>
+  <List className="w-3.5 h-3.5" />
+  <span>Table</span>
+</Button>
+  </div>
+</div>
 
       {/* ส่วนแสดงผลข้อมูลในรูปแบบ Grid หรือ Table ตาม state ปัจจุบัน */}
       {isLoading ? (
@@ -346,7 +347,7 @@ export function CategoryManagement() {
                   </div>
 
                   <div className="flex items-center justify-between pt-3 border-t border-border/40">
-                    <span className="text-xs font-bold  bg-primary/20 text-black px-2.5 py-1 rounded-lg">
+                    <span className="text-xs font-bold  bg-primary text-white px-2.5 py-1 rounded-lg">
                       {cat.ItemCount ?? 0} รายการ
                     </span>
 
@@ -415,7 +416,7 @@ export function CategoryManagement() {
                     <td className="px-5 py-3 text-center">
                       <Badge
                         variant="outline"
-                        className="font-bold text-[11px] rounded-md"
+                        className="font-bold text-[11px] rounded-md bg-primary text-white"
                       >
                         {cat.ItemCount ?? 0} รายการ
                       </Badge>

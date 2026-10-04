@@ -140,7 +140,7 @@ export default function Profile() {
 
   return (
     <AppLayout>
-      <div className="bg-muted/15 min-h-[calc(100vh-4rem)] py-8 px-4 sm:px-6 lg:px-8 relative overflow-hidden font-sans">
+      <div className="bg-white min-h-[calc(100vh-4rem)] py-8 px-4 sm:px-6 lg:px-8 relative overflow-hidden font-sans w-full">
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-gradient-to-tr from-primary/10 via-emerald-500/10 to-sky-500/10 blur-3xl pointer-events-none rounded-full" />
 
         <div className="max-w-5xl mx-auto space-y-6 relative z-10">

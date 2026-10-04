@@ -188,8 +188,8 @@ export default function ExchangeDetail() {
 
   return (
     <AppLayout>
-      <section className="py-8 sm:py-12 bg-[#FAFAFA] min-h-screen">
-        <div className="mx-auto max-w-5xl px-4 sm:px-6 space-y-6">
+  <section className="py-8 sm:py-12 bg-white min-h-screen w-full">
+    <div className="mx-auto max-w-5xl px-4 sm:px-6 space-y-6">
           <div className="flex items-center gap-2 mb-6">
             <Button
               variant="ghost"

@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
+
 import {
   ArrowRightLeft,
   MapPin,
@@ -14,12 +15,15 @@ import {
   Info,
   FileText,
 } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+
 import AppLayout from "@/components/AppLayout";
 import { useToast } from "@/hooks/use-toast";
+
 import {
   getItems as fetchItemsAPI,
   IMAGE_BASE_URL,
@@ -110,7 +114,7 @@ export default function ExchangePreview() {
         : `${IMAGE_BASE_URL}/uploads/${cleanStr}`;
     } catch {
       const fallback = imageName
-        .replace(/\[|\]|"|'/g, "")
+        .replace(/\[\vert{}\]|"|'/g, "")
         .split(",")[0]
         .trim();
       return fallback.startsWith("http")
@@ -289,7 +293,6 @@ export default function ExchangePreview() {
         location: match.myPost?.location || "นัดเจอตามตกลง",
         phone_number: phone.replace(/-/g, ""),
 
-        // 👇 เพิ่มบรรทัดนี้เพื่อส่งคะแนนเปอเซ็นต์ไปด้วย
         match_score: match.score ? Number(match.score) : 0,
         exchange_type: isFromMatchResults ? "match" : "manual",
       };
@@ -341,7 +344,9 @@ export default function ExchangePreview() {
   return (
     <AppLayout>
       <section className="py-8 sm:py-12">
-        <div className="mx-auto max-w-3xl px-4 sm:px-6 space-y-6">
+        {/* ใช้ max-w-[1100px] ตามที่ขอ */}
+        <div className="mx-auto max-w-[1000px] px-4 md:px-8 space-y-6">
+          
           {/* Header */}
           <div className="flex items-center gap-3">
             <Button
@@ -362,7 +367,7 @@ export default function ExchangePreview() {
             </div>
           </div>
 
-          {/* 1. เลือกสิ่งของของตัวเอง (แสดงเมื่อเข้าผ่านหน้า Post Detail) */}
+          {/* 1. เลือกสิ่งของของตัวเอง */}
           {isFromPostDetails && (
             <Card className="glass-card border-primary/20 hover:shadow-md transition-shadow">
               <CardHeader className="pb-3 pt-4 px-5">
@@ -372,8 +377,7 @@ export default function ExchangePreview() {
                     เลือกสิ่งของของคุณที่จะนำไปแลก
                   </CardTitle>
                   <Badge
-                    variant="secondary"
-                    className="bg-primary/10 hover:bg-primary/10"
+                    className="bg-primary hover:bg-primary/90 text-white border-none"
                   >
                     มี {myInventory.length} ชิ้น
                   </Badge>
@@ -444,8 +448,8 @@ export default function ExchangePreview() {
           <Card className="glass-card border-primary/20 overflow-hidden">
             {match.score && isFromMatchResults && (
               <div className="bg-primary border border-primary/20 px-4 py-2.5 flex items-center justify-center gap-2">
-                <div className="h-4 w-4 text-primary-foreground" />
-                <span className="text-sm font-semibold text-white">
+                <Sparkles className="h-4 w-4 text-primary-foreground" />
+                <span className="text-sm font-semibold text-primary-foreground">
                   คะแนนความเหมาะสมจาก : {match.score}%
                 </span>
               </div>
@@ -458,15 +462,14 @@ export default function ExchangePreview() {
                   <div className="space-y-3 p-4 rounded-xl bg-secondary/10 border border-primary/10 flex flex-col justify-between">
                     <div>
                       <div className="flex items-center justify-between mb-2">
+                        {/* เปลี่ยนสีหมวดหมู่และชื่อเป็นสีหลักและตัวหนังสือสีขาว */}
                         <Badge
-                          variant="outline"
-                          className="text-[10px] bg-primary/10 hover:bg-primary/10 text-foreground border-border font-semibold truncate max-w-[140px]"
+                          className="text-[10px] bg-primary hover:bg-primary/90 text-white font-semibold truncate max-w-[140px] border-none"
                         >
                           ของคุณ
                         </Badge>
                         <Badge
-                          variant="secondary"
-                          className="text-[10px] bg-primary/10 hover:bg-primary/10"
+                          className="text-[10px] bg-primary hover:bg-primary/90 text-white border-none"
                         >
                           {match.myPost.category}
                         </Badge>
@@ -514,15 +517,14 @@ export default function ExchangePreview() {
                   <div className="space-y-3 p-4 rounded-xl bg-secondary/10 border border-primary/10 flex flex-col justify-between">
                     <div>
                       <div className="flex items-center justify-between mb-2">
+                        {/* เปลี่ยนสีหมวดหมู่และชื่อเป็นสีหลักและตัวหนังสือสีขาว */}
                         <Badge
-                          variant="outline"
-                          className="text-[10px] bg-primary/10 hover:bg-primary/10 text-foreground border-border font-semibold truncate max-w-[140px]"
+                          className="text-[10px] bg-primary hover:bg-primary/90 text-white font-semibold truncate max-w-[140px] border-none"
                         >
                           {match.theirPost.authorName}
                         </Badge>
                         <Badge
-                          variant="secondary"
-                          className="text-[10px] bg-primary/10 hover:bg-primary/10"
+                          className="text-[10px] bg-primary hover:bg-primary/90 text-white border-none"
                         >
                           {match.theirPost.category}
                         </Badge>
@@ -582,7 +584,7 @@ export default function ExchangePreview() {
                   </p>
                 </div>
                 <div className="bg-secondary/10 border border-primary/10 rounded-lg p-3">
-                  <span className="text-[10px] font-bold text-foreground text-primary uppercase tracking-wider block mb-1">
+                  <span className="text-[10px] font-bold text-primary uppercase tracking-wider block mb-1">
                     คู่แลกเปลี่ยน
                   </span>
                   <p className="text-xs text-foreground font-medium">
@@ -644,6 +646,7 @@ export default function ExchangePreview() {
               )}
             </Button>
           </div>
+          
         </div>
       </section>
     </AppLayout>

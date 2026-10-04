@@ -441,7 +441,7 @@ export default function PostDetail() {
                   <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
                     {title}
                   </h1>
-                  <Badge variant="secondary" className="shrink-0 text-xs bg-primary/10 hover:bg-primary/10">
+                  <Badge className="text-white shrink-0 text-xs bg-primary">
                     {category}
                   </Badge>
                 </div>

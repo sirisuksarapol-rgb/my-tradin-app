@@ -301,7 +301,7 @@ export default function Matching() {
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
               }`}
             >
-              <ArrowRightLeft className="h-4 w-4" /> สถานะการแมตช์
+              <ArrowRightLeft className="h-4 w-4" /> สถานะการแลกเปลี่ยน
             </button>
           </div>
 

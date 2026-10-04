@@ -31,6 +31,7 @@ interface ExchangeRequest {
   ExchangeStatus: string;
   ExchangeLocation: string;
   Score: number;
+  MatchScore?: number;
   MemberID: number;
   TargetMemberID: number;
   MyItemID: number;
@@ -87,11 +88,11 @@ export default function IncomingRequests() {
     useState<ExchangeRequest | null>(null);
   const [isAccepting, setIsAccepting] = useState(false);
 
-  // State สำหรับเปิดหน้าต่างยืนยันการปฏิเสธ
-  const [rejectRequest, setRejectRequest] = useState<ExchangeRequest | null>(null);
+  const [rejectRequest, setRejectRequest] = useState<ExchangeRequest | null>(
+    null,
+  );
   const [isRejecting, setIsRejecting] = useState(false);
 
-  // State สำหรับหน้าต่างแจ้งผลลัพธ์ (แก้ไข Syntax แล้ว)
   const [successModal, setSuccessModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -239,7 +240,8 @@ export default function IncomingRequests() {
         setSuccessModal({
           isOpen: true,
           title: "ตอบรับคำขอสำเร็จ! 🎉",
-          description: "ระบบกำลังส่งรหัส OTP ให้คุณและคู่แลกเปลี่ยน สามารถตรวจสอบสถานะได้ที่หน้าติดตามการแลกเปลี่ยน",
+          description:
+            "ระบบกำลังส่งรหัส OTP ให้คุณและคู่แลกเปลี่ยน สามารถตรวจสอบสถานะได้ที่หน้าติดตามการแลกเปลี่ยน",
           type: "accept",
           exchangeId: req.ExchangeID,
         });
@@ -271,7 +273,7 @@ export default function IncomingRequests() {
         setRequests((prev) =>
           prev.filter((item) => item.ExchangeID !== rejectRequest.ExchangeID),
         );
-        
+
         setRejectRequest(null);
         setSuccessModal({
           isOpen: true,
@@ -345,29 +347,47 @@ export default function IncomingRequests() {
             {requests.map((req) => (
               <Card
                 key={req.ExchangeID}
-                className="glass-card border-primary/20 hover:shadow-md transition-shadow"
+                className="glass-card border-primary/20"
               >
                 <CardContent className="p-4 space-y-3">
-                  <div className="flex items-center gap-2">
-                    {!seenIds.includes(req.ExchangeID) ? (
-                      <Badge className="bg-warning/10 text-warning border-0 text-xs font-medium">
-                        คำขอใหม่
-                      </Badge>
-                    ) : (
-                      <Badge
-                        variant="outline"
-                        className="text-muted-foreground border-muted text-xs font-normal"
-                      >
-                        {getRequestAgeText(req.StartDate)}
-                      </Badge>
-                    )}
+                  {/* ส่วนหัวของการ์ด: จัดแบบ 3 คอลัมน์ (ซ้าย / กลาง / ขวา) */}
+                  <div className="grid grid-cols-3 items-center gap-1">
+                    {/* 1. ฝั่งซ้าย: ป้ายคำขอใหม่ หรือ ระยะเวลา */}
+                    <div className="justify-self-start">
+                      {!seenIds.includes(req.ExchangeID) ? (
+                        <Badge className="bg-orange-500/15 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400 hover:bg-orange-500/15 dark:hover:bg-orange-500/20 pointer-events-none border-0 text-xs font-medium">
+                          คำขอใหม่
+                        </Badge>
+                      ) : (
+                        <Badge
+                          variant="outline"
+                          className="text-muted-foreground border-muted text-xs font-normal"
+                        >
+                          {getRequestAgeText(req.StartDate)}
+                        </Badge>
+                      )}
+                    </div>
 
-                    <span className="text-xs text-muted-foreground ml-auto">
-                      {req.StartDate
-                        ? new Date(req.StartDate).toLocaleDateString("th-TH")
-                        : "เมื่อเร็วๆ นี้"}
-                    </span>
+                    {/* 2. ตรงกลาง: คะแนนจับคู่ */}
+                    <div className="justify-self-center">
+                      {req.MatchScore && req.MatchScore > 0 ? (
+                        <Badge className="bg-primary text-white hover:bg-primary pointer-events-none border-0 text-[10px] px-1.5 py-0.5 font-semibold shadow-xs whitespace-nowrap">
+                          คะแนนจับคู่ {req.MatchScore}%
+                        </Badge>
+                      ) : null}
+                    </div>
+
+                    {/* 3. ฝั่งขวา: วันที่ */}
+                    <div className="justify-self-end">
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        {req.StartDate
+                          ? new Date(req.StartDate).toLocaleDateString("th-TH")
+                          : "เมื่อเร็วๆ นี้"}
+                      </span>
+                    </div>
                   </div>
+
+                  {/* ส่วนรูปภาพและรายละเอียดอื่นๆ ต่อด้านล่างตามปกติ... */}
 
                   <div className="flex items-center gap-3">
                     <div className="flex-1 text-center space-y-1 min-w-0">
@@ -574,14 +594,17 @@ export default function IncomingRequests() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog 
-        open={!!rejectRequest} 
+      <AlertDialog
+        open={!!rejectRequest}
         onOpenChange={(open) => !open && !isRejecting && setRejectRequest(null)}
       >
         <AlertDialogContent className="rounded-3xl max-w-sm p-6 text-center shadow-xl">
-          <AlertDialogTitle className="text-xl text-center">ยืนยันการปฏิเสธ</AlertDialogTitle>
+          <AlertDialogTitle className="text-xl text-center">
+            ยืนยันการปฏิเสธ
+          </AlertDialogTitle>
           <p className="text-sm text-muted-foreground mt-2">
-            คุณต้องการปฏิเสธคำขอแลกเปลี่ยนจาก <strong>{rejectRequest?.theirAuthorName}</strong> ใช่หรือไม่?
+            คุณต้องการปฏิเสธคำขอแลกเปลี่ยนจาก{" "}
+            <strong>{rejectRequest?.theirAuthorName}</strong> ใช่หรือไม่?
           </p>
           <AlertDialogFooter className="flex flex-col sm:flex-row gap-2 mt-5 sm:space-x-0">
             <Button
@@ -598,7 +621,9 @@ export default function IncomingRequests() {
               onClick={confirmReject}
               disabled={isRejecting}
             >
-              {isRejecting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              {isRejecting ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
               ยืนยันการปฏิเสธ
             </Button>
           </AlertDialogFooter>
@@ -609,7 +634,7 @@ export default function IncomingRequests() {
         open={successModal.isOpen}
         onOpenChange={(open) => {
           if (!open) {
-            setSuccessModal(prev => ({ ...prev, isOpen: false }));
+            setSuccessModal((prev) => ({ ...prev, isOpen: false }));
             if (successModal.type === "accept" && successModal.exchangeId) {
               navigate(`/exchange-tracking/${successModal.exchangeId}`, {
                 state: { newStatus: "accepted" },
@@ -622,14 +647,16 @@ export default function IncomingRequests() {
           <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner">
             <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
           </div>
-          <AlertDialogTitle className="text-xl text-center">{successModal.title}</AlertDialogTitle>
+          <AlertDialogTitle className="text-xl text-center">
+            {successModal.title}
+          </AlertDialogTitle>
           <p className="text-sm text-muted-foreground mt-2">
             {successModal.description}
           </p>
           <Button
             className="w-full rounded-xl mt-6 h-11 font-semibold"
             onClick={() => {
-              setSuccessModal(prev => ({ ...prev, isOpen: false }));
+              setSuccessModal((prev) => ({ ...prev, isOpen: false }));
               if (successModal.type === "accept" && successModal.exchangeId) {
                 navigate(`/exchange-tracking/${successModal.exchangeId}`, {
                   state: { newStatus: "accepted" },
@@ -641,7 +668,6 @@ export default function IncomingRequests() {
           </Button>
         </AlertDialogContent>
       </AlertDialog>
-
     </AppLayout>
   );
 }
