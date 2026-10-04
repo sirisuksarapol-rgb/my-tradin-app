@@ -1,40 +1,104 @@
+
+import re
+
 from pythainlp.tokenize import word_tokenize
 from pythainlp.corpus import thai_stopwords
 
+
 # ==========================================
-# MODULE CONFIGURATION & INITIALIZATION
+# MODULE CONFIGURATION
 # ==========================================
-# โหลดชุดข้อมูลคำหยุดภาษาไทย (Thai Stop Words) มาเก็บไว้ในตัวแปรสำหรับใช้ในการกรองคำฟุ่มเฟือย
+
 thai_stop_words = thai_stopwords()
 
 
-# =========================================================================
-# 1. ฟังก์ชันประมวลผลและทำความสะอาดข้อความภาษาไทย (PREPROCESS THAI TEXT)
-# =========================================================================
-def preprocess_thai_text(text):
+# ==========================================
+# TEXT NORMALIZATION
+# ==========================================
+
+def normalize_text(text):
     """
-    ฟังก์ชันตัวช่วย (Helper Function): ทำความสะอาด ตัดคำ และกรองคำหยุดออกจากข้อความภาษาไทย
-    
-    รายละเอียดการทำงานเชิงลึก:
-    1. ตรวจสอบความถูกต้องของข้อความรับเข้า (text):
-       - หากตัวแปรเป็นค่าว่าง, None, หรือ False จะคืนค่าเป็น List เปล่าทันทีเพื่อป้องกันข้อผิดพลาด
-    2. แปลงรูปแบบข้อความ (Text Normalization):
-       - ปรับตัวอักษรทั้งหมดให้เป็นตัวพิมพ์เล็ก (lowercase) และตัดช่องว่างส่วนเกินบริเวณหน้าและหลังด้วย .strip()
-    3. ดำเนินการตัดคำภาษาไทย (Word Tokenization):
-       - เรียกใช้งานฟังก์ชัน word_tokenize ร่วมกับพจนานุกรมมาตรฐานเอนจิน 'newmm'
-    4. กรองคำและทำความสะอาดผลลัพธ์ (Filtering):
-       - คัดกรองเอาเฉพาะสตริงที่มีตัวอักษรจริง ๆ (ตัดช่องว่างหรือสตริงว่างทิ้ง)
-       - ตรวจสอบและตัดคำหยุด (Stop words) ที่ไม่มีนัยสำคัญทางความหมายออกไป (เช่น คำเชื่อม, คำบุพบท)
-    5. ส่งคืนผลลัพธ์สุดท้ายเป็น List ของ Token คำที่ผ่านการคัดกรองอย่างสมบูรณ์
+    ทำความสะอาดข้อความพื้นฐาน
+
+    - แปลงเป็น lowercase
+    - รวม whitespace
+    - ตัดช่องว่างหัวและท้าย
     """
     if not text:
+        return ""
+
+    text = str(text).lower().strip()
+    text = re.sub(r"\s+", " ", text)
+
+    return text
+
+
+# ==========================================
+# THAI TEXT PREPROCESSING
+# ==========================================
+
+def preprocess_thai_text(text):
+    """
+    ตัดคำภาษาไทยและกรอง Stop Words
+
+    คืนค่าเป็น List ของ Token
+    """
+    text = normalize_text(text)
+
+    if not text:
         return []
-    
-    # แปลงข้อความให้เป็นตัวพิมพ์เล็กและตัดช่องว่างส่วนเกินรอบด้าน
-    text = text.lower().strip()
-    
-    # ดำเนินการตัดคำภาษาไทยโดยระบุใช้เอนจินมาตรฐาน 'newmm'
-    tokens = word_tokenize(text, engine='newmm')
-    
-    # กรองช่องว่างและคำหยุด (Stop words) ออกจากรายการคำที่ตัดได้
-    return [t.strip() for t in tokens if t.strip() and t not in thai_stop_words]
+
+    tokens = word_tokenize(text, engine="newmm")
+
+    return [
+        token.strip()
+        for token in tokens
+        if token.strip() and token.strip() not in thai_stop_words
+    ]
+
+
+# ==========================================
+# IMPORTANT ATTRIBUTE EXTRACTION
+# ==========================================
+
+def extract_important_attributes(text):
+    """
+    ดึงข้อมูลที่มีความสำคัญต่อการ Matching สินค้า
+
+    เช่น:
+    - ตัวเลข
+    - รุ่น
+    - ความจุ
+    - ขนาด
+    - รหัสสินค้า
+    - ตัวอักษร+ตัวเลข เช่น S24, A55, 128GB
+    """
+    text = normalize_text(text)
+
+    if not text:
+        return set()
+
+    attributes = set()
+
+    # ตัวเลขและค่าที่มีหน่วย เช่น 128GB, 6.7, 256 gb
+    number_patterns = re.findall(
+        r"\b\d+(?:\.\d+)?\s?(?:gb|tb|mb|inch|นิ้ว|ปี|kg|g|cm|mm|v|w|mah)?\b",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    for value in number_patterns:
+        attributes.add(value.replace(" ", ""))
+
+    # รหัส/รุ่นที่มีทั้งตัวอักษรและตัวเลข เช่น S24, A55, iPhone15
+    model_patterns = re.findall(
+        r"\b[a-z]+\d+[a-z0-9-]*\b|\b\d+[a-z]+\b",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    for value in model_patterns:
+        attributes.add(value)
+
+    return attributes
+

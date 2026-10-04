@@ -1,534 +1,339 @@
 import datetime
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, current_app
 from db import get_connection
 from services.notification_service import notify_user
 
-# ==========================================
-# ADMIN BLUEPRINT CONFIGURATION
-# ==========================================
-# สร้าง Blueprint สำหรับจัดกลุ่มเส้นทาง API ทั้งหมดที่อยู่ภายใต้สิทธิ์ผู้ดูแลระบบ (Admin Panel)
-# ช่วยให้สามารถจัดการ Route, Middleware หรือ Prefix ร่วมกันได้อย่างเป็นระบบ (เช่น /api/admin/...)
 admin_bp = Blueprint("admin", __name__)
 
-
-# ==========================================
-# HELPER FUNCTION: DATA FORMATTING & SERIALIZATION
-# ==========================================
 def format_cursor_data(cursor, data, is_single=False):
     """
-    ฟังก์ชันตัวช่วย (Helper Function) สำหรับแปลงข้อมูลดิบ (Raw Data) ที่ได้จาก Database Cursor 
-    ให้เป็นโครงสร้างข้อมูลประเภท Dictionary หรือ List of Dictionary ที่พร้อมสำหรับการแปลงเป็น JSON Response
-    
-    หน้าที่หลัก:
-    1. แม็ปปิ้งชื่อคอลัมน์จาก cursor.description เข้ากับข้อมูลแต่ละแถว (กรณีข้อมูลเป็น Tuple)
-    2. แปลงวัตถุประเภทวันที่และเวลา (datetime.datetime, datetime.date) ให้เป็น ISO 8601 String 
-       เพื่อป้องกันปัญหา TypeError เมื่อ Flask พยายามแปลงข้อมูลดังกล่าวเป็น JSON
-    
-    Parameters:
-        cursor (pymysql.cursors.Cursor): Database cursor ที่ใช้รันคำสั่ง Query เพื่อดึงโครงสร้างคอลัมน์
-        data (tuple | list | dict | None): ข้อมูลดิบที่ได้จากการ fetch ผ่านคำสั่ง fetchall() หรือ fetchone()
-        is_single (bool): กำหนดเป็น True หากต้องการแปลงข้อมูลชุดเดี่ยว (fetchone) หรือ False สำหรับหลายรายการ (fetchall)
-        
-    Returns:
-        dict | list | None: โครงสร้างข้อมูลที่ผ่านการแปลงรูปแบบและ serialize เรียบร้อยแล้ว
+    แปลงข้อมูลดิบจาก Database Cursor ให้เป็น Dictionary หรือ List of Dictionary 
+    พร้อมแปลงข้อมูลเวลา (Datetime/Date) เป็น ISO 8601 String
     """
     if not cursor.description or data is None:
         return data if not is_single else None
     
-    # ดึงชื่อคอลัมน์ทั้งหมดจากคำอธิบายของ cursor เพื่อใช้เป็น Key ใน Dictionary
     columns = [col[0] for col in cursor.description]
     
     def serialize_item(val):
-        # ตรวจสอบและแปลงประเภทข้อมูลทางเวลา (Datetime/Date) ให้เป็นรูปแบบมาตรฐาน ISO String
         if isinstance(val, (datetime.datetime, datetime.date)):
             return val.isoformat()
         return val
 
-    # กรณีที่ต้องการข้อมูลชุดเดี่ยว (Single Record)
     if is_single:
         if isinstance(data, dict):
             return {k: serialize_item(v) for k, v in data.items()}
         return {columns[i]: serialize_item(data[i]) for i in range(len(columns))}
     
-    # กรณีที่ต้องการข้อมูลหลายรายการ (Multiple Records / List of rows)
-    else:
-        results = []
-        for row in data:
-            if isinstance(row, dict):
-                results.append({k: serialize_item(v) for k, v in row.items()})
-            else:
-                results.append({columns[i]: serialize_item(row[i]) for i in range(len(columns))})
-        return results
+    results = []
+    for row in data:
+        if isinstance(row, dict):
+            results.append({k: serialize_item(v) for k, v in row.items()})
+        else:
+            results.append({columns[i]: serialize_item(row[i]) for i in range(len(columns))})
+    return results
 
 
-# ==========================================
-# 1. DASHBOARD SUMMARY API
-# ==========================================
 @admin_bp.route("/dashboard", methods=["GET"])
 def dashboard():
-    """
-    API Endpoint: GET /dashboard
-    คำอธิบาย: รวบรวมและดึงข้อมูลสถิติภาพรวมระบบ (Metrics & Statistics) สำหรับแสดงผลบนหน้าจอ Dashboard ของผู้ดูแลระบบ
-    
-    กระบวนการทำงาน:
-    1. เชื่อมต่อฐานข้อมูลและสร้าง Cursor
-    2. รันคำสั่ง SQL นับจำนวนสมาชิกรวมทั้งหมดในตาราง member
-    3. รันคำสั่ง SQL นับจำนวนโพสต์สิ่งของทั้งหมดในตาราง item
-    4. รันคำสั่ง SQL นับจำนวนรายงานปัญหาที่มีสถานะค้างดำเนินการ ('Pending') ในตาราง problem
-    5. ปิดการเชื่อมต่อและส่งคืนข้อมูลในรูปแบบ JSON Object
-    """
-    conn = get_connection()
-    cursor = conn.cursor()
+    """ดึงข้อมูลสถิติภาพรวมระบบ (Metrics & Statistics) สำหรับ Dashboard"""
+    conn = None
+    cursor = None
+    try:
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
 
-    # ดึงจำนวนสมาชิกทั้งหมดในระบบ
-    cursor.execute("SELECT COUNT(*) total FROM member")
-    row = cursor.fetchone()
-    total_users = row["total"] if isinstance(row, dict) else row[0]
+        cursor.execute("SELECT COUNT(*) as total FROM member")
+        total_users = cursor.fetchone()["total"]
 
-    # ดึงจำนวนสินค้าหรือโพสต์ทั้งหมดในระบบ
-    cursor.execute("SELECT COUNT(*) total FROM item")
-    row = cursor.fetchone()
-    total_items = row["total"] if isinstance(row, dict) else row[0]
+        cursor.execute("SELECT COUNT(*) as total FROM item")
+        total_items = cursor.fetchone()["total"]
 
-    # ดึงจำนวนรายงานปัญหาที่ยังอยู่ในสถานะรอดำเนินการ (Pending)
-    cursor.execute("SELECT COUNT(*) total FROM problem WHERE ReportStatus='Pending'")
-    row = cursor.fetchone()
-    total_reports = row["total"] if isinstance(row, dict) else row[0]
+        cursor.execute("SELECT COUNT(*) as total FROM problem WHERE ReportStatus='Pending'")
+        total_reports = cursor.fetchone()["total"]
 
-    cursor.close()
-    conn.close()
-
-    # ส่งออกผลลัพธ์ข้อมูลสรุปเชิงสถิติกลับไปยัง Client
-    return jsonify({
-        "users": total_users,
-        "items": total_items,
-        "reports": total_reports
-    })
+        return jsonify({
+            "users": total_users,
+            "items": total_items,
+            "reports": total_reports
+        }), 200
+    except Exception as e:
+        current_app.logger.error(f"Error fetching dashboard stats: {str(e)}")
+        return jsonify({"error": "เกิดข้อผิดพลาดในการดึงข้อมูล"}), 500
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
 
 
-# ==========================================
-# 2. USER MANAGEMENT API (GET ALL USERS)
-# ==========================================
 @admin_bp.route("/users", methods=["GET"])
 def users():
-    """
-    API Endpoint: GET /users
-    คำอธิบาย: ดึงรายชื่อบัญชีผู้ใช้งานทั้งหมดในระบบเพื่อใช้ในหน้าบริหารจัดการสมาชิก (User Management)
-    
-    ฟีเจอร์เด่น:
-    - ใช้ Subquery เพื่อคำนวณจำนวนโพสต์สินค้า (PostCount) ของสมาชิกแต่ละรายแบบเรียลไทม์
-    - จัดเรียงข้อมูลตามวันที่สมัครสมาชิก (RegisterDate) จากใหม่ล่าสุดไปหาเก่าที่สุด (DESC)
-    """
-    conn = get_connection()
-    cursor = conn.cursor()
-    
-    # ดึงข้อมูลโปรไฟล์ผู้ใช้ พร้อมทำ Subquery นับจำนวนโพสต์ของแต่ละ User
-    cursor.execute("""
-        SELECT
-            m.MemberID,
-            m.DisplayName,
-            m.Email,
-            m.ProfileImage,
-            m.RegisterDate,
-            m.MemberStatus,
-            (
-                SELECT COUNT(*)
-                FROM item i
-                WHERE i.MemberID = m.MemberID
-            ) AS PostCount
-        FROM member m
-        ORDER BY m.RegisterDate DESC
-    """)
-    raw_data = cursor.fetchall()
-    data = format_cursor_data(cursor, raw_data)
-
-    cursor.close()
-    conn.close()
-    return jsonify(data)
+    """ดึงรายชื่อบัญชีผู้ใช้งานทั้งหมดในระบบ พร้อมจำนวนโพสต์"""
+    conn = None
+    cursor = None
+    try:
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT
+                m.MemberID, m.DisplayName, m.Email, m.ProfileImage,
+                m.RegisterDate, m.MemberStatus,
+                (SELECT COUNT(*) FROM item i WHERE i.MemberID = m.MemberID) AS PostCount
+            FROM member m
+            ORDER BY m.RegisterDate DESC
+        """)
+        return jsonify(format_cursor_data(cursor, cursor.fetchall())), 200
+    except Exception as e:
+        current_app.logger.error(f"Error fetching users: {str(e)}")
+        return jsonify({"error": "เกิดข้อผิดพลาดในการดึงข้อมูลผู้ใช้งาน"}), 500
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
 
 
-# ==========================================
-# 3. ITEM MANAGEMENT API (GET ALL ITEMS)
-# ==========================================
 @admin_bp.route("/items", methods=["GET"])
 def items():
-    conn = get_connection()
-    cursor = conn.cursor()
-    
-    # ✅ เพิ่ม m.ProfileImage เข้าไปใน SELECT ด้านล่างนี้
-    cursor.execute("""
-        SELECT
-            i.ItemID,
-            i.ItemName,
-            i.ItemDescription,
-            i.ItemImage,
-            i.ItemStatus,
-            i.PostDate,
-            m.MemberID,
-            m.DisplayName,
-            m.ProfileImage,
-            i.CategoryID
-        FROM item i
-        LEFT JOIN member m ON i.MemberID = m.MemberID
-        ORDER BY i.PostDate DESC
-    """)
-    raw_data = cursor.fetchall()
-    data = format_cursor_data(cursor, raw_data)
-
-    cursor.close()
-    conn.close()
-    return jsonify(data)
+    """ดึงข้อมูลรายการโพสต์สิ่งของทั้งหมดในระบบ"""
+    conn = None
+    cursor = None
+    try:
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT
+                i.ItemID, i.ItemName, i.ItemDescription, i.ItemImage,
+                i.ItemStatus, i.PostDate, i.CategoryID,
+                m.MemberID, m.DisplayName, m.ProfileImage
+            FROM item i
+            LEFT JOIN member m ON i.MemberID = m.MemberID
+            ORDER BY i.PostDate DESC
+        """)
+        return jsonify(format_cursor_data(cursor, cursor.fetchall())), 200
+    except Exception as e:
+        current_app.logger.error(f"Error fetching items: {str(e)}")
+        return jsonify({"error": "เกิดข้อผิดพลาดในการดึงข้อมูลรายการสินค้า"}), 500
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
 
 
-# ==========================================
-# 4. REPORT MANAGEMENT API (GET ALL REPORTS)
-# ==========================================
 @admin_bp.route("/reports", methods=["GET"])
 def reports():
-    """
-    API Endpoint: GET /reports
-    คำอธิบาย: ดึงรายการแจ้งปัญหาทั้งหมดที่ผู้ใช้งานส่งเข้ามาในระบบ (Report Management)
-    
-    กระบวนการทำงาน:
-    - เชื่อมโยงตารางรายงานปัญหา (problem) เข้ากับตารางสินค้า (item) และตารางสมาชิก (member) 
-      เพื่อให้แอดมินเห็นบริบทว่าปัญหานั้นเกี่ยวข้องกับสินค้าชิ้นไหนและใครเป็นผู้แจ้ง
-    - เรียงลำดับจากวันที่แจ้งล่าสุด (ReportDate DESC)
-    """
-    conn = get_connection()
-    cursor = conn.cursor()
-    
-    # ดึงข้อมูลรายงานปัญหาพร้อมเชื่อมโยงข้อมูลสินค้าและผู้แจ้ง
-    cursor.execute("""
-        SELECT
-            p.ProblemID,
-            p.ReportStatus,
-            p.ReportDate,
-            p.ProblemType,
-            p.HelpCenterData,
-            i.ItemID,
-            i.ItemName,
-            m.MemberID,
-            m.DisplayName
-        FROM problem p
-        LEFT JOIN item i ON p.ItemID = i.ItemID
-        LEFT JOIN member m ON p.MemberID = m.MemberID
-        ORDER BY p.ReportDate DESC
-    """)
-    raw_data = cursor.fetchall()
-    data = format_cursor_data(cursor, raw_data)
-
-    cursor.close()
-    conn.close()
-    return jsonify(data)
+    """ดึงรายการแจ้งปัญหาทั้งหมด พร้อมบริบทที่เกี่ยวข้องกับสินค้าและผู้แจ้ง"""
+    conn = None
+    cursor = None
+    try:
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT
+                p.ProblemID, p.ReportStatus, p.ReportDate, p.ProblemType, p.HelpCenterData,
+                i.ItemID, i.ItemName, m.MemberID, m.DisplayName
+            FROM problem p
+            LEFT JOIN item i ON p.ItemID = i.ItemID
+            LEFT JOIN member m ON p.MemberID = m.MemberID
+            ORDER BY p.ReportDate DESC
+        """)
+        return jsonify(format_cursor_data(cursor, cursor.fetchall())), 200
+    except Exception as e:
+        current_app.logger.error(f"Error fetching reports: {str(e)}")
+        return jsonify({"error": "เกิดข้อผิดพลาดในการดึงข้อมูลรายงานปัญหา"}), 500
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
 
 
-# ==========================================
-# 5. RESOLVE REPORT API
-# ==========================================
 @admin_bp.route("/reports/<int:problem_id>", methods=["PUT"])
 def resolve_report(problem_id):
-    conn = get_connection()
-    cursor = conn.cursor(dictionary=True)
-    
+    """แก้ไขสถานะรายงานปัญหาเป็น 'Resolved' และส่งแจ้งเตือนกลับไปยังผู้แจ้ง"""
+    conn = None
+    cursor = None
     try:
-        # รับค่าข้อความดำเนินการจากแอดมิน (ถ้ามี)
         data = request.json or {}
         resolution_msg = data.get("resolution_message", "").strip()
 
-        cursor.execute("""
-            SELECT MemberID, ProblemType 
-            FROM problem 
-            WHERE ProblemID = %s
-        """, (problem_id,))
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+
+        cursor.execute("SELECT MemberID, ProblemType FROM problem WHERE ProblemID = %s", (problem_id,))
         report = cursor.fetchone()
 
         if not report:
             return jsonify({"success": False, "message": "ไม่พบข้อมูลรายงานปัญหานี้"}), 404
 
-        update_sql = "UPDATE problem SET ReportStatus = 'Resolved' WHERE ProblemID = %s"
-        cursor.execute(update_sql, (problem_id,))
+        cursor.execute("UPDATE problem SET ReportStatus = 'Resolved' WHERE ProblemID = %s", (problem_id,))
         conn.commit()
 
-        # ส่งการแจ้งเตือนหาผู้ใช้งาน
         if report.get("MemberID"):
-            member_id = report["MemberID"]
             problem_type = report["ProblemType"] or "ข้อเสนอแนะ/ปัญหาที่คุณแจ้ง"
-            title = "อัปเดตสถานะการรายงาน"
-            
-            # ปรับเปลี่ยนข้อความตามที่แอดมินกรอกมา
-            if resolution_msg:
-                message = f"แอดมินได้ตรวจสอบและดำเนินการ: {resolution_msg} (เคส: {problem_type})"
-            else:
-                message = f"แอดมินได้ตรวจสอบและแก้ไข '{problem_type}' เรียบร้อยแล้ว ขอบคุณที่ช่วยส่งข้อเสนอแนะครับ!"
+            message = f"แอดมินได้ตรวจสอบและดำเนินการ: {resolution_msg} (เคส: {problem_type})" if resolution_msg else f"แอดมินได้ตรวจสอบและแก้ไข '{problem_type}' เรียบร้อยแล้ว ขอบคุณที่ช่วยส่งข้อเสนอแนะครับ!"
             
             notify_user(
-                member_id=member_id, 
-                title=title, 
+                member_id=report["MemberID"], 
+                title="อัปเดตสถานะการรายงาน", 
                 message=message, 
                 link="/notifications"
             )
 
-        return jsonify({
-            "success": True, 
-            "message": "ปิดเคสและส่งแจ้งเตือนไปยังผู้แจ้งเรียบร้อยแล้ว"
-        }), 200
-
+        return jsonify({"success": True, "message": "ปิดเคสและส่งแจ้งเตือนไปยังผู้แจ้งเรียบร้อยแล้ว"}), 200
     except Exception as e:
-        conn.rollback()
-        print(f"❌ Error resolving report {problem_id}: {str(e)}")
-        return jsonify({"success": False, "message": f"เกิดข้อผิดพลาด: {str(e)}"}), 500
+        if conn: conn.rollback()
+        current_app.logger.error(f"Error resolving report {problem_id}: {str(e)}")
+        return jsonify({"success": False, "message": "เกิดข้อผิดพลาดในการดำเนินการ"}), 500
     finally:
-        cursor.close()
-        conn.close()
+        if cursor: cursor.close()
+        if conn: conn.close()
 
 
-# ==========================================
-# 6. SUSPEND USER API (BAN USER)
-# ==========================================
 @admin_bp.route("/users/<int:member_id>/suspend", methods=["PUT"])
 def suspend_user(member_id):
-    data = request.json or {}
-    suspend_type = data.get("type", "permanent")
-    until_date_str = data.get("until_date")
-    reason = data.get("reason", "ละเมิดเงื่อนไขข้อตกลงของระบบ")
-
-    suspended_until = None
-    if suspend_type == "temporary" and until_date_str:
-        try:
-            suspended_until = datetime.datetime.strptime(until_date_str, "%Y-%m-%d")
-            suspended_until = suspended_until.replace(hour=23, minute=59, second=59)
-        except ValueError:
-            pass
-
-    conn = get_connection()
-    cursor = conn.cursor(dictionary=True)
-    
+    """ระงับสิทธิ์การใช้งานของสมาชิกตามระยะเวลาที่กำหนด พร้อมแจ้งเตือนผ่านระบบและอีเมล"""
+    conn = None
+    cursor = None
     try:
-        # ดึงอีเมลและชื่อของผู้ใช้ที่กำลังจะถูกแบนเพื่อส่งเมลแจ้งเตือน
+        data = request.json or {}
+        suspend_type = data.get("type", "permanent")
+        until_date_str = data.get("until_date")
+        reason = data.get("reason", "ละเมิดเงื่อนไขข้อตกลงของระบบ")
+
+        suspended_until = None
+        if suspend_type == "temporary" and until_date_str:
+            try:
+                suspended_until = datetime.datetime.strptime(until_date_str, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
+            except ValueError:
+                pass
+
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+        
         cursor.execute("SELECT Email, DisplayName FROM member WHERE MemberID = %s", (member_id,))
         user_info = cursor.fetchone()
 
         cursor.execute("""
             UPDATE member 
-            SET MemberStatus = 'Suspended', 
-                SuspendedUntil = %s, 
-                SuspendReason = %s 
+            SET MemberStatus = 'Suspended', SuspendedUntil = %s, SuspendReason = %s 
             WHERE MemberID = %s
         """, (suspended_until, reason, member_id))
         conn.commit()
 
         message = f"บัญชีของคุณถูกระงับเนื่องจาก: {reason}"
-        if suspended_until:
-            message += f"\nจะสามารถใช้งานได้อีกครั้งในวันที่ {suspended_until.strftime('%d/%m/%Y %H:%M น.')}"
-        else:
-            message += "\n(ระงับแบบถาวร)"
+        message += f"\nจะสามารถใช้งานได้อีกครั้งในวันที่ {suspended_until.strftime('%d/%m/%Y %H:%M น.')}" if suspended_until else "\n(ระงับแบบถาวร)"
 
-        # ส่ง Notification ในระบบ
-        notify_user(
-            member_id=member_id,
-            title="แจ้งเตือนการระงับสิทธิ์ใช้งาน",
-            message=message,
-            link="/contact"
-        )
+        notify_user(member_id=member_id, title="แจ้งเตือนการระงับสิทธิ์ใช้งาน", message=message, link="/contact")
 
-        # 📧 [เพิ่มใหม่] ส่วนการส่งอีเมลแจ้งเตือนไปยังอีเมลของผู้ใช้
         if user_info and user_info.get("Email"):
-            user_email = user_info["Email"]
-            # หมายเหตุ: ตรงนี้สามารถเรียกใช้ฟังก์ชันส่งอีเมลจริงของโปรเจกต์คุณได้ เช่น send_email(user_email, "บัญชีของคุณถูกระงับ", message)
-            print(f"📧 ส่งอีเมลแจ้งเตือนการระงับบัญชีไปยัง: {user_email} | เหตุผล: {reason}")
-
-        return jsonify({"success": True, "message": "ระงับสิทธิ์ผู้ใช้งานและส่งอีเมลแจ้งเตือนเรียบร้อยแล้ว"}), 200
-        
-    except Exception as e:
-        conn.rollback()
-        print(f"❌ Error suspending user {member_id}: {str(e)}")
-        return jsonify({"success": False, "message": str(e)}), 500
-    finally:
-        cursor.close()
-        conn.close()
-    data = request.json or {}
-    suspend_type = data.get("type", "permanent")
-    until_date_str = data.get("until_date")
-    reason = data.get("reason", "ละเมิดเงื่อนไขข้อตกลงของระบบ")
-
-    suspended_until = None
-    if suspend_type == "temporary" and until_date_str:
-        try:
-            suspended_until = datetime.datetime.strptime(until_date_str, "%Y-%m-%d")
-            suspended_until = suspended_until.replace(hour=23, minute=59, second=59)
-        except ValueError:
-            pass
-
-    conn = get_connection()
-    cursor = conn.cursor(dictionary=True)
-    
-    try:
-        cursor.execute("""
-            UPDATE member 
-            SET MemberStatus = 'Suspended', 
-                SuspendedUntil = %s, 
-                SuspendReason = %s 
-            WHERE MemberID = %s
-        """, (suspended_until, reason, member_id))
-        conn.commit()
-
-        message = f"บัญชีของคุณถูกระงับเนื่องจาก: {reason}"
-        if suspended_until:
-            message += f"\nจะสามารถใช้งานได้อีกครั้งในวันที่ {suspended_until.strftime('%d/%m/%Y %H:%M น.')}"
-        else:
-            message += "\n(ระงับแบบถาวร)"
-
-        notify_user(
-            member_id=member_id,
-            title="แจ้งเตือนการระงับสิทธิ์ใช้งาน",
-            message=message,
-            link="/contact"
-        )
+            current_app.logger.info(f"📧 Sending suspension email to: {user_info['Email']} | Reason: {reason}")
 
         return jsonify({"success": True, "message": "ระงับสิทธิ์ผู้ใช้งานเรียบร้อยแล้ว"}), 200
-        
     except Exception as e:
-        conn.rollback()
-        print(f"❌ Error suspending user {member_id}: {str(e)}")
-        return jsonify({"success": False, "message": str(e)}), 500
+        if conn: conn.rollback()
+        current_app.logger.error(f"Error suspending user {member_id}: {str(e)}")
+        return jsonify({"success": False, "message": "เกิดข้อผิดพลาดในการระงับสิทธิ์"}), 500
     finally:
-        cursor.close()
-        conn.close()
+        if cursor: cursor.close()
+        if conn: conn.close()
 
 
-# ==========================================
-# 7. UNSUSPEND USER API (RESTORE USER)
-# ==========================================
 @admin_bp.route("/users/<int:member_id>/unsuspend", methods=["PUT"])
 def unsuspend_user(member_id):
-    """
-    API Endpoint: PUT /users/<member_id>/unsuspend
-    คำอธิบาย: คืนสิทธิ์การใช้งาน (Unsuspend) ให้กับบัญชีผู้ใช้ที่เคยถูกระงับ เพื่อให้กลับมาใช้งานระบบได้ตามปกติ
-    
-    กระบวนการทำงาน:
-    1. ปรับสถานะ MemberStatus ในตาราง member กลับเป็น 'Active'
-    2. ล้างข้อมูลระยะเวลาและเหตุผลการแบน (ตั้งค่า SuspendedUntil และ SuspendReason เป็น NULL)
-    3. บันทึกฐานข้อมูลและส่งการแจ้งเตือนคืนสิทธิ์ไปยังผู้ใช้งาน
-    """
-    conn = get_connection()
-    cursor = conn.cursor(dictionary=True)
-    
+    """คืนสิทธิ์การใช้งานให้กับบัญชีที่ถูกระงับ"""
+    conn = None
+    cursor = None
     try:
-        # รีเซ็ตสถานะผู้ใช้กลับเป็นปกติ
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+        
         cursor.execute("""
             UPDATE member 
-            SET MemberStatus = 'Active', 
-                SuspendedUntil = NULL, 
-                SuspendReason = NULL 
+            SET MemberStatus = 'Active', SuspendedUntil = NULL, SuspendReason = NULL 
             WHERE MemberID = %s
         """, (member_id,))
         conn.commit()
 
-        # ส่งข้อความแจ้งเตือนว่าบัญชีได้รับการปลดแบนแล้ว
         notify_user(
             member_id=member_id,
             title="แจ้งเตือนการคืนสิทธิ์ใช้งาน",
-            message="บัญชีของคุณได้รับการคืนสิทธิ์การใช้งานแล้ว คุณสามารถเข้าใช้งานและแลกเปลี่ยนสิ่งของได้ตามปกติ",
+            message="บัญชีของคุณได้รับการคืนสิทธิ์การใช้งานแล้ว คุณสามารถเข้าใช้งานได้ตามปกติ",
             link="/"
         )
 
         return jsonify({"success": True, "message": "คืนสิทธิ์ผู้ใช้งานเรียบร้อยแล้ว"}), 200
-        
     except Exception as e:
-        conn.rollback()
-        print(f"❌ Error unsuspending user {member_id}: {str(e)}")
-        return jsonify({"success": False, "message": str(e)}), 500
+        if conn: conn.rollback()
+        current_app.logger.error(f"Error unsuspending user {member_id}: {str(e)}")
+        return jsonify({"success": False, "message": "เกิดข้อผิดพลาดในการคืนสิทธิ์"}), 500
     finally:
-        cursor.close()
-        conn.close()
-        
+        if cursor: cursor.close()
+        if conn: conn.close()
 
-# ==========================================
-# 8. DELETE ITEM BY ADMIN API
-# ==========================================
+
 @admin_bp.route("/items/<int:item_id>", methods=["DELETE"])
 def delete_item_by_admin(item_id):
-    conn = get_connection()
-    cursor = conn.cursor(dictionary=True)
-    
+    """ลบโพสต์ออกจากระบบโดยสิทธิ์ผู้ดูแลระบบ และแจ้งเตือนเจ้าของโพสต์"""
+    conn = None
+    cursor = None
     try:
-        # รับค่าเหตุผลการลบจาก Frontend
         data = request.json or {}
         reason = data.get("reason", "ผิดเงื่อนไขการใช้งานของระบบ")
 
-        # ตรวจสอบการมีอยู่ของโพสต์และดึงข้อมูลเจ้าของ
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+        
         cursor.execute("SELECT MemberID, ItemName FROM item WHERE ItemID = %s", (item_id,))
         item = cursor.fetchone()
 
         if not item:
             return jsonify({"success": False, "message": "ไม่พบรายการโพสต์นี้"}), 404
 
-        # ลบโพสต์ออกจากฐานข้อมูล
         cursor.execute("DELETE FROM item WHERE ItemID = %s", (item_id,))
         conn.commit()
 
-        # ส่งข้อความแจ้งเตือนหาเจ้าของสินค้าพร้อมระบุเหตุผลที่รับมา
         if item.get("MemberID"):
             notify_user(
                 member_id=item["MemberID"],
                 title="แจ้งเตือนการลบโพสต์",
-                message=f"โพสต์ '{item.get('ItemName', 'สิ่งของของคุณ')}' ถูกลบโดยผู้ดูแลระบบ เนื่องจาก: {reason}",
+                message=f"โพสต์ '{item.get('ItemName', 'สิ่งของของคุณ')}' ถูกลบโดยผู้ดูแลระบบ เนื่องจาก: {reason}"
             )
 
-        return jsonify({"success": True, "message": "ลบโพสต์และส่งแจ้งเตือนเรียบร้อยแล้ว"}), 200
-        
+        return jsonify({"success": True, "message": "ลบโพสต์เรียบร้อยแล้ว"}), 200
     except Exception as e:
-        conn.rollback()
-        print(f"❌ Error deleting item {item_id}: {str(e)}")
-        return jsonify({"success": False, "message": str(e)}), 500
+        if conn: conn.rollback()
+        current_app.logger.error(f"Error deleting item {item_id}: {str(e)}")
+        return jsonify({"success": False, "message": "เกิดข้อผิดพลาดในการลบโพสต์"}), 500
     finally:
-        cursor.close()
-        conn.close()
-        
-# ==========================================
-# 9. GET USER STATS & REVIEWS API
-# ==========================================
+        if cursor: cursor.close()
+        if conn: conn.close()
+
+
 @admin_bp.route("/users/<int:member_id>/stats", methods=["GET"])
 def get_user_stats(member_id):
-    conn = get_connection()
-    cursor = conn.cursor(dictionary=True)
-    
+    """ดึงสถิติการแลกเปลี่ยนและรีวิวของผู้ใช้งานเฉพาะราย"""
+    conn = None
+    cursor = None
     try:
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+        
         cursor.execute("""
-            SELECT COUNT(*) AS total 
-            FROM exchange 
-            WHERE (MemberID = %s OR TargetMemberID = %s) 
-              AND (ExchangeStatus = 'Completed' OR ExchangerResult = 'Success')
+            SELECT COUNT(*) AS total FROM exchange 
+            WHERE (MemberID = %s OR TargetMemberID = %s) AND (ExchangeStatus = 'Completed' OR ExchangerResult = 'Success')
         """, (member_id, member_id))
-        success_row = cursor.fetchone()
-        successful_exchanges = success_row["total"] if success_row else 0
+        successful_exchanges = (cursor.fetchone() or {}).get("total", 0)
 
         cursor.execute("""
-            SELECT COUNT(*) AS total 
-            FROM exchange 
-            WHERE (MemberID = %s OR TargetMemberID = %s) 
-              AND (ExchangeStatus = 'Cancelled' OR ExchangerResult = 'Failed')
+            SELECT COUNT(*) AS total FROM exchange 
+            WHERE (MemberID = %s OR TargetMemberID = %s) AND (ExchangeStatus = 'Cancelled' OR ExchangerResult = 'Failed')
         """, (member_id, member_id))
-        failed_row = cursor.fetchone()
-        failed_exchanges = failed_row["total"] if failed_row else 0
+        failed_exchanges = (cursor.fetchone() or {}).get("total", 0)
 
         cursor.execute("""
             SELECT 
-                e.ExchangeID,
-                e.Score,
-                e.Comment,
-                e.PartnerScore,
-                e.PartnerComment,
-                e.SuccessDate,
-                e.StartDate,
-                e.MemberID,
-                e.TargetMemberID,
-                m1.DisplayName AS SenderName,
-                m2.DisplayName AS TargetName
+                e.ExchangeID, e.Score, e.Comment, e.PartnerScore, e.PartnerComment, 
+                e.SuccessDate, e.StartDate, e.MemberID, e.TargetMemberID,
+                m1.DisplayName AS SenderName, m2.DisplayName AS TargetName
             FROM exchange e
             LEFT JOIN member m1 ON e.MemberID = m1.MemberID
             LEFT JOIN member m2 ON e.TargetMemberID = m2.MemberID
-            WHERE (e.MemberID = %s OR e.TargetMemberID = %s)
+            WHERE e.MemberID = %s OR e.TargetMemberID = %s
         """, (member_id, member_id))
         raw_reviews = cursor.fetchall()
 
@@ -538,15 +343,9 @@ def get_user_stats(member_id):
 
         for row in raw_reviews:
             is_member = (int(row["MemberID"]) == int(member_id))
-            
-            if is_member:
-                comment = row.get("PartnerComment")
-                score = row.get("PartnerScore")
-                reviewer_name = row.get("TargetName") or "ผู้ใช้งานระบบ"
-            else:
-                comment = row.get("Comment")
-                score = row.get("Score")
-                reviewer_name = row.get("SenderName") or "ผู้ใช้งานระบบ"
+            comment = row.get("PartnerComment") if is_member else row.get("Comment")
+            score = row.get("PartnerScore") if is_member else row.get("Score")
+            reviewer_name = (row.get("TargetName") if is_member else row.get("SenderName")) or "ผู้ใช้งานระบบ"
 
             if score is not None:
                 total_score += float(score)
@@ -574,10 +373,13 @@ def get_user_stats(member_id):
                 "reviews": reviews
             }
         }), 200
-
     except Exception as e:
-        print(f"❌ Error fetching stats for user {member_id}: {str(e)}")
-        return jsonify({"success": False, "message": str(e), "data": {"successfulExchanges": 0, "failedExchanges": 0, "rating": 0.0, "reviews": []}}), 500
+        current_app.logger.error(f"Error fetching stats for user {member_id}: {str(e)}")
+        return jsonify({
+            "success": False, 
+            "message": "เกิดข้อผิดพลาดในการดึงสถิติ", 
+            "data": {"successfulExchanges": 0, "failedExchanges": 0, "rating": 0.0, "reviews": []}
+        }), 500
     finally:
-        cursor.close()
-        conn.close()
+        if cursor: cursor.close()
+        if conn: conn.close()
