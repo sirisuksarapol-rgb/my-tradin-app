@@ -1,14 +1,5 @@
 import React, { useState, useEffect } from "react";
-import {
-  ArrowLeft,
-  ArrowRightLeft,
-  Star,
-  MapPin,
-  Calendar,
-  CheckCircle2,
-  XCircle,
-  Package,
-  MessageSquareQuote, FileText
+import { ArrowLeft, ArrowRightLeft, Star, MapPin, Calendar, CheckCircle2, XCircle, Package, MessageSquareQuote, FileText,
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
@@ -57,12 +48,8 @@ interface PartnerStats {
   reviewScore: string;
 }
 
-interface ApiError {
-  message?: string;
-}
-
 // =========================================================================
-// COMPONENT: ExchangeDetail (หน้าจอแสดงรายละเอียดเชิงลึกของรายการแลกเปลี่ยน)[cite: 10]
+// COMPONENT: ExchangeDetail (หน้าจอแสดงรายละเอียดเชิงลึกของรายการแลกเปลี่ยน)
 // =========================================================================
 export default function ExchangeDetail() {
   const navigate = useNavigate();
@@ -188,8 +175,8 @@ export default function ExchangeDetail() {
 
   return (
     <AppLayout>
-  <section className="py-8 sm:py-12 bg-white min-h-screen w-full">
-    <div className="mx-auto max-w-5xl px-4 sm:px-6 space-y-6">
+      <section className="py-8 sm:py-12 bg-white min-h-screen w-full">
+        <div className="mx-auto max-w-5xl px-4 sm:px-6 space-y-6">
           <div className="flex items-center gap-2 mb-6">
             <Button
               variant="ghost"
@@ -453,51 +440,6 @@ export default function ExchangeDetail() {
   );
 }
 
-// =========================================================================
-// COMPONENT: StepIndicator[cite: 10]
-// =========================================================================
-function StepIndicator({
-  step,
-  currentStatus,
-  label,
-}: {
-  step: number;
-  currentStatus: string;
-  label: string;
-}) {
-  let activeStep = 1;
-  if (currentStatus === "accepted") activeStep = 2;
-  if (currentStatus === "in_progress") activeStep = 3;
-  if (currentStatus === "completed") activeStep = 4;
-
-  const isPassed = step < activeStep;
-  const isCurrent = step === activeStep;
-
-  return (
-    <div className="flex flex-col items-center space-y-2">
-      <div
-        className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${
-          isPassed
-            ? "bg-primary text-white"
-            : isCurrent
-              ? "bg-primary text-white ring-4 ring-primary/20"
-              : "bg-muted text-muted-foreground border border-border"
-        }`}
-      >
-        {isPassed ? <CheckCircle2 className="w-5 h-5" /> : step}
-      </div>
-      <p
-        className={`text-[11px] sm:text-xs font-medium ${isCurrent ? "text-primary font-bold" : "text-muted-foreground"}`}
-      >
-        {label}
-      </p>
-    </div>
-  );
-}
-
-// =========================================================================
-// COMPONENT: DetailRow[cite: 10]
-// =========================================================================
 function DetailRow({
   icon,
   label,

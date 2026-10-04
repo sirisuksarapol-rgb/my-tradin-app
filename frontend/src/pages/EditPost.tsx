@@ -11,10 +11,6 @@ import AppLayout from "@/components/AppLayout";
 import { useToast } from "@/hooks/use-toast";
 import { getItems, updateItem, getCategories, IMAGE_BASE_URL } from "@/api/api";
 
-// =========================================================================
-// INTERFACES: โครงสร้างข้อมูล TypeScript สำหรับ Type Safety (ห้ามใช้ any)
-// =========================================================================
-
 interface DBItemDetail {
   ItemID?: number;
   ItemName?: string;
@@ -41,7 +37,6 @@ interface DBCategory {
   icon_color?: string;
 }
 
-// คอมโพเนนต์ช่วยเรนเดอร์ไอคอนแบบไดนามิกจากฐานข้อมูล (รองรับ Lucide Icon, URL/Image และ Emoji โดยไม่มีการใช้ any)
 const DynamicIcon = ({ name, className, style }: { name?: string; className?: string; style?: React.CSSProperties }) => {
   if (!name) return null;
   if (name.startsWith("http") || name.startsWith("/")) {
@@ -64,7 +59,6 @@ export default function EditPost() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // States สำหรับเก็บข้อมูลฟอร์มและจัดการสถานะการทำงาน
   const [images, setImages] = useState<string[]>([]); 
   const [imageFiles, setImageFiles] = useState<(File | string)[]>([]); 
   const [categoriesList, setCategoriesList] = useState<DBCategory[]>([]);
@@ -96,7 +90,6 @@ export default function EditPost() {
     fetchCategoriesData();
   }, []);
 
-  // กรองหมวดหมู่ "ทั้งหมด" ออกจากการเลือก
   const filteredCategories = categoriesList.filter(
     (cat: DBCategory) => cat.CategoryName !== "ทั้งหมด"
   );
@@ -279,7 +272,6 @@ export default function EditPost() {
     }
   };
 
-  // แสดงผลสถานะกำลังโหลดข้อมูลเริ่มต้นของโพสต์
   if (loading) {
     return (
       <AppLayout>
@@ -291,7 +283,7 @@ export default function EditPost() {
   return (
     <AppLayout>
       {/* ส่วนหัวข้อหน้าจอแก้ไขโพสต์ */}
-      <section className="border-b border-border/50  w-screen relative left-1/2 -translate-x-1/2 -mt-6 px-4 sm:px-6">
+      <section className="border-b border-border/50 w-screen relative left-1/2 -translate-x-1/2 -mt-6 px-4 sm:px-6">
         <div className="mx-auto max-w-5xl py-8">
           <div className="flex items-center justify-between">
             <div>
@@ -300,9 +292,6 @@ export default function EditPost() {
                   แก้ไขโพสต์
                 </h1>
               </div>
-              <p className="text-sm text-muted-foreground mt-1">
-                แก้ไขข้อมูลสิ่งของที่ต้องการแลกเปลี่ยน
-              </p>
             </div>
             <Button
               variant="ghost"

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Star, ArrowRightLeft, HelpCircle, LogOut, UserCog, ChevronRight, AlertTriangle, ShieldCheck, Package, LucideIcon, X } from "lucide-react";
+import { Star, ArrowRightLeft, HelpCircle, LogOut, UserCog, ChevronRight, AlertTriangle, Package, LucideIcon, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";

@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   ArrowLeft,
@@ -14,7 +15,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import AppLayout from "@/components/AppLayout";
-import { useState, useEffect } from "react";
 import { getItems, getUserStats, IMAGE_BASE_URL } from "@/api/api";
 import ReportModal from "@/components/ReportModal";
 
@@ -190,8 +190,6 @@ export default function UserProfile() {
       : `${IMAGE_BASE_URL}/uploads/${rawImg.trim()}`;
   }
 
-  
-
   const mainContent = (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-8">
       <div className="flex items-center justify-between">
@@ -210,7 +208,6 @@ export default function UserProfile() {
           </h1>
         </div>
 
-        {/* 🚩 ปุ่มรายงานผู้ใช้งาน (แสดงเฉพาะเมื่อไม่ใช่เจ้าของและไม่ได้มาจากหน้าแอดมิน) */}
         {!isOwner && !fromAdmin && (
           <Button
             variant="ghost"
@@ -365,7 +362,6 @@ export default function UserProfile() {
     </div>
   );
 
-  // ✅ 2. ตรวจสอบเงื่อนไขการคืนค่า ถ้ามาจาก Admin ให้แสดงเนื้อหาเปล่า (ซ่อน Navbar/Footer)
   return fromAdmin ? (
     <div className="min-h-screen bg-background overflow-y-auto w-full">
       {mainContent}

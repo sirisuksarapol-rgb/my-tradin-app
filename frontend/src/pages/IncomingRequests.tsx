@@ -1,29 +1,13 @@
 import { useState, useEffect } from "react";
-import {
-  ArrowRightLeft,
-  CheckCircle,
-  XCircle,
-  Inbox,
-  ArrowLeft,
-  Eye,
-  Loader2,
-  Phone,
-  X,
-} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import axios, { AxiosError } from "axios";
+import { ArrowRightLeft, CheckCircle, XCircle, Inbox, ArrowLeft, Eye, Loader2, Phone, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import AppLayout from "@/components/AppLayout";
 import { useToast } from "@/hooks/use-toast";
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogFooter,
-  AlertDialogCancel,
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogFooter, AlertDialogCancel,
 } from "@/components/ui/alert-dialog";
 
 interface ExchangeRequest {
@@ -78,19 +62,19 @@ interface LoggedInUser {
 const API_BASE_URL = "http://localhost:5000/api/exchanges";
 const IMAGE_BASE_URL = "http://localhost:5000/uploads/";
 
+// =========================================================================
+// COMPONENT: IncomingRequests (หน้าจอจัดการคำขอแลกเปลี่ยนที่ได้รับเข้ามา)[cite: 16]
+// =========================================================================
 export default function IncomingRequests() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
   const [isPhoneModalOpen, setIsPhoneModalOpen] = useState(false);
   const [phoneInput, setPhoneInput] = useState("");
-  const [selectedRequest, setSelectedRequest] =
-    useState<ExchangeRequest | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<ExchangeRequest | null>(null);
   const [isAccepting, setIsAccepting] = useState(false);
 
-  const [rejectRequest, setRejectRequest] = useState<ExchangeRequest | null>(
-    null,
-  );
+  const [rejectRequest, setRejectRequest] = useState<ExchangeRequest | null>(null);
   const [isRejecting, setIsRejecting] = useState(false);
 
   const [successModal, setSuccessModal] = useState<{
@@ -115,6 +99,9 @@ export default function IncomingRequests() {
     return saved ? JSON.parse(saved) : [];
   });
 
+  /**
+   * ฟังก์ชัน: คำนวณระยะเวลาของคำขอแลกเปลี่ยนนับจากวันที่สร้าง[cite: 16]
+   */
   const getRequestAgeText = (startDateStr: string | null): string => {
     if (!startDateStr) return "เมื่อเร็วๆ นี้";
 
@@ -141,6 +128,9 @@ export default function IncomingRequests() {
   const savedUser = sessionStorage.getItem("user");
   const user: LoggedInUser | null = savedUser ? JSON.parse(savedUser) : null;
 
+  /**
+   * ฟังก์ชัน: ดึงข้อมูลคำขอแลกเปลี่ยนที่ส่งมาถึงผู้ใช้ปัจจุบัน[cite: 16]
+   */
   const fetchIncomingRequests = async () => {
     const currentUserId = user?.id || user?.MemberID;
 
@@ -200,6 +190,9 @@ export default function IncomingRequests() {
     setIsPhoneModalOpen(true);
   };
 
+  /**
+   * ฟังก์ชัน: ยืนยันการตอบรับคำขอแลกเปลี่ยนและส่งเบอร์โทรศัพท์[cite: 16]
+   */
   const confirmAccept = async () => {
     if (!selectedRequest) return;
 
@@ -259,6 +252,9 @@ export default function IncomingRequests() {
     }
   };
 
+  /**
+   * ฟังก์ชัน: ยืนยันการปฏิเสธคำขอแลกเปลี่ยน[cite: 16]
+   */
   const confirmReject = async () => {
     if (!rejectRequest) return;
     setIsRejecting(true);
@@ -296,6 +292,9 @@ export default function IncomingRequests() {
     }
   };
 
+  /**
+   * ฟังก์ชัน: จัดรูปแบบ URL รูปภาพสินค้าให้ถูกต้องพร้อมใช้งาน[cite: 16]
+   */
   const getImageUrl = (imagePath: string | null | undefined): string => {
     if (
       !imagePath ||
@@ -350,9 +349,7 @@ export default function IncomingRequests() {
                 className="glass-card border-primary/20"
               >
                 <CardContent className="p-4 space-y-3">
-                  {/* ส่วนหัวของการ์ด: จัดแบบ 3 คอลัมน์ (ซ้าย / กลาง / ขวา) */}
                   <div className="grid grid-cols-3 items-center gap-1">
-                    {/* 1. ฝั่งซ้าย: ป้ายคำขอใหม่ หรือ ระยะเวลา */}
                     <div className="justify-self-start">
                       {!seenIds.includes(req.ExchangeID) ? (
                         <Badge className="bg-orange-500/15 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400 hover:bg-orange-500/15 dark:hover:bg-orange-500/20 pointer-events-none border-0 text-xs font-medium">
@@ -368,7 +365,6 @@ export default function IncomingRequests() {
                       )}
                     </div>
 
-                    {/* 2. ตรงกลาง: คะแนนจับคู่ */}
                     <div className="justify-self-center">
                       {req.MatchScore && req.MatchScore > 0 ? (
                         <Badge className="bg-primary text-white hover:bg-primary pointer-events-none border-0 text-[10px] px-1.5 py-0.5 font-semibold shadow-xs whitespace-nowrap">
@@ -377,7 +373,6 @@ export default function IncomingRequests() {
                       ) : null}
                     </div>
 
-                    {/* 3. ฝั่งขวา: วันที่ */}
                     <div className="justify-self-end">
                       <span className="text-xs text-muted-foreground whitespace-nowrap">
                         {req.StartDate
@@ -386,8 +381,6 @@ export default function IncomingRequests() {
                       </span>
                     </div>
                   </div>
-
-                  {/* ส่วนรูปภาพและรายละเอียดอื่นๆ ต่อด้านล่างตามปกติ... */}
 
                   <div className="flex items-center gap-3">
                     <div className="flex-1 text-center space-y-1 min-w-0">

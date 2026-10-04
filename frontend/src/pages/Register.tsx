@@ -29,8 +29,8 @@ export default function Register() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [otp, setOtp] = useState("");
   
-  const [timeLeft, setTimeLeft] = useState(10 * 60); // 10 นาทีสำหรับ OTP รวม
-  const [resendCountdown, setResendCountdown] = useState(30); // 30 วินาทีสำหรับการกดส่งใหม่
+  const [timeLeft, setTimeLeft] = useState(10 * 60);
+  const [resendCountdown, setResendCountdown] = useState(30);
 
   const updateField = (field: keyof typeof formData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -63,7 +63,6 @@ export default function Register() {
     }
   };
 
-  // 1. ฟังก์ชันขอรหัส OTP (ยิงไปขอรหัสอย่างเดียว ไม่ส่งข้อมูลอื่นเพื่อประหยัด Data)
   const requestOTP = async (isResend = false) => {
     setIsLoading(true);
     try {
@@ -90,15 +89,12 @@ export default function Register() {
     }
   };
 
-  // 2. ฟังก์ชันเมื่อกด "ยืนยันและรับรหัส OTP" จากหน้า Preview
   const handleRegister = () => requestOTP(false);
 
-  // 3. ฟังก์ชันกดยืนยัน OTP พร้อมแนบข้อมูลทั้งหมดไปบันทึก
   const handleVerifyOTP = async () => {
     if (otp.length < 6) return;
     setIsLoading(true);
     try {
-      // ส่งข้อมูลทั้งหมดไปพร้อมกับรหัส OTP ทีเดียว
       const submitData = new FormData();
       submitData.append("email", formData.email);
       submitData.append("password", formData.password);
@@ -125,14 +121,12 @@ export default function Register() {
     }
   };
 
-  // Timer สำหรับหมดเวลา OTP
   useEffect(() => {
     if (step !== "otp" || timeLeft <= 0) return;
     const timer = setInterval(() => setTimeLeft((t) => t - 1), 1000);
     return () => clearInterval(timer);
   }, [step, timeLeft]);
 
-  // Timer สำหรับปุ่มส่งซ้ำ
   useEffect(() => {
     if (step !== "otp" || resendCountdown <= 0) return;
     const timer = setInterval(() => setResendCountdown((t) => t - 1), 1000);
@@ -140,6 +134,7 @@ export default function Register() {
   }, [step, resendCountdown]);
 
   const formatTime = (s: number) => `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 flex flex-col font-sans selection:bg-primary/25">
       <Navbar />
@@ -149,7 +144,8 @@ export default function Register() {
         <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-emerald-400/10 rounded-full blur-[130px] pointer-events-none" />
 
         <div className="w-full max-w-4xl h-auto md:h-[650px] bg-white dark:bg-zinc-900 rounded-[2.5rem] shadow-2xl border border-slate-100 dark:border-zinc-800 overflow-hidden grid md:grid-cols-2 relative z-10 animate-in fade-in duration-500">
-          {/* Left Panel: Register Form */}
+          
+          {/* Left Panel: Dynamic Content */}
           <div className="p-8 sm:p-12 flex flex-col justify-center h-full">
             {step === "form" && (
               <>
@@ -161,97 +157,69 @@ export default function Register() {
 
                 <form onSubmit={handleFormSubmit} className="space-y-3">
                   <div className="flex justify-center mb-6 mt-2">
-  <button 
-    type="button" 
-    onClick={() => fileInputRef.current?.click()} 
-    className="relative group cursor-pointer"
-  >
-    {/* กรอบรูปโปรไฟล์แบบเรียบๆ เปลี่ยนแค่ความสว่างเล็กน้อยตอนเอาเมาส์ชี้ */}
-    <Avatar className="h-24 w-24 border-2 border-slate-200 dark:border-zinc-700 shadow-sm transition-opacity group-hover:opacity-80">
-      <AvatarImage src={profileImagePreview || ""} className="object-cover" /> 
-      
-      {/* สถานะตอนที่ยังไม่ได้อัปโหลดรูป (กรอบเส้นประเรียบๆ) */}
-      <AvatarFallback className="bg-slate-50 dark:bg-zinc-800 flex flex-col items-center justify-center gap-1">
-        <ImagePlus className="h-6 w-6 text-slate-400" />
-        <span className="text-[10px] font-medium text-slate-500">
-          เพิ่มรูป
-        </span>
-      </AvatarFallback>
-    </Avatar>
-
-    {/* ไอคอนกล้องมุมขวาล่าง แบบไม่มีเอฟเฟกต์เด้ง */}
-    <div className="absolute bottom-0 right-0 p-2 bg-primary text-white rounded-full shadow-md border-2 border-white dark:border-zinc-900 transition-colors group-hover:bg-primary/90">
-      <Camera className="w-4 h-4" />
-    </div>
-  </button>
-
-  <input 
-    ref={fileInputRef} 
-    type="file" 
-    accept="image/*" 
-    className="hidden" 
-    onChange={handleImageChange} 
-  /> 
-</div>
+                    <button 
+                      type="button" 
+                      onClick={() => fileInputRef.current?.click()} 
+                      className="relative group cursor-pointer"
+                    >
+                      <Avatar className="h-24 w-24 border-2 border-slate-200 dark:border-zinc-700 shadow-sm transition-opacity group-hover:opacity-80">
+                        <AvatarImage src={profileImagePreview || ""} className="object-cover" /> 
+                        <AvatarFallback className="bg-slate-50 dark:bg-zinc-800 flex flex-col items-center justify-center gap-1">
+                          <ImagePlus className="h-6 w-6 text-slate-400" />
+                          <span className="text-[10px] font-medium text-slate-500">เพิ่มรูป</span>
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="absolute bottom-0 right-0 p-2 bg-primary text-white rounded-full shadow-md border-2 border-white dark:border-zinc-900 transition-colors group-hover:bg-primary/90">
+                        <Camera className="w-4 h-4" />
+                      </div>
+                    </button>
+                    <input 
+                      ref={fileInputRef} 
+                      type="file" 
+                      accept="image/*" 
+                      className="hidden" 
+                      onChange={handleImageChange} 
+                    /> 
+                  </div>
 
                   <div className="space-y-1">
-                    <Label className="text-xs font-bold text-slate-500 ml-1">
-                      ชื่อผู้ใช้
-                    </Label>
+                    <Label className="text-xs font-bold text-slate-500 ml-1">ชื่อผู้ใช้</Label>
                     <div className="relative">
                       <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                       <Input
                         placeholder="ชื่อของคุณ"
                         value={formData.displayName}
-                        onChange={(e) =>
-                          updateField("displayName", e.target.value)
-                        }
+                        onChange={(e) => updateField("displayName", e.target.value)}
                         className="pl-11 h-11 rounded-xl bg-slate-50 dark:bg-zinc-800 border-slate-200 dark:border-zinc-700"
                       />
                     </div>
-                    {errors.displayName && (
-                      <p className="text-[11px] text-red-500 font-bold ml-1">
-                        {errors.displayName}
-                      </p>
-                    )}
+                    {errors.displayName && <p className="text-[11px] text-red-500 font-bold ml-1">{errors.displayName}</p>}
                   </div>
 
                   <div className="space-y-1">
-                    <Label className="text-xs font-bold text-slate-500 ml-1">
-                      อีเมล
-                    </Label>
+                    <Label className="text-xs font-bold text-slate-500 ml-1">อีเมล</Label>
                     <div className="relative">
                       <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                       <Input
                         type="email"
-                        placeholder="example@gmsil.com"
+                        placeholder="example@gmail.com"
                         value={formData.email}
                         onChange={(e) => updateField("email", e.target.value)}
                         className="pl-11 h-11 rounded-xl bg-slate-50 dark:bg-zinc-800 border-slate-200 dark:border-zinc-700"
                       />
                     </div>
-                    {errors.email && (
-                      <p className="text-[11px] text-red-500 font-bold ml-1">
-                        {errors.email}
-                      </p>
-                    )}
+                    {errors.email && <p className="text-[11px] text-red-500 font-bold ml-1">{errors.email}</p>}
                   </div>
 
-                  {/* ช่องรหัสผ่าน */}
                   <div className="space-y-1">
-                    <Label className="text-xs font-bold text-slate-500 ml-1">
-                      รหัสผ่าน
-                    </Label>
+                    <Label className="text-xs font-bold text-slate-500 ml-1">รหัสผ่าน</Label>
                     <div className="relative">
                       <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                       <Input
                         type={showPassword ? "text" : "password"}
                         placeholder="••••••••"
                         value={formData.password}
-                        onChange={(e) =>
-                          updateField("password", e.target.value)
-                        }
-                        // เพิ่ม pr-11 เพื่อไม่ให้ข้อความทับไอคอนลูกตาด้านขวา
+                        onChange={(e) => updateField("password", e.target.value)}
                         className="pl-11 pr-11 h-11 rounded-xl bg-slate-50 dark:bg-zinc-800 border-slate-200 dark:border-zinc-700"
                       />
                       <button
@@ -259,55 +227,32 @@ export default function Register() {
                         onClick={() => setShowPassword(!showPassword)}
                         className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                       >
-                        {showPassword ? (
-                          <EyeOff className="w-4 h-4" />
-                        ) : (
-                          <Eye className="w-4 h-4" />
-                        )}
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     </div>
-                    {errors.password && (
-                      <p className="text-[11px] text-red-500 font-bold ml-1">
-                        {errors.password}
-                      </p>
-                    )}
+                    {errors.password && <p className="text-[11px] text-red-500 font-bold ml-1">{errors.password}</p>}
                   </div>
 
-                  {/* ช่องยืนยันรหัสผ่าน */}
                   <div className="space-y-1">
-                    <Label className="text-xs font-bold text-slate-500 ml-1">
-                      ยืนยันรหัสผ่าน
-                    </Label>
+                    <Label className="text-xs font-bold text-slate-500 ml-1">ยืนยันรหัสผ่าน</Label>
                     <div className="relative">
                       <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                       <Input
                         type={showConfirmPassword ? "text" : "password"}
                         placeholder="••••••••"
                         value={formData.confirmPassword}
-                        onChange={(e) =>
-                          updateField("confirmPassword", e.target.value)
-                        }
+                        onChange={(e) => updateField("confirmPassword", e.target.value)}
                         className="pl-11 pr-11 h-11 rounded-xl bg-slate-50 dark:bg-zinc-800 border-slate-200 dark:border-zinc-700"
                       />
                       <button
                         type="button"
-                        onClick={() =>
-                          setShowConfirmPassword(!showConfirmPassword)
-                        }
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                         className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                       >
-                        {showConfirmPassword ? (
-                          <EyeOff className="w-4 h-4" />
-                        ) : (
-                          <Eye className="w-4 h-4" />
-                        )}
+                        {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     </div>
-                    {errors.confirmPassword && (
-                      <p className="text-[11px] text-red-500 font-bold ml-1">
-                        {errors.confirmPassword}
-                      </p>
-                    )}
+                    {errors.confirmPassword && <p className="text-[11px] text-red-500 font-bold ml-1">{errors.confirmPassword}</p>}
                   </div>
 
                   <Button
@@ -322,30 +267,18 @@ export default function Register() {
 
             {step === "preview" && (
               <div className="text-center space-y-6">
-                <h2 className="text-2xl font-black text-slate-900 dark:text-white">
-                  ตรวจสอบข้อมูล
-                </h2>
-
-                {/* 📌 เพิ่มส่วนแสดงตัวอย่างรูปโปรไฟล์ */}
+                <h2 className="text-2xl font-black text-slate-900 dark:text-white">ตรวจสอบข้อมูล</h2>
+                
                 <div className="flex justify-center">
                   <Avatar className="h-20 w-20 border-2 border-primary shadow-md">
-                    <AvatarImage
-                      src={profileImagePreview || ""}
-                      className="object-cover"
-                    />
-                    <AvatarFallback>
-                      <User className="h-8 w-8 text-slate-400" />
-                    </AvatarFallback>
+                    <AvatarImage src={profileImagePreview || ""} className="object-cover" />
+                    <AvatarFallback><User className="h-8 w-8 text-slate-400" /></AvatarFallback>
                   </Avatar>
                 </div>
 
                 <div className="p-4 bg-slate-50 dark:bg-zinc-800 rounded-2xl space-y-2 text-left text-slate-700 dark:text-slate-300">
-                  <p>
-                    <b>ชื่อ:</b> {formData.displayName}
-                  </p>
-                  <p>
-                    <b>อีเมล:</b> {formData.email}
-                  </p>
+                  <p><b>ชื่อ:</b> {formData.displayName}</p>
+                  <p><b>อีเมล:</b> {formData.email}</p>
                 </div>
 
                 <Button
@@ -353,11 +286,7 @@ export default function Register() {
                   disabled={isLoading}
                   className="w-full h-12 rounded-xl font-bold bg-primary text-primary-foreground shadow-lg shadow-primary/25"
                 >
-                  {isLoading ? (
-                    <Loader2 className="animate-spin" />
-                  ) : (
-                    "ยืนยันและรับรหัส OTP"
-                  )}
+                  {isLoading ? <Loader2 className="animate-spin" /> : "ยืนยันและรับรหัส OTP"}
                 </Button>
               </div>
             )}
@@ -365,48 +294,44 @@ export default function Register() {
             {step === "otp" && (
               <div className="text-center space-y-6">
                 <h2 className="text-2xl font-black">ยืนยันรหัส OTP</h2>
-                <p className="text-xs text-slate-400">
-                  รหัสถูกส่งไปที่ {formData.email}
-                </p>
+                <p className="text-xs text-slate-400">รหัสถูกส่งไปที่ {formData.email}</p>
                 <div className="text-orange-500 font-mono font-bold">
                   <Timer className="inline mr-1" /> {formatTime(timeLeft)}
                 </div>
-                {/* 1. กล่องกรอกรหัส OTP ของเดิม */}
-<div className="flex justify-center">
-  <InputOTP maxLength={6} value={otp} onChange={setOtp}>
-    <InputOTPGroup className="gap-2">
-      {[...Array(6)].map((_, i) => (
-        <InputOTPSlot key={i} index={i} className="h-11 w-10 rounded-xl" />
-      ))}
-    </InputOTPGroup>
-  </InputOTP>
-</div>
+                
+                <div className="flex justify-center">
+                  <InputOTP maxLength={6} value={otp} onChange={setOtp}>
+                    <InputOTPGroup className="gap-2">
+                      {[...Array(6)].map((_, i) => (
+                        <InputOTPSlot key={i} index={i} className="h-11 w-10 rounded-xl" />
+                      ))}
+                    </InputOTPGroup>
+                  </InputOTP>
+                </div>
 
-{/* 📌 2. นำโค้ดส่วนนี้ไปแทรกตรงกลาง เพื่อให้แสดงเวลาถอยหลังและปุ่มขอรหัสใหม่ */}
-<div className="text-sm my-4 h-6 flex items-center justify-center">
-  {resendCountdown > 0 ? (
-    <p className="text-slate-400 font-medium">ส่งรหัสใหม่ได้ใน {resendCountdown} วินาที</p>
-  ) : (
-    <button 
-      type="button" /* ใส่ type="button" เพื่อป้องกันการ submit ฟอร์ม */
-      onClick={() => requestOTP(true)} 
-      disabled={isLoading}
-      className="text-primary font-bold hover:underline flex items-center justify-center gap-1 mx-auto transition-all"
-    >
-      <RefreshCw size={14} className={isLoading ? "animate-spin" : ""} />
-      ส่งรหัสยืนยันอีกครั้ง
-    </button>
-  )}
-</div>
+                <div className="text-sm my-4 h-6 flex items-center justify-center">
+                  {resendCountdown > 0 ? (
+                    <p className="text-slate-400 font-medium">ส่งรหัสใหม่ได้ใน {resendCountdown} วินาที</p>
+                  ) : (
+                    <button 
+                      type="button" 
+                      onClick={() => requestOTP(true)} 
+                      disabled={isLoading}
+                      className="text-primary font-bold hover:underline flex items-center justify-center gap-1 mx-auto transition-all"
+                    >
+                      <RefreshCw size={14} className={isLoading ? "animate-spin" : ""} />
+                      ส่งรหัสยืนยันอีกครั้ง
+                    </button>
+                  )}
+                </div>
 
-{/* 3. ปุ่มกด ยืนยัน OTP ของเดิม */}
-<Button
-  onClick={handleVerifyOTP}
-  disabled={isLoading || otp.length < 6}
-  className="w-full h-12 rounded-xl font-bold bg-[#84b89b] hover:bg-[#6fa084] text-white shadow-lg transition-all"
->
-  {isLoading ? <Loader2 className="animate-spin" /> : "ยืนยัน OTP"}
-</Button>
+                <Button
+                  onClick={handleVerifyOTP}
+                  disabled={isLoading || otp.length < 6}
+                  className="w-full h-12 rounded-xl font-bold bg-[#84b89b] hover:bg-[#6fa084] text-white shadow-lg transition-all"
+                >
+                  {isLoading ? <Loader2 className="animate-spin" /> : "ยืนยัน OTP"}
+                </Button>
               </div>
             )}
 
@@ -424,7 +349,7 @@ export default function Register() {
             )}
           </div>
 
-          {/* Right Panel: Clear Image & Sign In Switch */}
+          {/* Right Panel: Call to action for Login */}
           <div className="relative text-white p-8 sm:p-12 flex flex-col items-center justify-center text-center overflow-hidden">
             <img
               src={promoImage}
@@ -435,11 +360,7 @@ export default function Register() {
 
             <div className="relative z-10 space-y-6 max-w-sm">
               <div className="w-14 h-14 bg-white/20 rounded-2xl backdrop-blur-md flex items-center justify-center mx-auto border border-white/30 shadow-inner">
-                <img
-                  src={logo}
-                  alt="Logo"
-                  className="w-8 h-8 object-contain brightness-0 invert"
-                />
+                <img src={logo} alt="Logo" className="w-8 h-8 object-contain brightness-0 invert" />
               </div>
               <div className="space-y-2">
                 <h2 className="text-3xl font-black tracking-tight text-white drop-shadow-md">
@@ -459,6 +380,7 @@ export default function Register() {
               </Button>
             </div>
           </div>
+          
         </div>
       </main>
     </div>

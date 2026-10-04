@@ -22,7 +22,7 @@ export default function SecurityVerify() {
 
   /**
    * ฟังก์ชัน: handleVerify
-   * มีไว้สำหรับ: ตรวจสอบความถูกต้องของรหัส PIN ที่ผู้ใช้งานกรอกเทียบกับรหัสจำลอง (MOCK_PIN) 
+   * มีไว้สำหรับ: ตรวจสอบความถูกต้องของรหัส PIN ที่ผู้ใช้งานกรอกเทียบกับรหัสจำลอง (MOCK_PIN)
    * หากถูกต้องจะเปลี่ยนสถานะเป็นยืนยันสำเร็จและแสดงการแจ้งเตือน หากไม่ถูกต้องจะล้างค่า PIN และแสดงข้อความแจ้งเตือนข้อผิดพลาด
    */
   const handleVerify = () => {
@@ -40,13 +40,13 @@ export default function SecurityVerify() {
       <div className="max-w-lg mx-auto space-y-6 py-4">
         <div className="flex items-center gap-2">
           <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => navigate(-1)}
-                className="-ml-2"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate(-1)}
+            className="-ml-2"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
           <h1 className="text-xl font-bold font-heading">ความปลอดภัย</h1>
         </div>
 

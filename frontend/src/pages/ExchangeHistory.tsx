@@ -1,15 +1,6 @@
 import { useState, useEffect } from "react";
-import {
-  ArrowLeft,
-  Clock,
-  ArrowRightLeft,
-  ChevronRight,
-  Calendar,
-  CheckCircle2,
-  XCircle,
-  RefreshCw,
-} from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { ArrowLeft, Clock, ArrowRightLeft, ChevronRight, Calendar, CheckCircle2, XCircle, RefreshCw } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -39,7 +30,7 @@ interface ExchangeItem {
 }
 
 // =========================================================================
-// COMPONENT: ExchangeHistory (หน้าจอสำหรับแสดงประวัติรายการแลกเปลี่ยนทั้งหมดของผู้ใช้)[cite: 8]
+// COMPONENT: ExchangeHistory (หน้าจอสำหรับแสดงประวัติรายการแลกเปลี่ยนทั้งหมดของผู้ใช้)
 // =========================================================================
 export default function ExchangeHistory() {
   const navigate = useNavigate();
@@ -48,8 +39,8 @@ export default function ExchangeHistory() {
   const [activeTab, setActiveTab] = useState<"success" | "failed">("success");
 
   /**
-   * ฟังก์ชัน: fetchHistoryData[cite: 8]
-   * มีไว้สำหรับ: ดึงข้อมูลประวัติการแลกเปลี่ยนทั้งหมดจาก API และอัปเดตลงใน State พร้อมจัดการสถานะกำลังโหลด[cite: 8]
+   * ฟังก์ชัน: fetchHistoryData
+   * มีไว้สำหรับ: ดึงข้อมูลประวัติการแลกเปลี่ยนทั้งหมดจาก API และอัปเดตลงใน State พร้อมจัดการสถานะกำลังโหลด
    */
   useEffect(() => {
     const fetchHistoryData = async () => {
@@ -194,7 +185,7 @@ export default function ExchangeHistory() {
 }
 
 // =========================================================================
-// COMPONENT: ExchangeDetailCard (คอมโพเนนต์ย่อยแสดงการ์ดสรุปข้อมูลรายการแลกเปลี่ยนแต่ละรายการ)[cite: 8]
+// COMPONENT: ExchangeDetailCard (คอมโพเนนต์ย่อยแสดงการ์ดสรุปข้อมูลรายการแลกเปลี่ยนแต่ละรายการ)[cite: 11]
 // =========================================================================
 function ExchangeDetailCard({ item }: { item: ExchangeItem }) {
   const navigate = useNavigate();
@@ -202,8 +193,8 @@ function ExchangeDetailCard({ item }: { item: ExchangeItem }) {
   const partnerName = item.theirAuthorName;
 
   /**
-   * ฟังก์ชัน: getImageUrl[cite: 8]
-   * มีไว้สำหรับ: จัดรูปแบบและดึง URL ของรูปภาพสินค้า โดยตัดเอาชื่อภาพแรกมาเชื่อมต่อกับ Base URL[cite: 8]
+   * ฟังก์ชัน: getImageUrl[cite: 11]
+   * มีไว้สำหรับ: จัดรูปแบบและดึง URL ของรูปภาพสินค้า โดยตัดเอาชื่อภาพแรกมาเชื่อมต่อกับ Base URL[cite: 11]
    */
   const getImageUrl = (imageString: string) => {
     if (!imageString) return "/placeholder-image.png";
@@ -212,8 +203,8 @@ function ExchangeDetailCard({ item }: { item: ExchangeItem }) {
   };
 
   /**
-   * ฟังก์ชัน: formatDate[cite: 8]
-   * มีไว้สำหรับ: แปลงสตริงวันที่ให้อยู่ในรูปแบบมาตรฐาน YYYY-MM-DD พร้อมตรวจสอบความถูกต้องของข้อมูล[cite: 8]
+   * ฟังก์ชัน: formatDate[cite: 11]
+   * มีไว้สำหรับ: แปลงสตริงวันที่ให้อยู่ในรูปแบบมาตรฐาน YYYY-MM-DD พร้อมตรวจสอบความถูกต้องของข้อมูล[cite: 11]
    */
   const formatDate = (dateString?: string) => {
     if (!dateString) return "-";
@@ -361,7 +352,7 @@ function ExchangeDetailCard({ item }: { item: ExchangeItem }) {
 }
 
 // =========================================================================
-// COMPONENT: EmptyState (คอมโพเนนต์ย่อยสำหรับแสดงผลเมื่อไม่มีข้อมูลในรายการ)[cite: 8]
+// COMPONENT: EmptyState (คอมโพเนนต์ย่อยสำหรับแสดงผลเมื่อไม่มีข้อมูลในรายการ)[cite: 11]
 // =========================================================================
 function EmptyState({ message }: { message: string }) {
   return (

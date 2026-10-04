@@ -1,33 +1,14 @@
-import React, { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-
-import {
-  ArrowRightLeft,
-  MapPin,
-  Phone,
-  ShieldCheck,
-  Sparkles,
-  ArrowLeft,
-  Box,
-  CheckCircle2,
-  Circle,
-  Loader2,
-  Info,
-  FileText,
+import { ArrowRightLeft, MapPin, Phone, ShieldCheck, Sparkles, ArrowLeft, Box, CheckCircle2, Circle, Loader2, Info, FileText,
 } from "lucide-react";
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-
 import AppLayout from "@/components/AppLayout";
 import { useToast } from "@/hooks/use-toast";
-
-import {
-  getItems as fetchItemsAPI,
-  IMAGE_BASE_URL,
-  createExchangeRequest,
+import { getItems as fetchItemsAPI, IMAGE_BASE_URL, createExchangeRequest,
 } from "@/api/api";
 
 interface RealPostItem {
@@ -124,7 +105,7 @@ export default function ExchangePreview() {
   };
 
   /**
-   * ฟังก์ชัน: กรองรายการสิ่งของที่เป็นของตนเองจากระบบคลังสินค้า (Inventory)
+   * ฟังก์ชัน: กรองรายการสิ่งของที่เป็นของตนเองจากระบบคลังสินค้า (Inventory)[cite: 12]
    */
   const myInventory = useMemo(() => {
     if (!currentUserId) return [];
@@ -132,7 +113,7 @@ export default function ExchangePreview() {
   }, [dbItems, currentUserId]);
 
   /**
-   * ฟังก์ชัน: แยกประเภทและดึงรหัสเป้าหมาย (targetId) กับรหัสสินค้าเริ่มต้น (preSelectedMyId) จาก URL params
+   * ฟังก์ชัน: แยกประเภทและดึงรหัสเป้าหมาย (targetId) กับรหัสสินค้าเริ่มต้น (preSelectedMyId) จาก URL params[cite: 12]
    */
   const { targetId, preSelectedMyId } = useMemo(() => {
     if (!matchId) return { targetId: "", preSelectedMyId: "" };
@@ -147,7 +128,7 @@ export default function ExchangePreview() {
   }, [matchId]);
 
   /**
-   * ฟังก์ชัน: กำหนดค่าเริ่มต้นให้กับสินค้าของตนเองที่จะใช้ในการแลกเปลี่ยน
+   * ฟังก์ชัน: กำหนดค่าเริ่มต้นให้กับสินค้าของตนเองที่จะใช้ในการแลกเปลี่ยน[cite: 12]
    */
   useEffect(() => {
     if (preSelectedMyId && !selectedMyPostId) {
@@ -161,7 +142,7 @@ export default function ExchangePreview() {
   const isFromPostDetails = matchId?.startsWith("post-");
 
   /**
-   * ฟังก์ชัน: รวบรวมข้อมูลการเปรียบเทียบระหว่างสินค้าของตนเองและสินค้าของคู่แลกเปลี่ยน
+   * ฟังก์ชัน: รวบรวมข้อมูลการเปรียบเทียบระหว่างสินค้าของตนเองและสินค้าของคู่แลกเปลี่ยน[cite: 12]
    */
   const match = useMemo(() => {
     const theirPost = dbItems.find(
@@ -247,7 +228,7 @@ export default function ExchangePreview() {
   ]);
 
   /**
-   * ฟังก์ชัน: ตรวจสอบความถูกต้องของเบอร์โทรและสินค้า แล้วส่งคำขอแลกเปลี่ยนไปยัง API ระบบ
+   * ฟังก์ชัน: ตรวจสอบความถูกต้องของเบอร์โทรและสินค้า แล้วส่งคำขอแลกเปลี่ยนไปยัง API ระบบ[cite: 12]
    */
   const handleConfirm = async () => {
     if (!phone || phone.replace(/-/g, "").length < 10) {
@@ -344,10 +325,8 @@ export default function ExchangePreview() {
   return (
     <AppLayout>
       <section className="py-8 sm:py-12">
-        {/* ใช้ max-w-[1100px] ตามที่ขอ */}
         <div className="mx-auto max-w-[1000px] px-4 md:px-8 space-y-6">
           
-          {/* Header */}
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
@@ -367,7 +346,6 @@ export default function ExchangePreview() {
             </div>
           </div>
 
-          {/* 1. เลือกสิ่งของของตัวเอง */}
           {isFromPostDetails && (
             <Card className="glass-card border-primary/20 hover:shadow-md transition-shadow">
               <CardHeader className="pb-3 pt-4 px-5">
@@ -444,7 +422,6 @@ export default function ExchangePreview() {
             </Card>
           )}
 
-          {/* 2. Match Comparison Display */}
           <Card className="glass-card border-primary/20 overflow-hidden">
             {match.score && isFromMatchResults && (
               <div className="bg-primary border border-primary/20 px-4 py-2.5 flex items-center justify-center gap-2">
@@ -457,12 +434,10 @@ export default function ExchangePreview() {
 
             <CardContent className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
-                {/* สิ่งของของคุณ */}
                 {match.myPost ? (
                   <div className="space-y-3 p-4 rounded-xl bg-secondary/10 border border-primary/10 flex flex-col justify-between">
                     <div>
                       <div className="flex items-center justify-between mb-2">
-                        {/* เปลี่ยนสีหมวดหมู่และชื่อเป็นสีหลักและตัวหนังสือสีขาว */}
                         <Badge
                           className="text-[10px] bg-primary hover:bg-primary/90 text-white font-semibold truncate max-w-[140px] border-none"
                         >
@@ -507,17 +482,14 @@ export default function ExchangePreview() {
                   </div>
                 )}
 
-                {/* ปุ่มลูกศรตรงกลาง */}
                 <div className="hidden md:flex absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-primary text-white items-center justify-center shadow-md border-2 border-primary/20 z-10 transition-transform hover:scale-110">
                   <ArrowRightLeft className="h-5 w-5" />
                 </div>
 
-                {/* สิ่งของคู่แลกเปลี่ยน */}
                 {match.theirPost ? (
                   <div className="space-y-3 p-4 rounded-xl bg-secondary/10 border border-primary/10 flex flex-col justify-between">
                     <div>
                       <div className="flex items-center justify-between mb-2">
-                        {/* เปลี่ยนสีหมวดหมู่และชื่อเป็นสีหลักและตัวหนังสือสีขาว */}
                         <Badge
                           className="text-[10px] bg-primary hover:bg-primary/90 text-white font-semibold truncate max-w-[140px] border-none"
                         >
@@ -565,7 +537,6 @@ export default function ExchangePreview() {
             </CardContent>
           </Card>
 
-          {/* 3. สถานที่นัดรับ */}
           <Card className="glass-card border-primary/20">
             <CardHeader className="pb-3 pt-4 px-5">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -595,7 +566,6 @@ export default function ExchangePreview() {
             </CardContent>
           </Card>
 
-          {/* 4. หมายเลขโทรศัพท์ */}
           <Card className="glass-card border-primary/20">
             <CardHeader className="pb-2 pt-4 px-5">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -621,7 +591,6 @@ export default function ExchangePreview() {
             </CardContent>
           </Card>
 
-          {/* 5. คำแนะนำความปลอดภัย */}
           <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-2.5">
             <Info className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
             <p className="text-[11px] text-amber-700/80 dark:text-amber-500/90 leading-normal font-medium">
@@ -630,7 +599,6 @@ export default function ExchangePreview() {
             </p>
           </div>
 
-          {/* 6. Action Buttons */}
           <div className="space-y-3 pt-2">
             <Button
               className="w-full h-12 eco-gradient text-primary-foreground shadow-sm transition-all font-semibold"

@@ -1,13 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import {
-  ArrowRightLeft,
-  Sparkles,
-  Package,
-  Search,
-  ArrowLeft,
-  Loader2,
-} from "lucide-react";
+import { ArrowRightLeft, Sparkles, Package, Search, ArrowLeft, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

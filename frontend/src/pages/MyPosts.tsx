@@ -142,7 +142,7 @@ export default function MyPosts() {
       return `${IMAGE_BASE_URL}/uploads/${cleanStr}`;
     } catch {
       const fallback = imageName
-        .replace(/\[|\]|"|'/g, "")
+        .replace(/\[\vert{}\]|"|'/g, "")
         .split(",")[0]
         .trim();
       if (fallback) {
@@ -165,9 +165,6 @@ export default function MyPosts() {
               <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight font-heading">
                 ของฉัน
               </h1>
-              <p className="text-sm text-muted-foreground">
-                จัดการโพสต์สิ่งของที่คุณนำมาแลกเปลี่ยน
-              </p>
             </div>
             <Button
               className="eco-gradient text-primary-foreground gap-2 rounded-xl"
@@ -230,15 +227,15 @@ export default function MyPosts() {
                         </h3>
                       </div>
 
-                      <div className="flex items-center bg-primary/10 gap-3 bg-muted/40 border border-border/40 rounded-2xl p-2.5 w-full">
-                        <div className="w-8 h-8 rounded-xl bg-background border border-border/50 flex items-center justify-center shrink-0 shadow-sm">
+                      <div className="flex items-center gap-3 bg-white border border-black dark:bg-zinc-900 dark:border-zinc-100 rounded-2xl p-2.5 w-full">
+                        <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-zinc-800 border border-black/20 flex items-center justify-center shrink-0 shadow-sm">
                           <ArrowRightLeft className="w-4 h-4 text-primary" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-[10px] text-primary text-muted-foreground font-semibold uppercase tracking-widest mb-0.5 leading-none">
+                          <p className="text-[10px] text-slate-500 dark:text-zinc-400 font-semibold uppercase tracking-widest mb-0.5 leading-none">
                             อยากแลกกับ
                           </p>
-                          <p className="text-sm font-bold text-foreground truncate">
+                          <p className="text-sm font-bold text-slate-900 dark:text-white truncate">
                             {post.DesiredItem || "อะไรก็ได้"}
                           </p>
                         </div>

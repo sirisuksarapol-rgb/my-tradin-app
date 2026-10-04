@@ -9,7 +9,7 @@ import {
   Inbox,
   Package,
   AlertCircle,
-  Search,
+  ArrowLeftRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -181,7 +181,7 @@ export default function Matching() {
       return `${IMAGE_BASE_URL}/uploads/${cleanStr}`;
     } catch {
       const fallback = imageName
-        .replace(/\[|\]|"|'/g, "")
+        .replace(/\[\vert{}\]|"|'/g, "")
         .split(",")[0]
         .trim();
       return fallback.startsWith("http")
@@ -260,9 +260,6 @@ export default function Matching() {
                   Smart Match
                 </h1>
               </div>
-              <p className="text-sm text-muted-foreground">
-                ระบบแนะนำคู่แลกเปลี่ยนที่เหมาะสมสำหรับคุณ
-              </p>
             </div>
 
             <Button
@@ -327,14 +324,12 @@ export default function Matching() {
                       key={post.ItemID}
                       className="glass-card hover:shadow-md transition-all group flex flex-col justify-between overflow-hidden border border-border/60 rounded-2xl"
                     >
-                      {/* 🔹 ลดความสูงรูปภาพลงโดยใช้ h-36 แทน aspect เดิม */}
                       <div className="w-full h-36 bg-muted/20 relative overflow-hidden">
                         <img
                           src={getCorrectImagePath(post.ItemImage)}
                           alt={post.ItemName}
                           className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110"
                           onError={(e) => {
-                            // 🔹 เติม as HTMLImageElement ตรงนี้ครับ
                             const target = e.target as HTMLImageElement;
                             if (
                               target.src !==
@@ -353,22 +348,21 @@ export default function Matching() {
                           </h3>
                         </div>
 
-                        <div className="flex items-center bg-primary/10 gap-3 bg-muted/40 border border-border/40 rounded-2xl p-2.5 w-full">
-                          <div className="w-8 h-8 rounded-xl bg-background border border-border/50 flex items-center justify-center shrink-0 shadow-sm">
-                            <ArrowRightLeft className="w-4 h-4 text-primary" />
+                        <div className="flex items-center gap-3 bg-white border border-black dark:bg-zinc-900 dark:border-zinc-100 rounded-2xl p-2.5 w-full">
+                          <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-zinc-800 border border-black/20 flex items-center justify-center shrink-0 shadow-sm">
+                            <ArrowLeftRight className="w-4 h-4 text-primary" />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="text-[10px] text-primary text-muted-foreground font-semibold uppercase tracking-widest mb-0.5 leading-none">
+                            <p className="text-[10px] text-slate-500 dark:text-zinc-400 font-semibold uppercase tracking-widest mb-0.5 leading-none">
                               อยากแลกกับ
                             </p>
-                            <p className="text-sm font-bold text-foreground truncate">
-                              {post.DesiredItem || "อะไรก็ได้"}
+                            <p className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                              {post.DesiredItem}
                             </p>
                           </div>
                         </div>
                       </CardContent>
 
-                      {/* 🔹 เปลี่ยนเป็นปุ่มเต็มพื้นที่ มีเส้นขีดด้านบน และไม่มีความโค้ง (rounded-none) */}
                       <Button
                         className="w-full h-11 text-sm bg-primary text-white border-t border-border/40 hover:bg-primary/90 hover:shadow-lg active:scale-[0.98] transition-all duration-300 rounded-none font-semibold flex items-center justify-center group"
                         onClick={() =>

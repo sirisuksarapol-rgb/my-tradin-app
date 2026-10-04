@@ -26,12 +26,7 @@ export default function Login() {
   const { toast } = useToast();
 
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  const [formData, setFormData] = useState<UserFormData>({
-    email: "",
-    password: "",
-  });
+  const [formData, setFormData] = useState<UserFormData>({ email: "", password: "" });
   const [errors, setErrors] = useState<Partial<UserFormData>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [suspendData, setSuspendData] = useState<SuspendData | null>(null);
@@ -43,10 +38,8 @@ export default function Login() {
 
   const validateForm = () => {
     const newErrors: Partial<UserFormData> = {};
-    if (!formData.email.includes("@"))
-      newErrors.email = "รูปแบบอีเมลไม่ถูกต้อง";
-    if (formData.password.length < 8)
-      newErrors.password = "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร";
+    if (!formData.email.includes("@")) newErrors.email = "รูปแบบอีเมลไม่ถูกต้อง";
+    if (formData.password.length < 8) newErrors.password = "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -54,6 +47,7 @@ export default function Login() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
+    
     setIsLoading(true);
     setSuspendData(null);
 
@@ -80,18 +74,15 @@ export default function Login() {
             reason: data.reason || data.message || "ละเมิดเงื่อนไขการใช้งาน",
             until: data.suspended_until || "ถาวร",
           });
-          setIsLoading(false);
           return;
         }
 
         if (status === 401) {
           toast({
             title: "เข้าสู่ระบบไม่สำเร็จ",
-            description:
-              data?.message || "อีเมลหรือรหัสผ่านไม่ถูกต้อง โปรดลองอีกครั้ง",
+            description: data?.message || "อีเมลหรือรหัสผ่านไม่ถูกต้อง โปรดลองอีกครั้ง",
             variant: "destructive",
           });
-          setIsLoading(false);
           return;
         }
       }
@@ -115,30 +106,19 @@ export default function Login() {
         <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-emerald-400/10 rounded-full blur-[130px] pointer-events-none" />
 
         <div className="w-full max-w-4xl h-auto md:h-[650px] bg-white dark:bg-zinc-900 rounded-[2.5rem] shadow-2xl border border-slate-100 dark:border-zinc-800 overflow-hidden grid md:grid-cols-2 relative z-10 animate-in fade-in duration-500">
-          {/* Left Panel: Clear Image & Promo Switch */}
+          
           <div className="relative text-white p-8 sm:p-12 flex flex-col items-center justify-center text-center overflow-hidden">
-            <img
-              src={promoImage}
-              alt="Promo"
-              className="absolute inset-0 w-full h-full object-cover"
-            />
+            <img src={promoImage} alt="Promo" className="absolute inset-0 w-full h-full object-cover" />
             <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" />
 
             <div className="relative z-10 space-y-6 max-w-sm">
               <div className="w-14 h-14 bg-white/20 rounded-2xl backdrop-blur-md flex items-center justify-center mx-auto border border-white/30 shadow-inner">
-                <img
-                  src={logo}
-                  alt="Logo"
-                  className="w-8 h-8 object-contain brightness-0 invert"
-                />
+                <img src={logo} alt="Logo" className="w-8 h-8 object-contain brightness-0 invert" />
               </div>
               <div className="space-y-2">
-                <h2 className="text-3xl font-black tracking-tight text-white drop-shadow-md">
-                  ยังไม่มีบัญชีใช่ไหม?
-                </h2>
+                <h2 className="text-3xl font-black tracking-tight text-white drop-shadow-md">ยังไม่มีบัญชีใช่ไหม?</h2>
                 <p className="text-sm text-slate-200 leading-relaxed font-medium drop-shadow">
-                  เข้าร่วมชุมชนของเราวันนี้
-                  เพื่อเริ่มต้นแลกเปลี่ยนสิ่งของได้ทันที ไม่มีค่าใช้จ่าย!
+                  เข้าร่วมชุมชนของเราวันนี้ เพื่อเริ่มต้นแลกเปลี่ยนสิ่งของได้ทันที ไม่มีค่าใช้จ่าย!
                 </p>
               </div>
               <Button
@@ -151,19 +131,14 @@ export default function Login() {
             </div>
           </div>
 
-          {/* Right Panel: Sign In Form */}
           <div className="p-8 sm:p-12 flex flex-col justify-center h-full">
             <div className="text-center mb-6">
-              <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white mb-1">
-                เข้าสู่ระบบ
-              </h1>
+              <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white mb-1">เข้าสู่ระบบ</h1>
             </div>
 
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-1">
-                <Label className="text-xs font-bold text-slate-500 ml-1">
-                  อีเมล
-                </Label>
+                <Label className="text-xs font-bold text-slate-500 ml-1">อีเมล</Label>
                 <div className="relative">
                   <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <Input
@@ -174,17 +149,11 @@ export default function Login() {
                     className="pl-11 h-12 rounded-xl bg-slate-50 dark:bg-zinc-800 border-slate-200 dark:border-zinc-700"
                   />
                 </div>
-                {errors.email && (
-                  <p className="text-[11px] text-red-500 font-bold ml-1">
-                    {errors.email}
-                  </p>
-                )}
+                {errors.email && <p className="text-[11px] text-red-500 font-bold ml-1">{errors.email}</p>}
               </div>
 
               <div className="space-y-1">
-                <Label className="text-xs font-bold text-slate-500 ml-1">
-                  รหัสผ่าน
-                </Label>
+                <Label className="text-xs font-bold text-slate-500 ml-1">รหัสผ่าน</Label>
                 <div className="relative">
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <Input
@@ -192,7 +161,6 @@ export default function Login() {
                     placeholder="••••••••"
                     value={formData.password}
                     onChange={(e) => updateField("password", e.target.value)}
-                    // เพิ่ม pr-11 เช่นเดียวกัน
                     className="pl-11 pr-11 h-12 rounded-xl bg-slate-50 dark:bg-zinc-800 border-slate-200 dark:border-zinc-700"
                   />
                   <button
@@ -200,18 +168,10 @@ export default function Login() {
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                   >
-                    {showPassword ? (
-                      <EyeOff className="w-4 h-4" />
-                    ) : (
-                      <Eye className="w-4 h-4" />
-                    )}
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-                {errors.password && (
-                  <p className="text-[11px] text-red-500 font-bold ml-1">
-                    {errors.password}
-                  </p>
-                )}
+                {errors.password && <p className="text-[11px] text-red-500 font-bold ml-1">{errors.password}</p>}
               </div>
 
               <Button
@@ -232,26 +192,16 @@ export default function Login() {
             <div className="mx-auto flex items-center justify-center h-20 w-20 rounded-full bg-red-100 dark:bg-red-900/20 mb-6">
               <AlertTriangle className="h-10 w-10 text-red-600 dark:text-red-500" />
             </div>
-            <h2 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-white mb-4">
-              บัญชีถูกระงับการใช้งาน
-            </h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-white mb-4">บัญชีถูกระงับการใช้งาน</h2>
             <div className="bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800/80 rounded-2xl p-4 text-sm text-left mb-6 space-y-3">
               <div>
-                <span className="block font-bold text-red-600 dark:text-red-400 mb-1">
-                  สาเหตุที่ถูกระงับ:
-                </span>
-                <p className="text-zinc-700 dark:text-zinc-300">
-                  {suspendData.reason}
-                </p>
+                <span className="block font-bold text-red-600 dark:text-red-400 mb-1">สาเหตุที่ถูกระงับ:</span>
+                <p className="text-zinc-700 dark:text-zinc-300">{suspendData.reason}</p>
               </div>
               <div className="h-px w-full bg-zinc-200 dark:bg-zinc-700/50" />
               <div>
-                <span className="block font-bold text-zinc-900 dark:text-white mb-1">
-                  ระงับถึงวันที่:
-                </span>
-                <p className="text-zinc-700 dark:text-zinc-300 font-medium">
-                  {suspendData.until}
-                </p>
+                <span className="block font-bold text-zinc-900 dark:text-white mb-1">ระงับถึงวันที่:</span>
+                <p className="text-zinc-700 dark:text-zinc-300 font-medium">{suspendData.until}</p>
               </div>
             </div>
             <Button

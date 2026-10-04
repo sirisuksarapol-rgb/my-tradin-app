@@ -1,13 +1,12 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Camera, MapPin, Globe, Trash2, X, Package, LayoutGrid, AlignLeft, ArrowRightLeft, Sparkles, Loader2, icons } from "lucide-react";
+import { Camera, MapPin, Globe, Trash2, X, Package, AlignLeft, ArrowRightLeft, Loader2, icons } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import AppLayout from "@/components/AppLayout";
 import { useToast } from "@/hooks/use-toast";
-import { CATEGORIES } from "@/lib/categories_data";
 import { createItem, getCategories } from "@/api/api";
 import { Button } from "@/components/ui/button";
 
@@ -72,7 +71,6 @@ export default function CreatePost() {
   const [wanted, setWanted] = useState("");
   const [location, setLocation] = useState("");
   const [mapLink, setMapLink] = useState("");
-  const categories = CATEGORIES.filter(c => c !== "ทั้งหมด");
 
   // สถานะควบคุมข้อผิดพลาด (Validation Errors) ในแต่ละฟิลด์
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -202,9 +200,6 @@ export default function CreatePost() {
                   สร้างโพสต์ใหม่
                 </h1>
               </div>
-              <p className="text-sm text-muted-foreground mt-1">
-                กรอกข้อมูลสิ่งของที่ต้องการนำมาแลกเปลี่ยน
-              </p>
             </div>
             <Button
               variant="ghost"
@@ -322,80 +317,78 @@ export default function CreatePost() {
                 </div>
 
                 {/* หมวดหมู่ */}
-<div className="space-y-2">
-  <Label
-    className={`font-semibold ${errors.category ? "text-red-500" : ""}`}
-  >
-    หมวดหมู่ <span className="text-red-500">*</span>
-  </Label>
+                <div className="space-y-2">
+                  <Label
+                    className={`font-semibold ${errors.category ? "text-red-500" : ""}`}
+                  >
+                    หมวดหมู่ <span className="text-red-500">*</span>
+                  </Label>
 
-  <Select
-    value={categoryId ? String(categoryId) : ""}
-    onValueChange={(val) => {
-      setCategoryId(Number(val));
-      const selectedCat = categoriesList.find(
-        (cat) => String(cat.CategoryID) === val
-      );
-      if (selectedCat) {
-        setCategory(selectedCat.CategoryName);
-      }
-      if (errors.category)
-        setErrors((prev) => ({ ...prev, category: "" }));
-    }}
-  >
-    <SelectTrigger
-      className={`relative pl-10 h-11 ${errors.category ? "border-red-500 ring-red-500" : ""}`}
-    >
-      {/* วางไอคอนแบบ Absolute ไว้ด้านซ้าย (เหมือนกับช่อง Input อื่นๆ) */}
-      <DynamicIcon 
-        name={
-          categoryId 
-            ? categoriesList.find(c => String(c.CategoryID) === String(categoryId))?.IconName 
-            : "LayoutGrid" // ถ้ายังไม่เลือกให้ใช้ไอคอน LayoutGrid
-        } 
-        className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${
-          errors.category ? "text-red-500" : "text-primary"
-        }`}
-      />
-      
-      {/* แสดงเฉพาะตัวหนังสือของหมวดหมู่ */}
-      <SelectValue placeholder="เลือกหมวดหมู่">
-        {categoryId && (() => {
-          const currentCat = categoriesList.find((c) => String(c.CategoryID) === String(categoryId));
-          return currentCat ? currentCat.CategoryName : "เลือกหมวดหมู่";
-        })()}
-      </SelectValue>
-    </SelectTrigger>
-    <SelectContent>
-      {categoriesList
-        .filter((c) => c.CategoryName !== "ทั้งหมด")
-        .map((cat) => {
-          const iconName = cat.IconName;
-          const iconColor = cat.Color || cat.CategoryColor || cat.color || cat.icon_color;
-          return (
-            <SelectItem
-              key={cat.CategoryID}
-              value={String(cat.CategoryID)}
-              className="hover:bg-slate-200/60 dark:hover:bg-zinc-800/60 hover:text-black dark:hover:text-black focus:bg-slate-200/60 dark:focus:bg-zinc-800/60 focus:text-black dark:focus:text-black cursor-pointer"
-            >
-              <span className="inline-flex items-center gap-2">
-                <DynamicIcon 
-                  name={iconName} 
-                  className="w-4 h-4 shrink-0" 
-                  style={{ color: iconColor || undefined }} 
-                />
-                <span>{cat.CategoryName}</span>
-              </span>
-            </SelectItem>
-          );
-        })} 
-    </SelectContent>
-  </Select>
+                  <Select
+                    value={categoryId ? String(categoryId) : ""}
+                    onValueChange={(val) => {
+                      setCategoryId(Number(val));
+                      const selectedCat = categoriesList.find(
+                        (cat) => String(cat.CategoryID) === val
+                      );
+                      if (selectedCat) {
+                        setCategory(selectedCat.CategoryName);
+                      }
+                      if (errors.category)
+                        setErrors((prev) => ({ ...prev, category: "" }));
+                    }}
+                  >
+                    <SelectTrigger
+                      className={`relative pl-10 h-11 ${errors.category ? "border-red-500 ring-red-500" : ""}`}
+                    >
+                      <DynamicIcon 
+                        name={
+                          categoryId 
+                            ? categoriesList.find(c => String(c.CategoryID) === String(categoryId))?.IconName 
+                            : "LayoutGrid"
+                        } 
+                        className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${
+                          errors.category ? "text-red-500" : "text-primary"
+                        }`}
+                      />
+                      
+                      <SelectValue placeholder="เลือกหมวดหมู่">
+                        {categoryId && (() => {
+                          const currentCat = categoriesList.find((c) => String(c.CategoryID) === String(categoryId));
+                          return currentCat ? currentCat.CategoryName : "เลือกหมวดหมู่";
+                        })()}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categoriesList
+                        .filter((c) => c.CategoryName !== "ทั้งหมด")
+                        .map((cat) => {
+                          const iconName = cat.IconName;
+                          const iconColor = cat.Color || cat.CategoryColor || cat.color || cat.icon_color;
+                          return (
+                            <SelectItem
+                              key={cat.CategoryID}
+                              value={String(cat.CategoryID)}
+                              className="hover:bg-slate-200/60 dark:hover:bg-zinc-800/60 hover:text-black dark:hover:text-black focus:bg-slate-200/60 dark:focus:bg-zinc-800/60 focus:text-black dark:focus:text-black cursor-pointer"
+                            >
+                              <span className="inline-flex items-center gap-2">
+                                <DynamicIcon 
+                                  name={iconName} 
+                                  className="w-4 h-4 shrink-0" 
+                                  style={{ color: iconColor || undefined }} 
+                                />
+                                <span>{cat.CategoryName}</span>
+                              </span>
+                            </SelectItem>
+                          );
+                        })} 
+                    </SelectContent>
+                  </Select>
 
-  {errors.category && (
-    <p className="text-xs text-red-500">{errors.category}</p>
-  )}
-</div>
+                  {errors.category && (
+                    <p className="text-xs text-red-500">{errors.category}</p>
+                  )}
+                </div>
 
                 {/* รายละเอียด */}
                 <div className="space-y-1.5">

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, memo, useRef } from "react";
-import { Link, useSearchParams, useNavigate } from "react-router-dom";
-import { Search, ArrowLeftRight, MapPin, Flame, ChevronLeft, ChevronRight, ArrowUpRight } from "lucide-react";
+import { Link, useSearchParams } from "react-router-dom";
+import { ArrowLeftRight, MapPin, ChevronLeft, ChevronRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import AppLayout from "@/components/AppLayout";
 import { getItems as fetchItemsAPI, IMAGE_BASE_URL } from "@/api/api";
@@ -42,15 +42,14 @@ const ItemCard = memo(({ post }: { post: FormattedPost }) => {
   return (
     <Link to={`/post/${post.id}`} className="block h-full outline-none group">
       <Card className="relative h-full flex flex-col overflow-hidden rounded-2xl bg-card border border-border/40 shadow-sm transition-all duration-500 ease-out hover:shadow-xl hover:border-primary/40 hover:-translate-y-1 cursor-pointer">
-        
         {/* รูปภาพ และ Floating Badge */}
         <div className="w-full aspect-[4/3] bg-muted/20 relative overflow-hidden">
-          <img 
-            src={imgSrc} 
-            alt={post.name} 
-            className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110" 
-            onError={() => { 
-              if (imgSrc !== "/placeholder.jpg") setImgSrc("/placeholder.jpg"); 
+          <img
+            src={imgSrc}
+            alt={post.name}
+            className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110"
+            onError={() => {
+              if (imgSrc !== "/placeholder.jpg") setImgSrc("/placeholder.jpg");
             }}
           />
         </div>
@@ -64,15 +63,15 @@ const ItemCard = memo(({ post }: { post: FormattedPost }) => {
             </h3>
 
             {/* ส่วน "ความต้องการ" */}
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/5 border border-primary/10 transition-colors duration-300 group-hover:bg-primary/10">
-              <div className="w-8 h-8 rounded-full bg-background flex items-center justify-center shrink-0 shadow-sm">
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-white border border-black dark:bg-zinc-900 dark:border-zinc-100">
+              <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-zinc-800 flex items-center justify-center shrink-0 shadow-sm border border-black/20">
                 <ArrowLeftRight className="w-4 h-4 text-primary" />
               </div>
               <div className="flex flex-col min-w-0">
-                <span className="text-[9px] uppercase font-bold tracking-wider text-primary/80">
+                <span className="text-[9px] uppercase font-bold tracking-wider text-slate-500 dark:text-zinc-400">
                   ต้องการแลกกับ
                 </span>
-                <p className="font-semibold text-foreground truncate text-xs sm:text-sm">
+                <p className="font-semibold text-slate-900 dark:text-white truncate text-xs sm:text-sm">
                   {post.desired}
                 </p>
               </div>
@@ -94,7 +93,6 @@ const ItemCard = memo(({ post }: { post: FormattedPost }) => {
 
 export default function Feed() {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   
   const querySearch = searchParams.get("search") || "";
   const [search, setSearch] = useState(querySearch);

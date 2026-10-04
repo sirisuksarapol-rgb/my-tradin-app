@@ -1,19 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
-import {
-  ArrowLeft,
-  MapPin,
-  ArrowRightLeft,
-  Star,
-  MessageCircle,
-  Globe,
-  FileText,
-  ChevronLeft,
-  ChevronRight,
-  ShieldAlert,
-  Flag,
-  CheckCircle,
-  Sparkles,
+import { ArrowLeft, MapPin, ArrowRightLeft, Star, MessageCircle, Globe, FileText, ChevronLeft, ChevronRight, ShieldAlert, Flag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,20 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import AppLayout from "@/components/AppLayout";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  getItems as fetchItemsAPI,
-  getUserStats,
-  IMAGE_BASE_URL,
-} from "@/api/api";
-import { createReport } from "@/api/api";
+import { getItems as fetchItemsAPI, getUserStats, IMAGE_BASE_URL, createReport } from "@/api/api";
 import ReportModal from "@/components/ReportModal";
 
 interface DBItemDetail {
@@ -286,7 +260,7 @@ export default function PostDetail() {
               : `${IMAGE_BASE_URL}/uploads/${cleanStr}`,
           );
         }
-      } catch (e) {
+      } catch {
         images.push("/placeholder.jpg");
       }
     } else {
@@ -333,7 +307,6 @@ export default function PostDetail() {
     }
   };
 
-  // ✅ 1. จัดเก็บเนื้อหาทั้งหมดไว้ในตัวแปร mainContent
   const mainContent = (
     <>
       <section className="py-8 sm:py-12">
@@ -593,7 +566,6 @@ export default function PostDetail() {
     </>
   );
 
-  // ✅ 2. ตรวจสอบว่าเปิดมาจากหน้า Admin หรือไม่ ถ้าใช่ให้ครอบด้วย <div> ธรรมดาแทน <AppLayout>
   return fromAdmin ? (
     <div className="min-h-screen bg-background overflow-y-auto w-full">
       {mainContent}
@@ -604,4 +576,3 @@ export default function PostDetail() {
     </AppLayout>
   );
 }
-

@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Camera, Save, User as UserIcon, Mail, Lock, Eye, EyeOff, CheckCircle2, AlertCircle, ShieldCheck, Upload, KeyRound, BadgeCheck, Sparkles, X } from "lucide-react";
+import { ArrowLeft, Camera, Save, User as UserIcon, Mail, Lock, Eye, EyeOff, CheckCircle2, AlertCircle, ShieldCheck, Upload, KeyRound, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import AppLayout from "@/components/AppLayout";
 import { updateUserProfile } from "@/api/api";

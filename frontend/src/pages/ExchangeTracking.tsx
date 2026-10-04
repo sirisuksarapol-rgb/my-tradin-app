@@ -156,22 +156,22 @@ const defaultReasonOptions = [
   "เหตุผลอื่นๆ",
 ];
 
+// =========================================================================
+// COMPONENT: ExchangeTracking (หน้าจอติดตามสถานะและจัดการรายการแลกเปลี่ยน)[cite: 14]
+// =========================================================================
 export default function ExchangeTracking() {
   const { matchId } = useParams<{ matchId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // ========================================================
-  // ⚙️ STATE MANAGEMENT
-  // ========================================================
   const [isLoading, setIsLoading] = useState(true);
   const [exchange, setExchange] = useState({
     matchId: matchId || "unknown",
     status: "pending",
     exchangeType: "manual",
     matchScore: 0,
-    score: null as number | null, // 👈 ใส่ as number | null เพื่อกันแดง
-    partnerScore: null as number | null, // 👈 ใส่ as number | null เพื่อกันแดง
+    score: null as number | null,
+    partnerScore: null as number | null,
     comment: "",
     partnerComment: "",
     cancelReasonDb: "",
@@ -202,14 +202,14 @@ export default function ExchangeTracking() {
 
   const [cancelReason, setCancelReason] = useState("");
   const [finalReason, setFinalReason] = useState("");
-
   const [verificationCode, setVerificationCode] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
   const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
 
-  // ========================================================
-  // 📦 HELPER FUNCTIONS
-  // ========================================================
+  /**
+   * ฟังก์ชัน: getCorrectImagePath[cite: 14]
+   * มีไว้สำหรับ: จัดรูปแบบและตรวจสอบเส้นทางรูปภาพสินค้าให้ถูกต้องพร้อมแสดงผล[cite: 14]
+   */
   const getCorrectImagePath = (imageName: string | undefined) => {
     if (!imageName || imageName.trim() === "undefined" || imageName === "null")
       return "/placeholder.jpg";
@@ -236,6 +236,10 @@ export default function ExchangeTracking() {
     }
   };
 
+  /**
+   * ฟังก์ชัน: fetchTrackingData[cite: 14]
+   * มีไว้สำหรับ: ดึงข้อมูลการติดตามสถานะการแลกเปลี่ยนจาก API และอัปเดตสถานะลงใน State[cite: 14]
+   */
   const fetchTrackingData = useCallback(async () => {
     if (!matchId) return;
     try {
@@ -263,22 +267,19 @@ export default function ExchangeTracking() {
             status: (matchData.ExchangeStatus || "pending").toLowerCase(),
             exchangeType: matchData.ExchangeType || "manual",
             matchScore: matchData.MatchScore || 0,
-            
-            // 👇 เพิ่มการเก็บชื่อ
             myAuthorName: matchData.myAuthorName || currentUser?.DisplayName || "คุณ",
             theirAuthorName: matchData.theirAuthorName || "คู่แลกเปลี่ยน",
-            
             myItem: {
               title: matchData.myPostTitle || "สิ่งของของคุณ",
               image: matchData.myPostImage || "",
               description: matchData.myPostDescription || "รายละเอียดเพิ่มเติมของสิ่งของ...",
-              location: matchData.myMeetingLocation || matchData.ExchangeLocation || "ไม่ได้ระบุสถานที่", // 👈 ดึงสถานที่ฝั่งเรา
+              location: matchData.myMeetingLocation || matchData.ExchangeLocation || "ไม่ได้ระบุสถานที่",
             },
             theirItem: {
               title: matchData.theirPostTitle || "ของที่สนใจแลก",
               image: matchData.theirPostImage || "",
               description: matchData.theirPostDescription || "รายละเอียดเพิ่มเติมของสิ่งของ...",
-              location: matchData.theirMeetingLocation || matchData.ExchangeLocation || "ไม่ได้ระบุสถานที่", // 👈 ดึงสถานที่ฝั่งคู่แลกเปลี่ยน
+              location: matchData.theirMeetingLocation || matchData.ExchangeLocation || "ไม่ได้ระบุสถานที่",
             },
             partnerPhone: isMember
               ? matchData.TargetPhoneNumber || matchData.partnerPhone || "-"
@@ -295,6 +296,7 @@ export default function ExchangeTracking() {
         }
       }
     } catch (error: unknown) {
+      console.error("Error fetching tracking data:", error);
       toast({
         title: "เกิดข้อผิดพลาด",
         description: "ไม่สามารถดึงข้อมูลสถานะได้",
@@ -309,9 +311,10 @@ export default function ExchangeTracking() {
     fetchTrackingData();
   }, [fetchTrackingData]);
 
-  // ========================================================
-  // ⚡ HANDLERS
-  // ========================================================
+  /**
+   * ฟังก์ชัน: handleVerifyCode[cite: 14]
+   * มีไว้สำหรับ: ตรวจสอบและยืนยันรหัสความปลอดภัย (OTP)[cite: 14]
+   */
   const handleVerifyCode = async () => {
     if (!matchId) return;
     if (!verificationCode || verificationCode.length < 6) {
@@ -351,6 +354,10 @@ export default function ExchangeTracking() {
     }
   };
 
+  /**
+   * ฟังก์ชัน: handleConfirmCancel[cite: 14]
+   * มีไว้สำหรับ: ยืนยันการขอยกเลิกรายการแลกเปลี่ยนพร้อมระบุสาเหตุ[cite: 14]
+   */
   const handleConfirmCancel = async () => {
     if (!cancelReason || !matchId) return;
     try {
@@ -363,6 +370,7 @@ export default function ExchangeTracking() {
         variant: "destructive",
       });
     } catch (error) {
+      console.error("Error cancelling exchange:", error);
       toast({
         title: "เกิดข้อผิดพลาด",
         description: "ไม่สามารถยกเลิกรายการได้ กรุณาลองใหม่",
@@ -371,11 +379,13 @@ export default function ExchangeTracking() {
     }
   };
 
-  // 🟢 แก้ไข: ยิง API completeExchange ไปบันทึกในฐานข้อมูลจริง
+  /**
+   * ฟังก์ชัน: handleConfirmReceive[cite: 14]
+   * มีไว้สำหรับ: ยืนยันสถานะการได้รับสินค้าเรียบร้อยแล้วผ่าน API[cite: 14]
+   */
   const handleConfirmReceive = async () => {
     if (!matchId) return;
     try {
-      // เอา score: 5 ออก
       const res = await completeExchange(matchId, {
         score: null,
         comment: null,
@@ -385,7 +395,7 @@ export default function ExchangeTracking() {
           title: "ยืนยันการรับของสำเร็จ",
           description: "ระบบบันทึกว่าคุณได้รับสินค้าเรียบร้อยแล้ว",
         });
-        fetchTrackingData(); // โหลดข้อมูลสถานะใหม่ล่าสุดทันที
+        fetchTrackingData();
       }
     } catch (error) {
       console.error("Error confirming receive:", error);
@@ -410,7 +420,6 @@ export default function ExchangeTracking() {
     );
   }
 
-  // คำนวณสถานะ
   const currentStatus = exchange.status;
   const currentIdx = stepIndex[currentStatus] ?? 0;
 
@@ -444,7 +453,7 @@ export default function ExchangeTracking() {
       : { key: "pending", label: "รอตอบรับ", icon: Clock },
     { key: "accepted", label: "ตอบรับแล้ว", icon: CheckCircle },
     { key: "in_progress", label: "ระหว่างดำเนินการ", icon: ArrowRightLeft },
-    currentStatus === "failed" || currentStatus === "auto_cancelled" // 👈 แก้ไขบรรทัดนี้
+    currentStatus === "failed" || currentStatus === "auto_cancelled"
       ? {
           key: currentStatus,
           label:
@@ -459,7 +468,6 @@ export default function ExchangeTracking() {
   return (
     <AppLayout>
       <section className="py-6 sm:py-10 max-w-5xl mx-auto px-4 space-y-6">
-        {/* Header Bar */}
         <div className="flex items-center justify-between w-full gap-3">
           <div className="flex items-center gap-3">
             <Button
@@ -477,7 +485,6 @@ export default function ExchangeTracking() {
             </div>
           </div>
 
-          {/* ส่วนขวา: ป้ายคะแนน (แสดงอยู่มุมขวา) */}
           {exchange.exchangeType === "match" && exchange.matchScore > 0 && (
             <span className="inline-flex items-center justify-center rounded-full bg-primary border border-primary/20 px-3 py-1 text-xs font-bold text-white shadow-sm shrink-0 whitespace-nowrap">
               เหมาะสม{" "}
@@ -486,22 +493,19 @@ export default function ExchangeTracking() {
           )}
         </div>
 
-        {/* 🚀 Stepper */}
         <Card className="border bg-card shadow-sm rounded-2xl">
           <CardContent className="p-6 sm:p-8">
             <h2 className="text-base font-bold text-foreground flex items-center gap-2 mb-8">
               <Clock className="h-5 w-5 text-primary" /> สถานะการดำเนินการ
             </h2>
 
-            {/* ใช้ items-start เพื่อให้ตำแหน่งของเส้นและไอคอนอยู่ด้านบนเสมอแม้ข้อความจะยาว */}
             <div className="relative flex flex-col sm:flex-row justify-between items-start w-full gap-6 sm:gap-0">
               {steps.map((step, idx) => {
                 const StepIcon = step.icon;
-                const isDone = idx <= currentIdx; // ผ่านไปแล้วหรือเป็นปัจจุบัน
+                const isDone = idx <= currentIdx;
                 const isPast = idx < currentIdx;
                 const isCurrent = idx === currentIdx;
 
-                // ดึงค่า config ตามสเต็ปนั้นๆ
                 const config =
                   statusConfig[step.key as keyof typeof statusConfig] ||
                   statusConfig.pending;
@@ -517,7 +521,6 @@ export default function ExchangeTracking() {
                         </div>
                       )}
 
-                      {/* 🟢 วงกลม Icon: ถ้าผ่านหรือปัจจุบัน จะใช้สีประจำสถานะนั้นทันที */}
                       <div
                         className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 transition-all border-2 ${
                           isDone
@@ -530,7 +533,6 @@ export default function ExchangeTracking() {
                         <StepIcon className="h-5 w-5" />
                       </div>
 
-                      {/* 🟢 ข้อความสถานะ: ถ้าผ่านหรือปัจจุบัน จะใช้ textClass ประจำสถานะนั้น */}
                       <div className="text-left sm:text-center w-full">
                         <p
                           className={`text-sm font-bold ${
@@ -568,7 +570,6 @@ export default function ExchangeTracking() {
           </CardContent>
         </Card>
 
-        {/* 🎉 สถานะ: สำเร็จแล้ว */}
         {currentStatus === "completed" && (
           <Card className="border bg-card rounded-2xl shadow-sm p-6 space-y-4">
             <div className="text-center space-y-1">
@@ -581,7 +582,6 @@ export default function ExchangeTracking() {
             </div>
 
             {(() => {
-              // ตรวจสอบคะแนนและคอมเมนต์ของฝั่งตัวเอง
               const userRating = isMember
                 ? exchange.score
                 : exchange.partnerScore;
@@ -594,7 +594,6 @@ export default function ExchangeTracking() {
                 userRating > 0;
 
               return hasReviewed ? (
-                // 🌟 กรณีรีวิวแล้ว: แสดงการ์ดสรุปรีวิวสไตล์สวยงาม
                 <Card className="border border-border/50 shadow-sm bg-background">
                   <CardContent className="p-6 space-y-6">
                     <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
@@ -631,7 +630,6 @@ export default function ExchangeTracking() {
                   </CardContent>
                 </Card>
               ) : (
-                // 🔘 กรณีที่ยังไม่ได้รีวิว: แสดงปุ่มกดไปหน้าเขียนรีวิว
                 <div className="text-center pt-2">
                   <Button
                     className="rounded-xl bg-primary px-8 h-11 font-semibold shadow-md hover:bg-primary/90"
@@ -646,7 +644,6 @@ export default function ExchangeTracking() {
           </Card>
         )}
 
-        {/* 🚫 สถานะ: ถูกปฏิเสธ (คู่สนทนากด reject) */}
         {currentStatus === "rejected" && (
           <Card className="border border-orange-300 shadow-sm bg-orange-500/10 rounded-2xl mt-6">
             <CardContent className="p-6 space-y-4">
@@ -667,7 +664,6 @@ export default function ExchangeTracking() {
           </Card>
         )}
 
-        {/* ⚠️ สถานะ: รายการถูกยกเลิก (มีคนกดยกเลิกกลางคัน หรือระบบยกเลิกอัตโนมัติ) */}
         {currentStatus === "failed" && (
           <Card className="border border-rose-300 shadow-sm bg-rose-500/10 rounded-2xl mt-6">
             <CardContent className="p-6 space-y-4">
@@ -718,7 +714,6 @@ export default function ExchangeTracking() {
           </Card>
         )}
 
-        {/* 📦 รายละเอียดข้อเสนอทั้งสองฝ่าย */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {(() => {
             const isCancelled =
@@ -726,12 +721,11 @@ export default function ExchangeTracking() {
               currentStatus === "auto_cancelled" ||
               currentStatus === "rejected";
 
-            // 🟢 สไตล์การ์ดฝั่งของคุณ
             const myCardClass = isCancelled
               ? "border-2 border-rose-300 bg-rose-50/10 shadow-sm rounded-2xl overflow-hidden flex flex-col justify-between"
               : hasReceived
                 ? "border-2 border-emerald-300 bg-emerald-50/10 shadow-sm rounded-2xl overflow-hidden flex flex-col justify-between"
-                : "border bg-card shadow-sm rounded-2xl overflow-hidden flex flex-col justify-between"; // สีเทาปกติ
+                : "border bg-card shadow-sm rounded-2xl overflow-hidden flex flex-col justify-between";
 
             const myHeaderClass = isCancelled
               ? "bg-rose-500/10 px-4 py-2.5 border-b border-rose-200 flex items-center justify-between text-rose-700 font-bold text-xs"
@@ -739,12 +733,11 @@ export default function ExchangeTracking() {
                 ? "bg-emerald-500/10 px-4 py-2.5 border-b border-emerald-200 flex items-center justify-between text-emerald-700 font-bold text-xs"
                 : "bg-muted px-4 py-2.5 border-b flex items-center justify-between text-muted-foreground font-bold text-xs";
 
-            // 🔵 สไตล์การ์ดฝั่งคู่แลกเปลี่ยน
             const theirCardClass = isCancelled
               ? "border-2 border-rose-300 bg-rose-50/10 shadow-sm rounded-2xl overflow-hidden flex flex-col justify-between"
               : partnerReceiveStatus === 1
                 ? "border-2 border-emerald-300 bg-emerald-50/10 shadow-sm rounded-2xl overflow-hidden flex flex-col justify-between"
-                : "border bg-card shadow-sm rounded-2xl overflow-hidden flex flex-col justify-between"; // สีเทาปกติ
+                : "border bg-card shadow-sm rounded-2xl overflow-hidden flex flex-col justify-between";
 
             const theirHeaderClass = isCancelled
               ? "bg-rose-500/10 px-4 py-2.5 border-b border-rose-200 flex items-center justify-between text-rose-700 font-bold text-xs"
@@ -754,7 +747,6 @@ export default function ExchangeTracking() {
 
             return (
               <>
-                {/* 🔘 การ์ดฝั่งของคุณ */}
                 <Card className={myCardClass}>
                   <div>
                     <div className={myHeaderClass}>
@@ -820,7 +812,6 @@ export default function ExchangeTracking() {
                   </div>
                 </Card>
 
-                {/* 🔘 การ์ดฝั่งคู่แลกเปลี่ยน */}
                 <Card className={theirCardClass}>
                   <div>
                     <div className={theirHeaderClass}>
@@ -890,9 +881,7 @@ export default function ExchangeTracking() {
           })()}
         </div>
 
-        {/* ⚡ ACTION CARDS (OTP / โชว์เบอร์) */}
         <div className="space-y-4">
-          {/* 🔴 บล็อกที่ 1: หน้าจอบังคับกรอก OTP */}
           {showOtpScreen && (
             <Card className="glass-card border-primary/20 bg-primary/5 rounded-2xl">
               <CardContent className="p-6 sm:p-8 space-y-4 text-center">
@@ -958,7 +947,6 @@ export default function ExchangeTracking() {
             </Card>
           )}
 
-          {/* 🟢 บล็อกที่ 2: หน้าจอโชว์เบอร์โทร */}
           {showProgressScreen && (
             <Card className="glass-card border-primary/20 bg-primary/5 shadow-sm rounded-2xl">
               <CardContent className="p-6 sm:p-8 space-y-6">
@@ -1031,11 +1019,10 @@ export default function ExchangeTracking() {
           )}
         </div>
 
-        {/* 🔴 DANGER ZONE: พบปัญหาหรือต้องการยกเลิก? */}
         {currentStatus !== "completed" &&
           currentStatus !== "failed" &&
           currentStatus !== "rejected" &&
-          currentStatus !== "auto_cancelled" && ( // 👈 เพิ่ม !== "rejected"
+          currentStatus !== "auto_cancelled" && (
             <Card className="border border-destructive/20 bg-destructive/5 rounded-2xl p-5 sm:p-6 transition-all mt-8">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="space-y-1">

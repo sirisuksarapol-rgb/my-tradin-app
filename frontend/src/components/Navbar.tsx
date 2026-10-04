@@ -75,7 +75,7 @@ export default function Navbar() {
                   <button
                     key={link.to}
                     onClick={() => handleNavClick(link.to)}
-                    className={`group relative px-4 py-2 text-sm font-semibold tracking-wide transition-colors cursor-pointer bg-transparent border-none ${isActive ? "text-black" : "text-neutral-900 hover:text-black"}`}
+                    className={`group relative px-4 py-2 text-sm font-semibold tracking-wide transition-colors cursor-pointer bg-transparent border-none ${isActive ? "text-black dark:text-white" : "text-neutral-900 dark:text-zinc-300 hover:text-black dark:hover:text-white"}`}
                   >
                     <span>{link.label}</span>
                     <span className={`absolute bottom-0 left-4 right-4 h-[3px] bg-primary rounded-full transition-all duration-300 ease-out origin-center ${isActive ? "scale-x-100 opacity-100" : "scale-x-0 opacity-0 group-hover:scale-x-100 group-hover:opacity-100"}`} />
@@ -89,7 +89,7 @@ export default function Navbar() {
             <Button 
               variant="ghost" 
               size="sm" 
-              className="font-semibold text-sm text-neutral-900 hover:text-black hover:bg-muted/50 gap-2 h-10 px-4 transition-colors" 
+              className="font-semibold text-sm text-neutral-900 dark:text-zinc-200 hover:text-black dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-800 gap-2 h-10 px-4 transition-colors" 
               asChild
             >
               <Link to="/login">
@@ -110,7 +110,7 @@ export default function Navbar() {
           </div>
 
           <button
-            className="md:hidden p-2.5 text-neutral-900 hover:bg-muted rounded-xl transition-colors"
+            className="md:hidden p-2.5 text-neutral-900 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-xl transition-colors cursor-pointer"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             aria-label="Toggle Mobile Menu"
           >
@@ -120,20 +120,20 @@ export default function Navbar() {
       </div>
 
       {isMenuOpen && (
-        <div className="md:hidden absolute top-full left-0 right-0 bg-background/98 backdrop-blur-xl border-b border-border shadow-xl p-4 animate-in fade-in-80 slide-in-from-top-2">
+        <div className="md:hidden absolute top-full left-0 right-0 bg-white dark:bg-zinc-900 border-b border-border shadow-xl p-4 animate-in fade-in-80 slide-in-from-top-2">
           <div className="flex flex-col gap-2">
             {NAV_LINKS.map((link) => (
               <button
                 key={link.to}
                 onClick={() => handleNavClick(link.to)}
-                className="px-4 py-3 rounded-xl text-sm font-semibold text-neutral-900 hover:bg-muted/50 text-left cursor-pointer bg-transparent border-none"
+                className="px-4 py-3 rounded-xl text-sm font-semibold text-neutral-900 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 text-left cursor-pointer bg-transparent border-none transition-colors"
               >
                 {link.label}
               </button>
             ))}
             <div className="h-px bg-border my-2" />
             <div className="grid grid-cols-2 gap-2 pt-1">
-              <Button variant="outline" className="w-full font-semibold text-neutral-900 h-11 rounded-xl gap-2" asChild onClick={() => setIsMenuOpen(false)}>
+              <Button variant="outline" className="w-full font-semibold text-neutral-900 dark:text-zinc-200 dark:bg-zinc-900 dark:border-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-800 h-11 rounded-xl gap-2" asChild onClick={() => setIsMenuOpen(false)}>
                 <Link to="/login">
                   <User size={16} />
                   เข้าสู่ระบบ
