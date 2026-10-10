@@ -1,6 +1,18 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, type SyntheticEvent } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { ArrowRightLeft, MapPin, Phone, ShieldCheck, Sparkles, ArrowLeft, Box, CheckCircle2, Circle, Loader2, Info, FileText,
+import {
+  ArrowRightLeft,
+  MapPin,
+  Phone,
+  ShieldCheck,
+  Sparkles,
+  ArrowLeft,
+  Box,
+  CheckCircle2,
+  Circle,
+  Loader2,
+  Info,
+  FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +20,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import AppLayout from "@/components/AppLayout";
 import { useToast } from "@/hooks/use-toast";
-import { getItems as fetchItemsAPI, IMAGE_BASE_URL, createExchangeRequest,
+import {
+  getItems as fetchItemsAPI,
+  IMAGE_BASE_URL,
+  createExchangeRequest,
 } from "@/api/api";
 
 interface RealPostItem {
@@ -30,9 +45,130 @@ interface ApiErrorResponse {
   error?: string;
 }
 
-// =========================================================================
-// COMPONENT: ExchangePreview (หน้าจอตรวจสอบและยืนยันรายละเอียดก่อนส่งคำขอแลกเปลี่ยน)
-// =========================================================================
+interface PreviewPost {
+  title: string;
+  description: string;
+  category: string;
+  image: string;
+  location: string;
+  authorName?: string;
+}
+
+function getCorrectImagePath(imageName?: string) {
+  if (!imageName || imageName.trim() === "undefined" || imageName === "null") {
+    return "/placeholder.jpg";
+  }
+
+  try {
+    let image = imageName.trim();
+
+    if (image.startsWith("[")) {
+      const parsed = JSON.parse(image.replace(/'/g, '"'));
+
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        image = parsed[0].trim();
+      }
+    } else if (image.includes(",")) {
+      image = image.split(",")[0].trim();
+    }
+
+    return image.startsWith("http")
+      ? image
+      : `${IMAGE_BASE_URL}/uploads/${image}`;
+  } catch {
+    const image =
+      imageName
+        .split("[")
+        .join("")
+        .split("]")
+        .join("")
+        .split("{")
+        .join("")
+        .split("}")
+        .join("")
+        .split('"')
+        .join("")
+        .split("'")
+        .join("")
+        .split(",")[0]
+        ?.trim() || "";
+
+    if (!image) return "/placeholder.jpg";
+
+    return image.startsWith("http")
+      ? image
+      : `${IMAGE_BASE_URL}/uploads/${image}`;
+  }
+}
+
+function handleImageError(event: SyntheticEvent<HTMLImageElement>) {
+  const image = event.currentTarget;
+
+  if (image.src !== `${window.location.origin}/placeholder.jpg`) {
+    image.src = "/placeholder.jpg";
+  }
+}
+
+function formatErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === "object" && error !== null) {
+    const err = error as ApiErrorResponse;
+    return err.message || err.error || "ไม่สามารถติดต่อระบบ API ได้ในขณะนี้";
+  }
+
+  return "ไม่สามารถติดต่อระบบ API ได้ในขณะนี้";
+}
+
+function ItemPreviewCard({
+  label,
+  category,
+  image,
+  title,
+  description,
+}: {
+  label: string;
+  category: string;
+  image: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="space-y-3 p-4 rounded-xl bg-secondary/10 border border-primary/10 flex flex-col justify-between">
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <Badge className="text-[10px] bg-primary hover:bg-primary/90 text-white font-semibold truncate max-w-[140px] border-none">
+            {label}
+          </Badge>
+          <Badge className="text-[10px] bg-primary hover:bg-primary/90 text-white border-none">
+            {category}
+          </Badge>
+        </div>
+
+        <img
+          src={image}
+          alt={title}
+          className="w-full h-48 rounded-lg object-cover border border-border mb-3 bg-background"
+          onError={handleImageError}
+        />
+
+        <h3 className="text-base font-bold text-foreground line-clamp-1">
+          {title}
+        </h3>
+
+        <div className="mt-2 text-xs text-muted-foreground space-y-1">
+          <div className="flex items-start gap-1.5">
+            <FileText className="w-3.5 h-3.5 shrink-0 mt-0.5 text-primary/70" />
+            <p className="line-clamp-3 leading-relaxed">{description}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ExchangePreview() {
   const { matchId } = useParams();
   const navigate = useNavigate();
@@ -42,28 +178,27 @@ export default function ExchangePreview() {
   const [phone, setPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
-
   const [dbItems, setDbItems] = useState<RealPostItem[]>([]);
-  const [currentUserId, setCurrentUserId] = useState<string>("");
+  const [currentUserId, setCurrentUserId] = useState("");
   const [selectedMyPostId, setSelectedMyPostId] = useState<string | number>("");
 
-  /**
-   * ฟังก์ชัน: โหลดข้อมูลรายการไอเทมทั้งหมดจากฐานข้อมูลและตรวจสอบรหัสผู้ใช้ปัจจุบันจาก sessionStorage
-   */
   useEffect(() => {
     const loadRealData = async () => {
       try {
         setLoading(true);
+
         const savedUser = sessionStorage.getItem("user");
+
         if (savedUser) {
           const user = JSON.parse(savedUser);
           const uid = user.id ?? user.user_id ?? user.UserID ?? user.MemberID;
           setCurrentUserId(String(uid));
         }
 
-        const res = await fetchItemsAPI();
-        if (res && Array.isArray(res.data)) {
-          setDbItems(res.data);
+        const response = await fetchItemsAPI();
+
+        if (response && Array.isArray(response.data)) {
+          setDbItems(response.data);
         }
       } catch (error: unknown) {
         console.error("Error fetching items for preview:", error);
@@ -71,65 +206,30 @@ export default function ExchangePreview() {
         setLoading(false);
       }
     };
+
     loadRealData();
   }, []);
 
-  /**
-   * ฟังก์ชัน: แปลงและจัดการเส้นทางไฟล์รูปภาพสินค้าให้ถูกต้องพร้อมใช้งาน
-   */
-  const getCorrectImagePath = (imageName: string | undefined) => {
-    if (!imageName || imageName.trim() === "undefined" || imageName === "null")
-      return "/placeholder.jpg";
-    try {
-      let cleanStr = imageName.trim();
-      if (cleanStr.startsWith("[")) {
-        const safeJsonStr = cleanStr.replace(/'/g, '"');
-        const parsed = JSON.parse(safeJsonStr);
-        if (Array.isArray(parsed) && parsed.length > 0)
-          cleanStr = parsed[0].trim();
-      } else if (cleanStr.includes(",")) {
-        cleanStr = cleanStr.split(",")[0].trim();
-      }
-      return cleanStr.startsWith("http")
-        ? cleanStr
-        : `${IMAGE_BASE_URL}/uploads/${cleanStr}`;
-    } catch {
-      const fallback = imageName
-        .replace(/\[\vert{}\]|"|'/g, "")
-        .split(",")[0]
-        .trim();
-      return fallback.startsWith("http")
-        ? fallback
-        : `${IMAGE_BASE_URL}/uploads/${fallback}`;
-    }
-  };
-
-  /**
-   * ฟังก์ชัน: กรองรายการสิ่งของที่เป็นของตนเองจากระบบคลังสินค้า (Inventory)[cite: 12]
-   */
   const myInventory = useMemo(() => {
     if (!currentUserId) return [];
+
     return dbItems.filter((item) => String(item.MemberID) === currentUserId);
   }, [dbItems, currentUserId]);
 
-  /**
-   * ฟังก์ชัน: แยกประเภทและดึงรหัสเป้าหมาย (targetId) กับรหัสสินค้าเริ่มต้น (preSelectedMyId) จาก URL params[cite: 12]
-   */
-  const { targetId, preSelectedMyId } = useMemo(() => {
-    if (!matchId) return { targetId: "", preSelectedMyId: "" };
-    if (matchId.startsWith("match-")) {
-      const parts = matchId.split("-");
-      return { preSelectedMyId: parts[1], targetId: parts[2] };
-    }
-    if (matchId.startsWith("post-")) {
-      return { preSelectedMyId: "", targetId: matchId.replace("post-", "") };
-    }
-    return { targetId: matchId, preSelectedMyId: "" };
-  }, [matchId]);
+  let targetId = matchId || "";
+  let preSelectedMyId = "";
 
-  /**
-   * ฟังก์ชัน: กำหนดค่าเริ่มต้นให้กับสินค้าของตนเองที่จะใช้ในการแลกเปลี่ยน[cite: 12]
-   */
+  if (matchId?.startsWith("match-")) {
+    const parts = matchId.split("-");
+    preSelectedMyId = parts[1];
+    targetId = parts[2];
+  } else if (matchId?.startsWith("post-")) {
+    targetId = matchId.replace("post-", "");
+  }
+
+  const isFromMatchResults = matchId?.startsWith("match-");
+  const isFromPostDetails = matchId?.startsWith("post-");
+
   useEffect(() => {
     if (preSelectedMyId && !selectedMyPostId) {
       setSelectedMyPostId(preSelectedMyId);
@@ -138,98 +238,75 @@ export default function ExchangePreview() {
     }
   }, [myInventory, selectedMyPostId, preSelectedMyId]);
 
-  const isFromMatchResults = matchId?.startsWith("match-");
-  const isFromPostDetails = matchId?.startsWith("post-");
+  const stateData = location.state?.matchData;
 
-  /**
-   * ฟังก์ชัน: รวบรวมข้อมูลการเปรียบเทียบระหว่างสินค้าของตนเองและสินค้าของคู่แลกเปลี่ยน[cite: 12]
-   */
-  const match = useMemo(() => {
-    const theirPost = dbItems.find(
-      (p) => String(p.ItemID) === String(targetId),
-    );
-    const mySelectedPost =
-      myInventory.find((p) => String(p.ItemID) === String(selectedMyPostId)) ||
-      myInventory[0];
+  const selectedMyItem =
+    myInventory.find(
+      (item) => String(item.ItemID) === String(selectedMyPostId),
+    ) || myInventory[0];
 
-    const theirActualName = theirPost
-      ? theirPost.DisplayName ||
-        theirPost.MemberName ||
-        theirPost.OwnerName ||
-        theirPost.Username ||
-        "ผู้ใช้งานระบบ"
-      : "ผู้ใช้งานระบบ";
+  const targetItem = dbItems.find(
+    (item) => String(item.ItemID) === String(targetId),
+  );
 
-    const stateData = location.state?.matchData;
+  let myPost: PreviewPost | null = null;
 
-    return {
-      id: matchId,
-      score: stateData?.score || null,
-
-      myPost: mySelectedPost
-        ? {
-            title: mySelectedPost.ItemName,
-            description:
-              mySelectedPost.ItemDescription || "ไม่มีรายละเอียดเพิ่มเติม",
-            category: mySelectedPost.CategoryName || "ทั่วไป",
-            image: getCorrectImagePath(mySelectedPost.ItemImage),
-            location: mySelectedPost.MeetingLocation || "นัดเจอตามตกลง",
-          }
-        : stateData?.myPost
-          ? {
-              title:
-                stateData.myPost.ItemName ||
-                stateData.myPost.title ||
-                "สิ่งของของคุณ",
-              description:
-                stateData.myPost.ItemDescription ||
-                stateData.myPost.description ||
-                "ไม่มีรายละเอียดเพิ่มเติม",
-              category: stateData.myPost.CategoryName || "ทั่วไป",
-              image: getCorrectImagePath(
-                stateData.myPost.ItemImage ||
-                  (stateData.myPost.images ? stateData.myPost.images[0] : ""),
-              ),
-              location: stateData.myPost.MeetingLocation || "นัดเจอตามตกลง",
-            }
-          : null,
-
-      theirPost: theirPost
-        ? {
-            title: theirPost.ItemName,
-            description:
-              theirPost.ItemDescription || "ไม่มีรายละเอียดเพิ่มเติม",
-            category: theirPost.CategoryName || "ทั่วไป",
-            image: getCorrectImagePath(theirPost.ItemImage),
-            location: theirPost.MeetingLocation || "นัดเจอตามตกลง",
-            authorName: theirActualName,
-          }
-        : stateData?.theirPost
-          ? {
-              title: stateData.theirPost.title || "สิ่งของคู่แลก",
-              description:
-                stateData.theirPost.description || "ไม่มีรายละเอียดเพิ่มเติม",
-              category: stateData.theirPost.category || "ทั่วไป",
-              image: getCorrectImagePath(
-                stateData.theirPost.images ? stateData.theirPost.images[0] : "",
-              ),
-              location: stateData.theirPost.location || "นัดเจอตามตกลง",
-              authorName: "ผู้ใช้งานระบบ",
-            }
-          : null,
+  if (selectedMyItem) {
+    myPost = {
+      title: selectedMyItem.ItemName,
+      description: selectedMyItem.ItemDescription || "ไม่มีรายละเอียดเพิ่มเติม",
+      category: selectedMyItem.CategoryName || "ทั่วไป",
+      image: getCorrectImagePath(selectedMyItem.ItemImage),
+      location: selectedMyItem.MeetingLocation || "นัดเจอตามตกลง",
     };
-  }, [
-    matchId,
-    selectedMyPostId,
-    dbItems,
-    myInventory,
-    location.state,
-    targetId,
-  ]);
+  } else if (stateData?.myPost) {
+    const post = stateData.myPost;
 
-  /**
-   * ฟังก์ชัน: ตรวจสอบความถูกต้องของเบอร์โทรและสินค้า แล้วส่งคำขอแลกเปลี่ยนไปยัง API ระบบ[cite: 12]
-   */
+    myPost = {
+      title: post.ItemName || post.title || "สิ่งของของคุณ",
+      description:
+        post.ItemDescription || post.description || "ไม่มีรายละเอียดเพิ่มเติม",
+      category: post.CategoryName || "ทั่วไป",
+      image: getCorrectImagePath(post.ItemImage || post.images?.[0]),
+      location: post.MeetingLocation || "นัดเจอตามตกลง",
+    };
+  }
+
+  let theirPost: PreviewPost | null = null;
+
+  if (targetItem) {
+    theirPost = {
+      title: targetItem.ItemName,
+      description: targetItem.ItemDescription || "ไม่มีรายละเอียดเพิ่มเติม",
+      category: targetItem.CategoryName || "ทั่วไป",
+      image: getCorrectImagePath(targetItem.ItemImage),
+      location: targetItem.MeetingLocation || "นัดเจอตามตกลง",
+      authorName:
+        targetItem.DisplayName ||
+        targetItem.MemberName ||
+        targetItem.OwnerName ||
+        targetItem.Username ||
+        "ผู้ใช้งานระบบ",
+    };
+  } else if (stateData?.theirPost) {
+    const post = stateData.theirPost;
+
+    theirPost = {
+      title: post.title || "สิ่งของคู่แลก",
+      description: post.description || "ไม่มีรายละเอียดเพิ่มเติม",
+      category: post.category || "ทั่วไป",
+      image: getCorrectImagePath(post.images?.[0]),
+      location: post.location || "นัดเจอตามตกลง",
+      authorName: "ผู้ใช้งานระบบ",
+    };
+  }
+
+  const match = {
+    score: stateData?.score || null,
+    myPost,
+    theirPost,
+  };
+
   const handleConfirm = async () => {
     if (!phone || phone.replace(/-/g, "").length < 10) {
       toast({
@@ -249,10 +326,7 @@ export default function ExchangePreview() {
       return;
     }
 
-    const theirPostData = dbItems.find(
-      (p) => String(p.ItemID) === String(targetId),
-    );
-    const targetMemberId = theirPostData ? theirPostData.MemberID : null;
+    const targetMemberId = targetItem?.MemberID;
 
     if (!targetMemberId) {
       toast({
@@ -273,7 +347,6 @@ export default function ExchangePreview() {
         their_item_id: String(targetId),
         location: match.myPost?.location || "นัดเจอตามตกลง",
         phone_number: phone.replace(/-/g, ""),
-
         match_score: match.score ? Number(match.score) : 0,
         exchange_type: isFromMatchResults ? "match" : "manual",
       };
@@ -293,17 +366,9 @@ export default function ExchangePreview() {
     } catch (error: unknown) {
       console.error("Error submitting exchange request:", error);
 
-      let errorMessage = "ไม่สามารถติดต่อระบบ API ได้ในขณะนี้";
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      } else if (typeof error === "object" && error !== null) {
-        const errObj = error as ApiErrorResponse;
-        errorMessage = errObj.message || errObj.error || errorMessage;
-      }
-
       toast({
         title: "เกิดข้อผิดพลาดในการบันทึก",
-        description: errorMessage,
+        description: formatErrorMessage(error),
         variant: "destructive",
       });
     } finally {
@@ -326,7 +391,6 @@ export default function ExchangePreview() {
     <AppLayout>
       <section className="py-8 sm:py-12">
         <div className="mx-auto max-w-[1000px] px-4 md:px-8 space-y-6">
-          
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
@@ -336,13 +400,12 @@ export default function ExchangePreview() {
             >
               <ArrowLeft className="h-5 w-5 text-foreground" />
             </Button>
-            <div>
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="h-6 w-6 text-primary" />
-                <h1 className="text-xl sm:text-2xl font-bold">
-                  ยืนยันการแลกเปลี่ยน
-                </h1>
-              </div>
+
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-6 w-6 text-primary" />
+              <h1 className="text-xl sm:text-2xl font-bold">
+                ยืนยันการแลกเปลี่ยน
+              </h1>
             </div>
           </div>
 
@@ -354,13 +417,12 @@ export default function ExchangePreview() {
                     <Box className="h-4 w-4 text-primary" />
                     เลือกสิ่งของของคุณที่จะนำไปแลก
                   </CardTitle>
-                  <Badge
-                    className="bg-primary hover:bg-primary/90 text-white border-none"
-                  >
+                  <Badge className="bg-primary hover:bg-primary/90 text-white border-none">
                     มี {myInventory.length} ชิ้น
                   </Badge>
                 </div>
               </CardHeader>
+
               <CardContent className="px-5 pb-5 pt-0">
                 <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
                   {myInventory.length === 0 ? (
@@ -372,33 +434,29 @@ export default function ExchangePreview() {
                     myInventory.map((post) => {
                       const isSelected =
                         String(selectedMyPostId) === String(post.ItemID);
+
                       return (
                         <div
                           key={post.ItemID}
                           onClick={() => setSelectedMyPostId(post.ItemID)}
-                          className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer select-none
-                            ${
-                              isSelected
-                                ? "border-primary bg-primary/5 shadow-sm"
-                                : "border-border bg-background hover:bg-muted/50"
-                            }`}
+                          className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer select-none ${
+                            isSelected
+                              ? "border-primary bg-primary/5 shadow-sm"
+                              : "border-border bg-background hover:bg-muted/50"
+                          }`}
                         >
                           <img
                             src={getCorrectImagePath(post.ItemImage)}
                             alt={post.ItemName}
                             className="w-14 h-14 rounded-lg object-cover shadow-sm shrink-0 bg-muted"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              if (
-                                target.src !==
-                                window.location.origin + "/placeholder.jpg"
-                              )
-                                target.src = "/placeholder.jpg";
-                            }}
+                            onError={handleImageError}
                           />
+
                           <div className="flex-1 min-w-0">
                             <p
-                              className={`text-sm font-semibold truncate ${isSelected ? "text-black" : "text-foreground"}`}
+                              className={`text-sm font-semibold truncate ${
+                                isSelected ? "text-black" : "text-foreground"
+                              }`}
                             >
                               {post.ItemName}
                             </p>
@@ -406,6 +464,7 @@ export default function ExchangePreview() {
                               {post.CategoryName || "ทั่วไป"}
                             </p>
                           </div>
+
                           <div className="shrink-0 pl-2">
                             {isSelected ? (
                               <CheckCircle2 className="w-5 h-5 text-primary fill-primary/20" />
@@ -435,47 +494,13 @@ export default function ExchangePreview() {
             <CardContent className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
                 {match.myPost ? (
-                  <div className="space-y-3 p-4 rounded-xl bg-secondary/10 border border-primary/10 flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <Badge
-                          className="text-[10px] bg-primary hover:bg-primary/90 text-white font-semibold truncate max-w-[140px] border-none"
-                        >
-                          ของคุณ
-                        </Badge>
-                        <Badge
-                          className="text-[10px] bg-primary hover:bg-primary/90 text-white border-none"
-                        >
-                          {match.myPost.category}
-                        </Badge>
-                      </div>
-                      <img
-                        src={match.myPost.image}
-                        alt={match.myPost.title}
-                        className="w-full h-48 rounded-lg object-cover border border-border mb-3 bg-background"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          if (
-                            target.src !==
-                            window.location.origin + "/placeholder.jpg"
-                          )
-                            target.src = "/placeholder.jpg";
-                        }}
-                      />
-                      <h3 className="text-base font-bold text-foreground line-clamp-1">
-                        {match.myPost.title}
-                      </h3>
-
-                      <div className="mt-2 text-xs text-muted-foreground space-y-1">
-                        <div className="flex items-start gap-1.5 ">
-                          <FileText className="w-3.5 h-3.5 shrink-0 mt-0.5 text-primary/70" />
-                          <p className="line-clamp-3 leading-relaxed">
-                            {match.myPost.description}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <ItemPreviewCard
+                    label="ของคุณ"
+                    category={match.myPost.category}
+                    image={match.myPost.image}
+                    title={match.myPost.title}
+                    description={match.myPost.description}
+                  />
                 ) : (
                   <div className="p-8 text-center text-xs text-muted-foreground bg-muted/30 rounded-xl border border-dashed border-border flex items-center justify-center">
                     กรุณาเลือกสิ่งของของคุณ
@@ -487,47 +512,13 @@ export default function ExchangePreview() {
                 </div>
 
                 {match.theirPost ? (
-                  <div className="space-y-3 p-4 rounded-xl bg-secondary/10 border border-primary/10 flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <Badge
-                          className="text-[10px] bg-primary hover:bg-primary/90 text-white font-semibold truncate max-w-[140px] border-none"
-                        >
-                          {match.theirPost.authorName}
-                        </Badge>
-                        <Badge
-                          className="text-[10px] bg-primary hover:bg-primary/90 text-white border-none"
-                        >
-                          {match.theirPost.category}
-                        </Badge>
-                      </div>
-                      <img
-                        src={match.theirPost.image}
-                        alt={match.theirPost.title}
-                        className="w-full h-48 rounded-lg object-cover border border-border mb-3 bg-background"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          if (
-                            target.src !==
-                            window.location.origin + "/placeholder.jpg"
-                          )
-                            target.src = "/placeholder.jpg";
-                        }}
-                      />
-                      <h3 className="text-base font-bold text-foreground line-clamp-1">
-                        {match.theirPost.title}
-                      </h3>
-
-                      <div className="mt-2 text-xs text-muted-foreground space-y-1">
-                        <div className="flex items-start gap-1.5">
-                          <FileText className="w-3.5 h-3.5 shrink-0 mt-0.5 text-primary/70" />
-                          <p className="line-clamp-3 leading-relaxed">
-                            {match.theirPost.description}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <ItemPreviewCard
+                    label={match.theirPost.authorName || "ผู้ใช้งานระบบ"}
+                    category={match.theirPost.category}
+                    image={match.theirPost.image}
+                    title={match.theirPost.title}
+                    description={match.theirPost.description}
+                  />
                 ) : (
                   <div className="p-8 text-center text-xs text-muted-foreground bg-muted/30 rounded-xl border border-dashed border-border flex items-center justify-center">
                     ไม่พบข้อมูลสิ่งของคู่แลกเปลี่ยน
@@ -544,6 +535,7 @@ export default function ExchangePreview() {
                 สถานที่นัดรับ
               </CardTitle>
             </CardHeader>
+
             <CardContent className="px-5 pb-5 pt-0">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="bg-secondary/10 border border-primary/10 rounded-lg p-3">
@@ -554,6 +546,7 @@ export default function ExchangePreview() {
                     {match.myPost?.location || "นัดเจอตามตกลง"}
                   </p>
                 </div>
+
                 <div className="bg-secondary/10 border border-primary/10 rounded-lg p-3">
                   <span className="text-[10px] font-bold text-primary uppercase tracking-wider block mb-1">
                     คู่แลกเปลี่ยน
@@ -573,6 +566,7 @@ export default function ExchangePreview() {
                 หมายเลขโทรศัพท์ของคุณ
               </CardTitle>
             </CardHeader>
+
             <CardContent className="px-5 pb-5 pt-0 space-y-3">
               <p className="text-xs text-muted-foreground leading-relaxed">
                 เบอร์นี้จะแสดงให้คู่แลกเห็นเมื่อยืนยันรหัสความปลอดภัย OTP
@@ -582,8 +576,8 @@ export default function ExchangePreview() {
                 type="tel"
                 placeholder="08X-XXX-XXXX"
                 value={phone}
-                onChange={(e) =>
-                  setPhone(e.target.value.replace(/[^0-9-]/g, ""))
+                onChange={(event) =>
+                  setPhone(event.target.value.replace(/[^0-9-]/g, ""))
                 }
                 maxLength={12}
                 className="h-11 text-sm font-medium focus-visible:ring-primary"
@@ -607,14 +601,14 @@ export default function ExchangePreview() {
             >
               {submitting ? (
                 <span className="flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" /> กำลังส่งคำขอ...
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  กำลังส่งคำขอ...
                 </span>
               ) : (
                 "ยืนยันส่งคำขอแลกเปลี่ยน"
               )}
             </Button>
           </div>
-          
         </div>
       </section>
     </AppLayout>

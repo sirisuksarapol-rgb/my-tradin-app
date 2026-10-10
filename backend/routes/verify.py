@@ -2,18 +2,14 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request, current_app
 from db import get_connection
 
-verify_bp = Blueprint(
-    "verify",
-    __name__,
-    url_prefix="/api/verify-email"
-)
+verify_bp = Blueprint("verify", __name__, url_prefix="/api/verify-email")
 
 
 @verify_bp.route("", methods=["POST"])
 def verify_email():
-    """ตรวจสอบและยืนยันตัวตนผู้ใช้งานด้วยรหัส OTP ผ่านทางอีเมล พร้อมเปิดใช้งานบัญชีผู้ใช้[cite: 14]"""
     conn = None
     cursor = None
+
     try:
         data = request.get_json(silent=True) or request.form
         email = data.get("email")
@@ -21,53 +17,72 @@ def verify_email():
 
         if not email or not code:
             return jsonify({
-                "success": False, 
+                "success": False,
                 "message": "ข้อมูลไม่ครบถ้วน กรุณากรอกอีเมลและรหัส OTP"
             }), 400
 
         conn = get_connection()
         cursor = conn.cursor(dictionary=True, buffered=True)
 
-        cursor.execute("""
-            SELECT MemberID, VerifyCode, VerifyExpire 
-            FROM member 
+        cursor.execute(
+            """
+            SELECT MemberID, VerifyCode, VerifyExpire
+            FROM member
             WHERE Email = %s
-            ORDER BY MemberID DESC 
-        """, (email,))
-        
+            ORDER BY MemberID DESC
+            """,
+            (email,)
+        )
         user = cursor.fetchone()
 
         if not user:
-            return jsonify({"success": False, "message": "ไม่พบอีเมลนี้ในระบบ"}), 404
+            return jsonify({
+                "success": False,
+                "message": "ไม่พบอีเมลนี้ในระบบ"
+            }), 404
 
-        db_code = str(user["VerifyCode"]).strip() if user["VerifyCode"] else ""
-        req_code = str(code).strip()
-
-        if db_code != req_code: 
-            return jsonify({"success": False, "message": "รหัส OTP ไม่ถูกต้อง"}), 400
+        if str(user["VerifyCode"] or "").strip() != str(code).strip():
+            return jsonify({
+                "success": False,
+                "message": "รหัส OTP ไม่ถูกต้อง"
+            }), 400
 
         if user["VerifyExpire"] and datetime.now() > user["VerifyExpire"]:
-            return jsonify({"success": False, "message": "รหัส OTP หมดอายุแล้ว กรุณาขอรหัสใหม่"}), 400
+            return jsonify({
+                "success": False,
+                "message": "รหัส OTP หมดอายุแล้ว กรุณาขอรหัสใหม่"
+            }), 400
 
-        cursor.execute("""
-            UPDATE member 
-            SET 
-                EmailVerified = 1, 
-                VerifyCode = NULL, 
+        cursor.execute(
+            """
+            UPDATE member
+            SET EmailVerified = 1,
+                VerifyCode = NULL,
                 VerifyExpire = NULL,
                 MemberStatus = 'Active'
             WHERE MemberID = %s
-        """, (user["MemberID"],))
-        
+            """,
+            (user["MemberID"],)
+        )
         conn.commit()
-        
-        return jsonify({"success": True, "message": "ยืนยันอีเมลสำเร็จ!"}), 200
+
+        return jsonify({
+            "success": True,
+            "message": "ยืนยันอีเมลสำเร็จ!"
+        }), 200
 
     except Exception as e:
-        if conn: conn.rollback()
+        if conn:
+            conn.rollback()
+
         current_app.logger.error(f"Database Error (Verify): {str(e)}")
-        return jsonify({"success": False, "message": "เกิดข้อผิดพลาดกับฐานข้อมูล"}), 500
-        
+        return jsonify({
+            "success": False,
+            "message": "เกิดข้อผิดพลาดกับฐานข้อมูล"
+        }), 500
+
     finally:
-        if cursor: cursor.close()
-        if conn: conn.close()
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()

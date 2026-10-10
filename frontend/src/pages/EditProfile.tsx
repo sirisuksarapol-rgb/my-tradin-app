@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Camera, Save, User as UserIcon, Mail, Lock, Eye, EyeOff, CheckCircle2, AlertCircle, ShieldCheck, Upload, KeyRound, X } from "lucide-react";
@@ -29,55 +30,42 @@ interface ApiErrorResponse {
   message?: string;
 }
 
-// =========================================================================
-// COMPONENT: EditProfile (หน้าจอสำหรับแก้ไขข้อมูลส่วนตัวและจัดการความปลอดภัยบัญชีผู้ใช้)
-// =========================================================================
 export default function EditProfile() {
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-
-  const [toast, setToast] = useState<{
-    show: boolean;
-    title: string;
-    message: string;
-    type: "success" | "error";
-  }>({
-    show: false,
-    title: "",
-    message: "",
-    type: "success",
-  });
-
-  const [fieldErrors, setFieldErrors] = useState({
-    name: "",
-    oldPassword: "",
-    newPassword: "",
-    confirmPassword: "",
-  });
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [avatarPreview, setAvatarPreview] = useState<string>("");
+  const [avatarPreview, setAvatarPreview] = useState("");
   const [formData, setFormData] = useState({ name: "", email: "" });
   const [passwords, setPasswords] = useState({
     oldPassword: "",
     newPassword: "",
     confirmPassword: "",
   });
-
   const [isOldPasswordVerified, setIsOldPasswordVerified] = useState(false);
   const [showPassword, setShowPassword] = useState({
     old: false,
     new: false,
     confirm: false,
   });
+  const [fieldErrors, setFieldErrors] = useState({
+    name: "",
+    oldPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+  const [toast, setToast] = useState({
+    show: false,
+    title: "",
+    message: "",
+    type: "success" as "success" | "error",
+  });
 
-  /**
-   * EFFECT: ตรวจสอบและดึงข้อมูลผู้ใช้งานที่เก็บไว้ใน sessionStorage เมื่อคอมโพเนนต์เริ่มทำงาน
-   * หากไม่พบข้อมูลบัญชี จะทำการนำทางผู้ใช้กลับไปยังหน้าเข้าสู่ระบบทันที
-   */
+  // โหลดข้อมูลผู้ใช้จาก sessionStorage
   useEffect(() => {
     const savedUser = sessionStorage.getItem("user");
+
     if (!savedUser) {
       navigate("/login");
       return;
@@ -91,95 +79,101 @@ export default function EditProfile() {
         ? `http://localhost:5000/uploads/${parsedUser.ProfileImage}`
         : parsedUser.avatar || "";
 
-      const mappedUser: User = { ...parsedUser, name, email, avatar };
+      const mappedUser = { ...parsedUser, name, email, avatar };
+
       setUser(mappedUser);
       setFormData({ name, email });
       setAvatarPreview(avatar);
-    } catch (e) {
-      console.error("Failed to parse stored user", e);
+    } catch (error) {
+      console.error("Failed to parse stored user:", error);
+      navigate("/login");
     }
   }, [navigate]);
 
-  /**
-   * ฟังก์ชัน: showToast
-   * มีไว้สำหรับ: แสดงข้อความแจ้งเตือนป๊อปอัพ (Notification Toast) แบบชั่วคราว พร้อมกำหนดประเภทความสำเร็จหรือข้อผิดพลาด
-   */
-  const showToast = (title: string, message: string, type: "success" | "error") => {
+  // แสดงข้อความแจ้งเตือน
+  const showToast = (
+    title: string,
+    message: string,
+    type: "success" | "error",
+  ) => {
     setToast({ show: true, title, message, type });
+
     setTimeout(() => {
       setToast((prev) => ({ ...prev, show: false }));
     }, 3500);
   };
 
-  /**
-   * ฟังก์ชัน: handleChange
-   * มีไว้สำหรับ: จัดการการเปลี่ยนแปลงค่าในฟิลด์ข้อมูลทั่วไป (เช่น ชื่อที่แสดง) และล้างข้อผิดพลาดของฟิลด์นั้น ๆ แบบเรียลไทม์
-   */
+  // ล้าง Error ของช่องที่แก้ไข
+  const clearError = (field: keyof typeof fieldErrors) => {
+    setFieldErrors((prev) => ({ ...prev, [field]: "" }));
+  };
+
+  // จัดการการกรอกข้อมูลทั่วไป
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+
     setFormData((prev) => ({ ...prev, [name]: value }));
-    if (fieldErrors[name as keyof typeof fieldErrors]) {
-      setFieldErrors((prev) => ({ ...prev, [name]: "" }));
-    }
+    clearError(name as keyof typeof fieldErrors);
   };
 
-  /**
-   * ฟังก์ชัน: handlePasswordChange
-   * มีไว้สำหรับ: จัดการการเปลี่ยนแปลงค่าในฟิลด์รหัสผ่าน และเคลียร์ข้อความแจ้งเตือนข้อผิดพลาดเมื่อผู้ใช้เริ่มพิมพ์แก้ไข
-   */
+  // จัดการการกรอกรหัสผ่าน
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+
     setPasswords((prev) => ({ ...prev, [name]: value }));
-    if (fieldErrors[name as keyof typeof fieldErrors]) {
-      setFieldErrors((prev) => ({ ...prev, [name]: "" }));
-    }
+    clearError(name as keyof typeof fieldErrors);
   };
 
-  /**
-   * ฟังก์ชัน: toggleShowPassword
-   * มีไว้สำหรับ: สลับสถานะการแสดงผลอักขระรหัสผ่าน (ซ่อน/แสดง) ในฟิลด์รหัสผ่านแต่ละช่อง
-   */
+  // แสดงหรือซ่อนรหัสผ่าน
   const toggleShowPassword = (field: keyof typeof showPassword) => {
     setShowPassword((prev) => ({ ...prev, [field]: !prev[field] }));
   };
 
-  /**
-   * ฟังก์ชัน: handleFileChange
-   * มีไว้สำหรับ: จัดการการเลือกไฟล์รูปภาพโปรไฟล์ใหม่ ตรวจสอบขนาดไม่ให้เกิน 2MB และสร้างตัวอย่างภาพพรีวิวด้วย FileReader
-   */
+  // เลือกรูปโปรไฟล์
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        showToast("ไฟล์ใหญ่เกินไป", "ขนาดรูปภาพต้องไม่เกิน 2MB", "error");
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => setAvatarPreview(reader.result as string);
-      reader.readAsDataURL(file);
-    }
-  };
+    if (!file) return;
 
-  /**
-   * ฟังก์ชัน: verifyOldPassword
-   * มีไว้สำหรับ: ตรวจสอบความถูกต้องเบื้องต้นของรหัสผ่านเดิมก่อนอนุญาตให้ผู้ใช้กรอกตั้งค่ารหัสผ่านใหม่
-   */
-  const verifyOldPassword = () => {
-    if (!passwords.oldPassword.trim()) {
-      setFieldErrors((prev) => ({ ...prev, oldPassword: "กรุณากรอกรหัสผ่านเดิม" }));
+    if (file.size > 2 * 1024 * 1024) {
+      showToast("ไฟล์ใหญ่เกินไป", "ขนาดรูปภาพต้องไม่เกิน 2MB", "error");
+      e.target.value = "";
       return;
     }
-    setFieldErrors((prev) => ({ ...prev, oldPassword: "" }));
+
+    const reader = new FileReader();
+
+    reader.onloadend = () => {
+      if (typeof reader.result === "string") {
+        setAvatarPreview(reader.result);
+      }
+    };
+
+    reader.readAsDataURL(file);
+  };
+
+  // ตรวจสอบข้อมูลรหัสผ่านเบื้องต้น
+  const verifyOldPassword = () => {
+    if (!passwords.oldPassword.trim()) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        oldPassword: "กรุณากรอกรหัสผ่านเดิม",
+      }));
+      return;
+    }
+
+    clearError("oldPassword");
     setIsOldPasswordVerified(true);
   };
 
-  /**
-   * ฟังก์ชัน: cancelPasswordChange
-   * มีไว้สำหรับ: ยกเลิกกระบวนการเปลี่ยนรหัสผ่าน รีเซ็ตฟิลด์รหัสผ่านทั้งหมด และคืนสถานะฟอร์มกลับสู่ค่าเริ่มต้น
-   */
+  // ยกเลิกการเปลี่ยนรหัสผ่าน
   const cancelPasswordChange = () => {
     setIsOldPasswordVerified(false);
-    setPasswords({ oldPassword: "", newPassword: "", confirmPassword: "" });
+    setPasswords({
+      oldPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    });
+
     setFieldErrors((prev) => ({
       ...prev,
       oldPassword: "",
@@ -188,17 +182,16 @@ export default function EditProfile() {
     }));
   };
 
-  /**
-   * ฟังก์ชัน: handleSave
-   * มีไว้สำหรับ: ตรวจสอบความถูกต้องของข้อมูลทั้งหมด (Validation) จัดเตรียม Payload ในรูปแบบ FormData 
-   * และส่งคำขออัปเดตโปรไฟล์ไปยังเซิร์ฟเวอร์ผ่าน API พร้อมจัดการผลลัพธ์และข้อผิดพลาด
-   */
+  // บันทึกข้อมูลโปรไฟล์
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
 
     if (!formData.name.trim()) {
-      setFieldErrors((prev) => ({ ...prev, name: "กรุณาระบุชื่อที่แสดง" }));
+      setFieldErrors((prev) => ({
+        ...prev,
+        name: "กรุณาระบุชื่อที่แสดง",
+      }));
       return;
     }
 
@@ -210,6 +203,7 @@ export default function EditProfile() {
         }));
         return;
       }
+
       if (passwords.newPassword !== passwords.confirmPassword) {
         setFieldErrors((prev) => ({
           ...prev,
@@ -221,47 +215,65 @@ export default function EditProfile() {
 
     try {
       setIsLoading(true);
+
       const payload = new FormData();
       payload.append("DisplayName", formData.name);
 
-      if (isOldPasswordVerified && passwords.oldPassword && passwords.newPassword) {
+      if (
+        isOldPasswordVerified &&
+        passwords.oldPassword &&
+        passwords.newPassword
+      ) {
         payload.append("OldPassword", passwords.oldPassword);
         payload.append("NewPassword", passwords.newPassword);
       }
 
-      if (fileInputRef.current?.files?.[0]) {
-        payload.append("profile_image", fileInputRef.current.files[0]);
+      const profileImage = fileInputRef.current?.files?.[0];
+
+      if (profileImage) {
+        payload.append("profile_image", profileImage);
       }
 
       const result = await updateUserProfile(user.MemberID, payload);
 
-      if (result.success) {
-        const dbUser = result.data;
-        const updatedUser: User = {
-          ...dbUser,
-          name: dbUser.DisplayName,
-          email: dbUser.Email,
-          avatar: dbUser.ProfileImage
-            ? `http://localhost:5000/uploads/${dbUser.ProfileImage}`
-            : "",
-        };
-
-        sessionStorage.setItem("user", JSON.stringify(updatedUser));
-        setUser(updatedUser);
-        showToast("บันทึกสำเร็จ", "อัปเดตข้อมูลโปรไฟล์เรียบร้อยแล้ว", "success");
-        cancelPasswordChange();
-
-        setTimeout(() => navigate("/profile"), 1200);
+      if (!result.success) {
+        showToast("เกิดข้อผิดพลาด", "ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้ง", "error");
+        return;
       }
-    } catch (error: unknown) {
+
+      const dbUser = result.data;
+
+      const updatedUser: User = {
+        ...dbUser,
+        name: dbUser.DisplayName,
+        email: dbUser.Email,
+        avatar: dbUser.ProfileImage
+          ? `http://localhost:5000/uploads/${dbUser.ProfileImage}`
+          : "",
+      };
+
+      sessionStorage.setItem("user", JSON.stringify(updatedUser));
+      setUser(updatedUser);
+      setFormData({
+        name: updatedUser.DisplayName || "",
+        email: updatedUser.Email || "",
+      });
+      setAvatarPreview(updatedUser.avatar || "");
+
+      showToast("บันทึกสำเร็จ", "อัปเดตข้อมูลโปรไฟล์เรียบร้อยแล้ว", "success");
+      cancelPasswordChange();
+
+      setTimeout(() => navigate("/profile"), 1200);
+    } catch (error) {
       console.error(error);
+
       const apiError = error as ApiErrorResponse;
-      const errorMessage =
+      const message =
         apiError.response?.data?.message ||
         apiError.message ||
         "ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้ง";
 
-      showToast("เกิดข้อผิดพลาด", errorMessage, "error");
+      showToast("เกิดข้อผิดพลาด", message, "error");
     } finally {
       setIsLoading(false);
     }
@@ -294,13 +306,14 @@ export default function EditProfile() {
             <div className="flex items-center gap-3 self-end sm:self-auto">
               <Button
                 type="button"
-                variant="ghost"
+                variant="outline"
                 onClick={() => navigate(-1)}
                 className="rounded-xl text-xs font-semibold text-foreground hover:bg-slate-200/60 dark:hover:bg-zinc-800/60 hover:text-foreground transition-all"
               >
                 ยกเลิก
               </Button>
               <Button
+                type="button"
                 onClick={handleSave}
                 disabled={isLoading}
                 className="rounded-xl px-6 h-10 text-xs font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm gap-2"
@@ -320,10 +333,7 @@ export default function EditProfile() {
             </div>
           </div>
 
-          <form
-            onSubmit={handleSave}
-            className="grid grid-cols-1 lg:grid-cols-12 gap-6"
-          >
+          <form onSubmit={handleSave} className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             <div className="lg:col-span-4 space-y-6">
               <Card className="border border-border/60 shadow-sm overflow-hidden bg-background">
                 <CardContent className="p-6 flex flex-col items-center text-center space-y-5">
@@ -332,20 +342,15 @@ export default function EditProfile() {
                     onClick={() => fileInputRef.current?.click()}
                   >
                     <Avatar className="h-32 w-32 border-4 border-background shadow-lg transition-transform duration-300 group-hover:scale-105">
-                      <AvatarImage
-                        src={avatarPreview}
-                        className="object-cover"
-                      />
+                      <AvatarImage src={avatarPreview} className="object-cover" />
                       <AvatarFallback className="bg-primary/10 text-primary text-4xl font-black">
-                        {formData.name?.charAt(0) || "U"}
+                        {formData.name.charAt(0) || "U"}
                       </AvatarFallback>
                     </Avatar>
 
                     <div className="absolute inset-0 bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white gap-1 backdrop-blur-[2px]">
                       <Camera className="h-6 w-6" />
-                      <span className="text-[10px] font-semibold">
-                        เปลี่ยนรูปภาพ
-                      </span>
+                      <span className="text-[10px] font-semibold">เปลี่ยนรูปภาพ</span>
                     </div>
 
                     <button
@@ -377,7 +382,7 @@ export default function EditProfile() {
 
                   <div className="w-full text-left bg-muted/30 p-3.5 rounded-xl space-y-1 border border-border/40">
                     <p className="text-[11px] font-bold text-foreground flex items-center gap-1">
-                      <ShieldCheck className="h-3.5 w-3.5 text-primary" />{" "}
+                      <ShieldCheck className="h-3.5 w-3.5 text-primary" />
                       คำแนะนำรูปโปรไฟล์
                     </p>
                     <p className="text-[10px] text-muted-foreground leading-relaxed">
@@ -403,8 +408,7 @@ export default function EditProfile() {
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-foreground flex items-center justify-between">
                         <span>
-                          ชื่อที่แสดงในระบบ{" "}
-                          <span className="text-destructive">*</span>
+                          ชื่อที่แสดงในระบบ <span className="text-destructive">*</span>
                         </span>
                       </label>
                       <div className="relative">
@@ -430,9 +434,7 @@ export default function EditProfile() {
 
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
-                        <label className="text-xs font-bold text-muted-foreground">
-                          อีเมลประจำบัญชี
-                        </label>
+                        <label className="text-xs font-bold text-muted-foreground">อีเมลประจำบัญชี</label>
                         <span className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full font-medium">
                           🔒 ไม่สามารถเปลี่ยนได้
                         </span>
@@ -442,8 +444,8 @@ export default function EditProfile() {
                         <Input
                           name="email"
                           value={formData.email}
-                          className="pl-10 h-11 bg-muted/40 text-muted-foreground border-border/50 cursor-not-allowed font-medium rounded-xl"
                           readOnly
+                          className="pl-10 h-11 bg-muted/40 text-muted-foreground border-border/50 cursor-not-allowed font-medium rounded-xl"
                         />
                       </div>
                     </div>
@@ -490,17 +492,12 @@ export default function EditProfile() {
                             onClick={() => toggleShowPassword("old")}
                             className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                           >
-                            {showPassword.old ? (
-                              <EyeOff className="h-4 w-4" />
-                            ) : (
-                              <Eye className="h-4 w-4" />
-                            )}
+                            {showPassword.old ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                           </button>
                         </div>
                         {fieldErrors.oldPassword && (
                           <p className="text-[11px] text-destructive font-semibold flex items-center gap-1 mt-1">
-                            <AlertCircle className="h-3 w-3" />{" "}
-                            {fieldErrors.oldPassword}
+                            <AlertCircle className="h-3 w-3" /> {fieldErrors.oldPassword}
                           </p>
                         )}
                       </div>
@@ -532,73 +529,42 @@ export default function EditProfile() {
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-bold text-foreground">
-                            รหัสผ่านใหม่
-                          </label>
-                          <div className="relative">
-                            <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input
-                              type={showPassword.new ? "text" : "password"}
-                              name="newPassword"
-                              value={passwords.newPassword}
-                              onChange={handlePasswordChange}
-                              className="pl-10 pr-10 h-11 bg-background rounded-xl border-border/80 focus-visible:border-primary"
-                              placeholder="อย่างน้อย 8 ตัวอักษร"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => toggleShowPassword("new")}
-                              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                            >
-                              {showPassword.new ? (
-                                <EyeOff className="h-4 w-4" />
-                              ) : (
-                                <Eye className="h-4 w-4" />
-                              )}
-                            </button>
-                          </div>
-                          {fieldErrors.newPassword && (
-                            <p className="text-[11px] text-destructive font-semibold flex items-center gap-1 mt-1">
-                              <AlertCircle className="h-3 w-3" />{" "}
-                              {fieldErrors.newPassword}
-                            </p>
-                          )}
-                        </div>
+                        {(["new", "confirm"] as const).map((field) => {
+                          const isNew = field === "new";
+                          const name = isNew ? "newPassword" : "confirmPassword";
+                          const label = isNew ? "รหัสผ่านใหม่" : "ยืนยันรหัสผ่านใหม่";
+                          const placeholder = isNew ? "อย่างน้อย 8 ตัวอักษร" : "กรอกรหัสผ่านใหม่อีกครั้ง";
+                          const error = isNew ? fieldErrors.newPassword : fieldErrors.confirmPassword;
 
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-bold text-foreground">
-                            ยืนยันรหัสผ่านใหม่
-                          </label>
-                          <div className="relative">
-                            <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input
-                              type={showPassword.confirm ? "text" : "password"}
-                              name="confirmPassword"
-                              value={passwords.confirmPassword}
-                              onChange={handlePasswordChange}
-                              className="pl-10 pr-10 h-11 bg-background rounded-xl border-border/80 focus-visible:border-primary"
-                              placeholder="กรอกรหัสผ่านใหม่อีกครั้ง"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => toggleShowPassword("confirm")}
-                              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                            >
-                              {showPassword.confirm ? (
-                                <EyeOff className="h-4 w-4" />
-                              ) : (
-                                <Eye className="h-4 w-4" />
+                          return (
+                            <div key={field} className="space-y-1.5">
+                              <label className="text-xs font-bold text-foreground">{label}</label>
+                              <div className="relative">
+                                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                  type={showPassword[field] ? "text" : "password"}
+                                  name={name}
+                                  value={passwords[name]}
+                                  onChange={handlePasswordChange}
+                                  className="pl-10 pr-10 h-11 bg-background rounded-xl border-border/80 focus-visible:border-primary"
+                                  placeholder={placeholder}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => toggleShowPassword(field)}
+                                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                >
+                                  {showPassword[field] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </button>
+                              </div>
+                              {error && (
+                                <p className="text-[11px] text-destructive font-semibold flex items-center gap-1 mt-1">
+                                  <AlertCircle className="h-3 w-3" /> {error}
+                                </p>
                               )}
-                            </button>
-                          </div>
-                          {fieldErrors.confirmPassword && (
-                            <p className="text-[11px] text-destructive font-semibold flex items-center gap-1 mt-1">
-                              <AlertCircle className="h-3 w-3" />{" "}
-                              {fieldErrors.confirmPassword}
-                            </p>
-                          )}
-                        </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -611,20 +577,12 @@ export default function EditProfile() {
 
       {toast.show && (
         <div className="fixed bottom-6 right-6 z-[100] flex items-center gap-3 w-80 p-4 rounded-2xl shadow-2xl border border-border/50 bg-background/90 backdrop-blur-xl animate-in slide-in-from-bottom-5 fade-in duration-300">
-          <div
-            className={`p-2 rounded-xl shrink-0 ${toast.type === "success" ? "bg-emerald-500/10 text-emerald-600" : "bg-destructive/10 text-destructive"}`}
-          >
-            {toast.type === "success" ? (
-              <CheckCircle2 className="h-5 w-5" />
-            ) : (
-              <AlertCircle className="h-5 w-5" />
-            )}
+          <div className={`p-2 rounded-xl shrink-0 ${toast.type === "success" ? "bg-emerald-500/10 text-emerald-600" : "bg-destructive/10 text-destructive"}`}>
+            {toast.type === "success" ? <CheckCircle2 className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-xs font-bold text-foreground">{toast.title}</p>
-            <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">
-              {toast.message}
-            </p>
+            <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{toast.message}</p>
           </div>
         </div>
       )}

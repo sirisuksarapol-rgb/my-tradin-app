@@ -29,7 +29,7 @@ import {
   Package,
   ArrowRightLeft,
   XCircle,
-  X
+  X,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
@@ -134,8 +134,8 @@ interface ApiReviewData {
   Rating?: number | string;
   reviewerName?: string;
   ReviewerName?: string;
-  reviewerProfileImage?: string; 
-  ReviewerProfileImage?: string; 
+  reviewerProfileImage?: string;
+  ReviewerProfileImage?: string;
   date?: string;
   ReviewDate?: string;
 }
@@ -303,7 +303,7 @@ export default function AdminDashboard() {
         FailedExchanges?: number;
         rating?: number;
         Rating?: number;
-        reviewScore?: number;  
+        reviewScore?: number;
         ReviewScore?: number;
         reviews?: ApiReviewData[];
       };
@@ -314,8 +314,12 @@ export default function AdminDashboard() {
               id: String(rev.id || rev.ExchangeID || ""),
               comment: String(rev.comment || rev.Comment || "ไม่มีความคิดเห็น"),
               rating: Number(rev.rating || rev.Rating || 0),
-              reviewerName: String(rev.reviewerName || rev.ReviewerName || "ผู้ใช้งานทั่วไป"),
-              reviewerProfileImage: String(rev.reviewerProfileImage || rev.ReviewerProfileImage || ""), 
+              reviewerName: String(
+                rev.reviewerName || rev.ReviewerName || "ผู้ใช้งานทั่วไป",
+              ),
+              reviewerProfileImage: String(
+                rev.reviewerProfileImage || rev.ReviewerProfileImage || "",
+              ),
               date: String(rev.date || rev.ReviewDate || ""),
             }),
           )
@@ -323,20 +327,18 @@ export default function AdminDashboard() {
 
       const statsData: UserStatsData = {
         successfulExchanges: Number(
-          record?.successfulExchanges ?? 
-          record?.SuccessfulExchanges ?? 0
+          record?.successfulExchanges ?? record?.SuccessfulExchanges ?? 0,
         ),
         failedExchanges: Number(
-          record?.failedExchanges ?? 
-          record?.FailedExchanges ?? 0
+          record?.failedExchanges ?? record?.FailedExchanges ?? 0,
         ),
         // ✅ เพิ่มการดึง reviewScore และ ReviewScore จากฐานข้อมูล
         rating: Number(
-          record?.rating ?? 
-          record?.Rating ?? 
-          record?.reviewScore ?? 
-          record?.ReviewScore ?? 
-          0
+          record?.rating ??
+            record?.Rating ??
+            record?.reviewScore ??
+            record?.ReviewScore ??
+            0,
         ),
         reviews: reviewsList,
       };
@@ -793,13 +795,13 @@ export default function AdminDashboard() {
           <Button
             variant="ghost"
             size="icon"
-            className="-ml-2"
+            className="-ml-2 text-foreground hover:bg-slate-200/60 hover:text-foreground dark:hover:bg-zinc-800/60"
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
           >
             {isSidebarOpen ? (
-              <ChevronLeft className="w-5 h-5" />
+              <ChevronLeft className="h-5 w-5" />
             ) : (
-              <Menu className="w-5 h-5" />
+              <Menu className="h-5 w-5" />
             )}
           </Button>
         </div>
@@ -867,123 +869,328 @@ export default function AdminDashboard() {
           <div className="max-w-6xl mx-auto space-y-6">
             {/* Dashboard View */}
             {activeMenu === "dashboard" && (
-              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                  <StatCard
-                    value={users.length}
-                    label="ผู้ใช้ทั้งหมด"
-                    icon={<Users className="w-5 h-5 text-primary" />}
-                    colorClass="bg-primary/10"
-                  />
-                  <StatCard
-                    value={posts.length}
-                    label="โพสต์ทั้งหมด"
-                    icon={<FileText className="w-5 h-5 text-primary" />}
-                    colorClass="bg-primary/10"
-                  />
-                  <StatCard
-                    value={totalIssues}
-                    label="ปัญหาที่ต้องแก้ไข"
-                    icon={<AlertTriangle className="w-5 h-5 text-warning" />}
-                    colorClass="bg-warning/10"
-                  />
-                  <StatCard
-                    value={pendingFeedbacks.length}
-                    label="ข้อเสนอแนะใหม่"
-                    icon={<MessageSquare className="w-5 h-5 text-primary" />}
-                    colorClass="bg-primary/10"
-                  />
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
+                {/* Header */}
+                <div>
+                  <h1 className="text-2xl font-bold text-foreground">
+                    ภาพรวมระบบ
+                  </h1>
                 </div>
-                <div className="bg-background relative overflow-hidden p-6 rounded-2xl border border-border/60 shadow-sm">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
-                      <ShieldAlert className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="text-base font-bold text-foreground">
-                        สถานะระบบภาพรวม
-                      </h3>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        สรุปข้อมูลผู้ใช้งานและรายงานที่รอการตรวจสอบ
-                      </p>
+
+                {/* Overview Stats */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Users */}
+                  <div className="bg-card border border-border/60 rounded-2xl p-5 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">
+                          ผู้ใช้งานทั้งหมด
+                        </p>
+
+                        <p className="text-3xl font-bold mt-2">
+                          {users.length}
+                        </p>
+
+                        <p className="text-xs text-muted-foreground mt-1">
+                          บัญชีในระบบ
+                        </p>
+                      </div>
+
+                      <div className="w-11 h-11 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                        <Users className="w-5 h-5" />
+                      </div>
                     </div>
                   </div>
 
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="flex flex-col justify-center p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <Users className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                          <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                  {/* Posts */}
+                  <div className="bg-card border border-border/60 rounded-2xl p-5 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">
+                          โพสต์ทั้งหมด
+                        </p>
+
+                        <p className="text-3xl font-bold mt-2">
+                          {posts.length}
+                        </p>
+
+                        <p className="text-xs text-muted-foreground mt-1">
+                          รายการสิ่งของ
+                        </p>
+                      </div>
+
+                      <div className="w-11 h-11 rounded-xl bg-blue-500/10 text-blue-600 flex items-center justify-center">
+                        <Package className="w-5 h-5" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Reports */}
+                  <div
+                    className={`bg-card border rounded-2xl p-5 shadow-sm ${
+                      totalIssues > 0
+                        ? "border-amber-500/30"
+                        : "border-border/60"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">
+                          รายการรอตรวจสอบ
+                        </p>
+
+                        <p
+                          className={`text-3xl font-bold mt-2 ${
+                            totalIssues > 0
+                              ? "text-amber-600"
+                              : "text-emerald-600"
+                          }`}
+                        >
+                          {totalIssues}
+                        </p>
+
+                        <p className="text-xs text-muted-foreground mt-1">
+                          รายงานจากผู้ใช้งาน
+                        </p>
+                      </div>
+
+                      <div
+                        className={`w-11 h-11 rounded-xl flex items-center justify-center ${
+                          totalIssues > 0
+                            ? "bg-amber-500/10 text-amber-600"
+                            : "bg-emerald-500/10 text-emerald-600"
+                        }`}
+                      >
+                        {totalIssues > 0 ? (
+                          <AlertTriangle className="w-5 h-5" />
+                        ) : (
+                          <CheckCircle2 className="w-5 h-5" />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Main Content */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                  {/* User Status */}
+                  <div className="lg:col-span-2 bg-card border border-border/60 rounded-2xl p-6 shadow-sm">
+                    <div className="flex items-center justify-between mb-6">
+                      <div>
+                        <h2 className="font-bold text-lg">สถานะผู้ใช้งาน</h2>
+
+                        <p className="text-sm text-muted-foreground mt-1">
+                          สถานะบัญชีผู้ใช้งานในระบบปัจจุบัน
+                        </p>
+                      </div>
+
+                      <Users className="w-5 h-5 text-muted-foreground" />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Active */}
+                      <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.06] p-5">
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="w-9 h-9 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                          </div>
+
+                          <span className="font-semibold text-sm text-emerald-700 dark:text-emerald-400">
                             บัญชีปกติ
                           </span>
                         </div>
-                        <div className="text-xl font-black text-emerald-700 dark:text-emerald-400">
-                          {users.filter((u) => !u.suspended).length}{" "}
-                          <span className="text-xs font-medium opacity-70">
-                            ราย
+
+                        <div className="flex items-end gap-2">
+                          <span className="text-3xl font-bold text-emerald-600">
+                            {users.filter((u) => !u.suspended).length}
+                          </span>
+
+                          <span className="text-xs text-muted-foreground mb-1">
+                            บัญชี
                           </span>
                         </div>
                       </div>
 
-                      <div className="flex flex-col justify-center p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20">
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <UserX className="w-4 h-4 text-rose-600 dark:text-rose-400" />
-                          <span className="text-xs font-semibold text-rose-700 dark:text-rose-400">
+                      {/* Suspended */}
+                      <div className="rounded-xl border border-rose-500/20 bg-rose-500/[0.06] p-5">
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="w-9 h-9 rounded-lg bg-rose-500/10 flex items-center justify-center">
+                            <UserX className="w-4 h-4 text-rose-600" />
+                          </div>
+
+                          <span className="font-semibold text-sm text-rose-700 dark:text-rose-400">
                             ถูกระงับ
                           </span>
                         </div>
-                        <div className="text-xl font-black text-rose-700 dark:text-rose-400">
-                          {users.filter((u) => u.suspended).length}{" "}
-                          <span className="text-xs font-medium opacity-70">
-                            ราย
+
+                        <div className="flex items-end gap-2">
+                          <span className="text-3xl font-bold text-rose-600">
+                            {users.filter((u) => u.suspended).length}
+                          </span>
+
+                          <span className="text-xs text-muted-foreground mb-1">
+                            บัญชี
                           </span>
                         </div>
                       </div>
                     </div>
 
-                    <div
-                      className={`flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border transition-colors ${totalIssues > 0 ? "bg-amber-500/10 border-amber-500/20" : "bg-muted/30 border-border/50"}`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div
-                          className={`p-2 rounded-full shrink-0 ${totalIssues > 0 ? "bg-amber-500/20 text-amber-600" : "bg-muted text-muted-foreground"}`}
-                        >
-                          {totalIssues > 0 ? (
-                            <AlertCircle className="w-4 h-4" />
-                          ) : (
-                            <CheckCircle2 className="w-4 h-4" />
-                          )}
-                        </div>
-                        <div>
-                          <p
-                            className={`text-sm font-bold ${totalIssues > 0 ? "text-amber-700 dark:text-amber-500" : "text-foreground"}`}
-                          >
-                            {totalIssues > 0
-                              ? "มีรายการรอตรวจสอบ"
-                              : "ไม่มีรายงานปัญหาใหม่"}
-                          </p>
-                          <p
-                            className={`text-xs mt-0.5 ${totalIssues > 0 ? "text-amber-600/80 dark:text-amber-400/80" : "text-muted-foreground"}`}
-                          >
-                            {totalIssues > 0
-                              ? "พบพฤติกรรมหรือโพสต์ที่ต้องตรวจสอบในเมนูรายงาน"
-                              : "ระบบทำงานปกติ ไม่มีรายงานที่ต้องดำเนินการ"}
-                          </p>
-                        </div>
+                    {/* Active Percentage */}
+                    <div className="mt-6">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-medium text-muted-foreground">
+                          อัตราบัญชีที่ใช้งานได้
+                        </span>
+
+                        <span className="text-xs font-bold">
+                          {users.length > 0
+                            ? Math.round(
+                                (users.filter((u) => !u.suspended).length /
+                                  users.length) *
+                                  100,
+                              )
+                            : 0}
+                          %
+                        </span>
                       </div>
 
-                      <div className="mt-3 sm:mt-0 ml-11 sm:ml-0 flex items-end gap-1.5 shrink-0">
-                        <span
-                          className={`text-2xl font-black leading-none ${totalIssues > 0 ? "text-amber-600 dark:text-amber-500" : "text-muted-foreground"}`}
-                        >
-                          {totalIssues}
-                        </span>
-                        <span className="text-xs font-medium text-muted-foreground mb-0.5">
-                          รายการ
-                        </span>
+                      <div className="h-2 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                          style={{
+                            width: `${
+                              users.length > 0
+                                ? (users.filter((u) => !u.suspended).length /
+                                    users.length) *
+                                  100
+                                : 0
+                            }%`,
+                          }}
+                        />
                       </div>
                     </div>
+                  </div>
+
+                  {/* Action Required */}
+                  <div className="bg-card border border-border/60 rounded-2xl p-6 shadow-sm">
+                    <div className="flex items-center gap-3 mb-6">
+                      <div
+                        className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                          totalIssues > 0
+                            ? "bg-amber-500/10 text-amber-600"
+                            : "bg-emerald-500/10 text-emerald-600"
+                        }`}
+                      >
+                        {totalIssues > 0 ? (
+                          <ShieldAlert className="w-5 h-5" />
+                        ) : (
+                          <CheckCircle2 className="w-5 h-5" />
+                        )}
+                      </div>
+
+                      <div>
+                        <h2 className="font-bold">สิ่งที่ต้องดำเนินการ</h2>
+
+                        <p className="text-xs text-muted-foreground mt-1">
+                          รายการที่ต้องตรวจสอบ
+                        </p>
+                      </div>
+                    </div>
+
+                    {totalIssues > 0 ? (
+                      <div className="space-y-4">
+                        {/* User Reports */}
+                        <div className="flex items-center justify-between p-4 rounded-xl bg-amber-500/[0.06] border border-amber-500/20">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                              <UserX className="w-4 h-4 text-amber-600" />
+                            </div>
+
+                            <div>
+                              <p className="text-sm font-semibold">
+                                รายงานผู้ใช้งาน
+                              </p>
+
+                              <p className="text-xs text-muted-foreground">
+                                รอตรวจสอบ
+                              </p>
+                            </div>
+                          </div>
+
+                          <span className="text-xl font-bold text-amber-600">
+                            {pendingUserReports.length}
+                          </span>
+                        </div>
+
+                        {/* Post Reports */}
+                        <div className="flex items-center justify-between p-4 rounded-xl bg-amber-500/[0.06] border border-amber-500/20">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                              <FileText className="w-4 h-4 text-amber-600" />
+                            </div>
+
+                            <div>
+                              <p className="text-sm font-semibold">
+                                รายงานโพสต์
+                              </p>
+
+                              <p className="text-xs text-muted-foreground">
+                                รอตรวจสอบ
+                              </p>
+                            </div>
+                          </div>
+
+                          <span className="text-xl font-bold text-amber-600">
+                            {pendingReports.length}
+                          </span>
+                        </div>
+
+                        {/* Feedback */}
+                        <div className="flex items-center justify-between p-4 rounded-xl bg-muted/40 border border-border/50">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                              <MessageSquare className="w-4 h-4" />
+                            </div>
+
+                            <div>
+                              <p className="text-sm font-semibold">
+                                ข้อเสนอแนะ
+                              </p>
+
+                              <p className="text-xs text-muted-foreground">
+                                รอดำเนินการ
+                              </p>
+                            </div>
+                          </div>
+
+                          <span className="text-xl font-bold">
+                            {pendingFeedbacks.length}
+                          </span>
+                        </div>
+
+                        <Button
+                          onClick={() => setActiveMenu("reports")}
+                          className="w-full rounded-xl"
+                        >
+                          ไปยังหน้ารายงาน
+                          <ArrowRightLeft className="w-4 h-4 ml-2" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="h-[260px] flex flex-col items-center justify-center text-center">
+                        <div className="w-14 h-14 rounded-full bg-emerald-500/10 flex items-center justify-center mb-4">
+                          <CheckCircle2 className="w-7 h-7 text-emerald-600" />
+                        </div>
+
+                        <h3 className="font-bold">
+                          ไม่มีรายการที่ต้องดำเนินการ
+                        </h3>
+
+                        <p className="text-xs text-muted-foreground mt-2 max-w-[220px]">
+                          ขณะนี้ไม่มีรายงานหรือปัญหาที่รอการตรวจสอบ
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1105,10 +1312,7 @@ export default function AdminDashboard() {
                                   </span>
                                 </div>
                               ) : (
-                                <Badge
-                                  variant="secondary"
-                                  className="bg-primary/10 text-primary border-0"
-                                >
+                                <Badge className="bg-primary/10 text-primary hover:bg-primary/10">
                                   ปกติ
                                 </Badge>
                               )}
@@ -1440,7 +1644,7 @@ export default function AdminDashboard() {
                                 }}
                                 className="h-8 text-xs bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground"
                               >
-                                รับทราบ / ดำเนินการ
+                                แจ้งผลดำเนินการ
                               </Button>
                             )}
                           </div>
@@ -1471,15 +1675,22 @@ export default function AdminDashboard() {
           !open && setManageModal((prev) => ({ ...prev, isOpen: false }))
         }
       >
-        <DialogContent className="sm:max-w-[600px] rounded-3xl p-0 overflow-hidden border-border/80 max-h-[90vh] flex flex-col">
-          <div className="bg-primary/10 p-6 flex items-center gap-4 border-b border-primary/10">
+        {/* 1. เพิ่ม bg-white dark:bg-zinc-950 ตรงนี้เพื่อให้พื้นหลังเป็นสีเดียวกันทั้งหมด */}
+        <DialogContent className="sm:max-w-[600px] rounded-3xl p-0 overflow-hidden border-border/80 max-h-[90vh] flex flex-col bg-white dark:bg-zinc-950">
+          {/* 2. เอา border-b border-primary/10 ออกจาก div นี้ เพื่อลบเส้นคั่น */}
+          <div className="p-6 flex items-center gap-4">
             {/* ทำให้รูปภาพและชื่อกดเพื่อไปยังหน้า Profile ได้ */}
-            <div 
+            <div
               className="cursor-pointer hover:opacity-80 transition-opacity shrink-0"
               onClick={() => {
                 setManageModal((prev) => ({ ...prev, isOpen: false }));
                 navigate(`/user/${manageModal.userId}`, {
-                  state: { fromAdmin: true, authorName: manageModal.userName, authorEmail: manageModal.userEmail, rawProfileImg: manageModal.profileImage }
+                  state: {
+                    fromAdmin: true,
+                    authorName: manageModal.userName,
+                    authorEmail: manageModal.userEmail,
+                    rawProfileImg: manageModal.profileImage,
+                  },
                 });
               }}
             >
@@ -1502,15 +1713,20 @@ export default function AdminDashboard() {
                 </div>
               )}
             </div>
-            
+
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <DialogTitle 
+                <DialogTitle
                   className="text-lg font-bold text-foreground truncate cursor-pointer hover:text-primary transition-colors"
                   onClick={() => {
                     setManageModal((prev) => ({ ...prev, isOpen: false }));
                     navigate(`/user/${manageModal.userId}`, {
-                      state: { fromAdmin: true, authorName: manageModal.userName, authorEmail: manageModal.userEmail, rawProfileImg: manageModal.profileImage }
+                      state: {
+                        fromAdmin: true,
+                        authorName: manageModal.userName,
+                        authorEmail: manageModal.userEmail,
+                        rawProfileImg: manageModal.profileImage,
+                      },
                     });
                   }}
                   title="คลิกเพื่อดูโปรไฟล์"
@@ -1524,7 +1740,7 @@ export default function AdminDashboard() {
                 ) : (
                   <Badge
                     variant="secondary"
-                    className="bg-emerald-500/10 text-emerald-600 border-0 text-[10px]"
+                    className="bg-primary/10 text-primary hover:bg-primary/10"
                   >
                     ปกติ
                   </Badge>
@@ -1535,9 +1751,8 @@ export default function AdminDashboard() {
               </DialogDescription>
             </div>
           </div>
-    
 
-          <div className="p-6 overflow-y-auto space-y-6 flex-1">
+          <div className="p-6 pt-0 overflow-y-auto space-y-6 flex-1">
             {manageModal.isLoadingStats ? (
               <div className="flex flex-col items-center justify-center py-12 space-y-3">
                 <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin"></div>
@@ -1635,7 +1850,6 @@ export default function AdminDashboard() {
                           <CardContent className="p-4 space-y-3">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
-                                {/* ✅ เพิ่มการแสดงรูปภาพคนรีวิว */}
                                 <div className="h-8 w-8 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-semibold overflow-hidden shrink-0">
                                   {rev.reviewerProfileImage &&
                                   rev.reviewerProfileImage.trim() !== "" &&
@@ -1643,21 +1857,22 @@ export default function AdminDashboard() {
                                   rev.reviewerProfileImage !== "undefined" ? (
                                     <img
                                       src={
-                                        rev.reviewerProfileImage.trim().startsWith("http")
+                                        rev.reviewerProfileImage
+                                          .trim()
+                                          .startsWith("http")
                                           ? rev.reviewerProfileImage.trim()
                                           : `${IMAGE_BASE_URL}/uploads/${rev.reviewerProfileImage.trim()}`
                                       }
                                       alt={rev.reviewerName}
                                       className="w-full h-full object-cover"
                                     />
+                                  ) : rev.reviewerName ? (
+                                    rev.reviewerName.charAt(0).toUpperCase()
                                   ) : (
-                                    rev.reviewerName
-                                      ? rev.reviewerName.charAt(0).toUpperCase()
-                                      : "U"
+                                    "U"
                                   )}
                                 </div>
                                 <div>
-                                  {/* ✅ คืนค่าเป็น Text ปกติ ไม่สามารถกดได้ (ไม่มี cursor-pointer หรือ hover:text-primary) */}
                                   <p className="text-sm font-medium text-foreground">
                                     {rev.reviewerName || "ผู้ใช้งานทั่วไป"}
                                   </p>
@@ -1736,43 +1951,91 @@ export default function AdminDashboard() {
           setResolveModal({ isOpen: false, reportId: "", category: "" })
         }
       >
-        <DialogContent className="sm:max-w-[420px] rounded-3xl p-0 overflow-hidden border-border/80">
-          <div className="bg-primary/10 p-6 flex flex-col items-center text-center border-b border-primary/10">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white dark:bg-zinc-900 text-primary shadow-sm mb-3">
-              <CheckCircle className="h-6 w-6" />
-            </div>
-            <DialogTitle className="text-lg font-bold text-primary">
-              ดำเนินการ / ปิดเคส
-            </DialogTitle>
-            <DialogDescription className="text-xs text-muted-foreground mt-1">
-              ข้อความนี้จะถูกส่งแจ้งเตือนไปยังผู้รายงาน
-              เพื่อแจ้งให้ทราบว่าระบบได้ดำเนินการแก้ไขอย่างไร
-            </DialogDescription>
-          </div>
+        {(() => {
+          // กำหนดค่า Default
+          let title = "ดำเนินการ / ปิดเคส";
+          let desc =
+            "ข้อความนี้จะถูกส่งแจ้งเตือนไปยังผู้รายงาน เพื่อแจ้งให้ทราบว่าระบบได้ดำเนินการอย่างไร";
+          let Icon = CheckCircle;
+          let colorTheme = "text-primary";
+          let bgTheme = "bg-primary/10";
+          let borderTheme = "border-primary/20";
+          let btnText = "ยืนยันการดำเนินการ";
+          let btnClass = "";
+          let ringTheme = "focus:ring-primary";
 
-          <div className="p-6 space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-foreground">
-                รายละเอียดการดำเนินการ (ไม่บังคับ)
-              </label>
-              <textarea
-                className="flex min-h-[80px] w-full rounded-xl border border-input bg-muted/30 p-3 text-xs focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-                placeholder="เช่น ได้ทำการแก้ไขบั๊กตามที่แจ้งแล้ว ขอบคุณครับ..."
-                value={resolveMessage}
-                onChange={(e) => setResolveMessage(e.target.value)}
-              />
-            </div>
+          // 1. หมวดหมู่: รายงานโพสต์ (ยืนยันตรวจสอบ)
+          if (resolveModal.category === "post") {
+            title = "ปิดเคสรายงานโพสต์";
+            desc =
+              "ระบบจะแจ้งให้ผู้รายงานทราบว่าคุณได้ตรวจสอบโพสต์นี้เรียบร้อยแล้ว";
+            Icon = CheckCircle;
+          }
+          // 2. หมวดหมู่: รายงานผู้ใช้งาน (กดข้าม / ไม่แบน)
+          else if (resolveModal.category === "user") {
+            title = "ปิดเคสรายงานผู้ใช้";
+            desc =
+              "ระบบจะบันทึกว่าเคสนี้ตรวจสอบแล้วโดยไม่มีการลงโทษบัญชีผู้ใช้";
+            Icon = UserX;
+            colorTheme = "text-muted-foreground"; // เปลี่ยนเป็นสีเทาให้ดูซอฟต์ลง
+            bgTheme = "bg-muted/30";
+            borderTheme = "border-border/50";
+            btnText = "ยืนยันปิดเคส";
+            btnClass =
+              "bg-zinc-800 hover:bg-zinc-900 text-white dark:bg-zinc-200 dark:hover:bg-zinc-300 dark:text-black";
+            ringTheme = "focus:ring-muted-foreground";
+          }
+          // 3. หมวดหมู่: ข้อเสนอแนะ / แจ้งบั๊ก
+          else if (resolveModal.category === "feedback") {
+            title = "แจ้งผลดำเนินการ";
+            desc =
+              "ระบบจะบันทึกว่าได้รับทราบและดำเนินการแก้ไขปัญหาตามที่ผู้ใช้แจ้งแล้ว";
+            Icon = MessageSquare;
+            btnText = "ยืนยันการรับทราบ";
+          }
 
-            <div className="flex gap-2 pt-2">
-              <Button
-                className="flex-1 rounded-xl h-10 text-xs font-bold shadow-md"
-                onClick={executeResolve}
-              >
-                ยืนยันการดำเนินการ
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
+          return (
+            <DialogContent className="sm:max-w-[420px] rounded-3xl p-0 overflow-hidden border-border/80 bg-white dark:bg-zinc-950">
+              <div className="p-6 pb-2 flex flex-col items-center text-center">
+                <div
+                  className={`flex h-12 w-12 items-center justify-center rounded-2xl ${bgTheme} ${colorTheme} shadow-sm mb-3 border ${borderTheme}`}
+                >
+                  <Icon className="h-6 w-6" />
+                </div>
+
+                <DialogTitle className={`text-lg font-bold ${colorTheme}`}>
+                  {title}
+                </DialogTitle>
+                <DialogDescription className="text-xs text-muted-foreground mt-1">
+                  {desc}
+                </DialogDescription>
+              </div>
+
+              <div className="p-6 pt-2 space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-foreground">
+                    รายละเอียดการดำเนินการ (ไม่บังคับ)
+                  </label>
+                  <textarea
+                    className={`flex min-h-[80px] w-full rounded-xl border border-input bg-muted/30 p-3 text-xs focus:outline-none focus:ring-2 ${ringTheme} resize-none`}
+                    placeholder="ระบุข้อความเพื่อส่งแจ้งเตือนไปยังผู้รายงาน..."
+                    value={resolveMessage}
+                    onChange={(e) => setResolveMessage(e.target.value)}
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <Button
+                    className={`flex-1 rounded-xl h-10 text-xs font-bold shadow-md ${btnClass}`}
+                    onClick={executeResolve}
+                  >
+                    {btnText}
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          );
+        })()}
       </Dialog>
 
       {/* 3. LOGOUT CONFIRM MODAL */}
@@ -1824,9 +2087,11 @@ export default function AdminDashboard() {
           !open && setSuspendModal((prev) => ({ ...prev, isOpen: false }))
         }
       >
-        <DialogContent className="sm:max-w-[450px] rounded-3xl p-0 overflow-hidden border-border/80">
-          <div className="bg-destructive/10 p-6 flex flex-col items-center text-center border-b border-destructive/10">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white dark:bg-zinc-900 text-destructive shadow-sm mb-3">
+        {/* เพิ่ม bg-white dark:bg-zinc-950 เพื่อบังคับพื้นหลังให้เป็นสีเดียวกันหมด */}
+        <DialogContent className="sm:max-w-[450px] rounded-3xl p-0 overflow-hidden border-border/80 bg-white dark:bg-zinc-950">
+          {/* เอา border-b border-destructive/10 ออกจาก div นี้ */}
+          <div className="p-6 pb-2 flex flex-col items-center text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-muted/30 text-destructive shadow-sm mb-3 border border-border/50">
               <Ban className="h-6 w-6" />
             </div>
             <DialogTitle className="text-lg font-bold text-destructive">
@@ -1840,7 +2105,7 @@ export default function AdminDashboard() {
             </DialogDescription>
           </div>
 
-          <div className="p-6 space-y-4">
+          <div className="p-6 pt-2 space-y-4">
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-foreground">
                 ประเภทการระงับ
@@ -1882,9 +2147,9 @@ export default function AdminDashboard() {
                 </label>
                 <Input
                   type="date"
-                  className="rounded-xl bg-muted/30 text-xs"
+                  className="w-fit rounded-xl bg-muted/30 text-xs pr-2"
                   value={suspendForm.untilDate}
-                  min={new Date().toISOString().split("T")[0]} // ป้องกันไม่ให้เลือกวันที่ย้อนหลัง
+                  min={new Date().toISOString().split("T")[0]}
                   onChange={(e) =>
                     setSuspendForm((prev) => ({
                       ...prev,
@@ -1964,7 +2229,8 @@ export default function AdminDashboard() {
         }
       >
         <DialogContent className="sm:max-w-[420px] rounded-3xl p-0 overflow-hidden border-border/80">
-          <div className="bg-destructive/10 p-6 flex flex-col items-center text-center border-b border-destructive/10">
+          {/* ลบ border-b border-destructive/10 ออกจากตรงนี้ */}
+          <div className="p-6 flex flex-col items-center text-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white dark:bg-zinc-900 text-destructive shadow-sm mb-3">
               <Trash2 className="h-6 w-6" />
             </div>

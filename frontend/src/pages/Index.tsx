@@ -1,17 +1,9 @@
+
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  ArrowRight,
-  Users,
-  Recycle,
-  ChevronLeft,
-  ChevronRight,
-  Layers,
-  ShieldCheck,
-  Search,
-} from "lucide-react";
+import { ArrowRight, Users, Recycle, ChevronLeft, ChevronRight, Layers, ShieldCheck, Search } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Highlighter } from "@/components/highlighter";
@@ -30,6 +22,8 @@ interface DBCategory {
   IconName: string;
   ItemCount?: number;
 }
+
+const ITEMS_PER_CATEGORY_PAGE = 8;
 
 const CAROUSEL_SLIDES = [
   {
@@ -117,29 +111,46 @@ const CATEGORY_STYLES = [
 
 export default function Index() {
   const location = useLocation();
-  const [categoriesList, setCategoriesList] = useState<DBCategory[]>([]);
-  const [isLoadingCategories, setIsLoadingCategories] = useState<boolean>(true);
-  const [currentSlide, setCurrentSlide] = useState<number>(0);
-  const [categoryPage, setCategoryPage] = useState<number>(0);
-  const itemsPerPage = 8;
 
+  const [categoriesList, setCategoriesList] = useState<DBCategory[]>([]);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [categoryPage, setCategoryPage] = useState(0);
+
+  const totalCategoryPages = Math.ceil(
+    categoriesList.length / ITEMS_PER_CATEGORY_PAGE,
+  );
+
+  const currentCategories = categoriesList.slice(
+    categoryPage * ITEMS_PER_CATEGORY_PAGE,
+    (categoryPage + 1) * ITEMS_PER_CATEGORY_PAGE,
+  );
+
+  // เลื่อนหน้าเมื่อเปิดหน้าแรกหรือเปลี่ยน URL
   useEffect(() => {
-    if (location.hash) {
-      const element = document.querySelector(location.hash);
-      if (element) {
-        setTimeout(() => {
-          element.scrollIntoView({ behavior: "smooth" });
-        }, 150);
-      }
-    } else {
+    if (!location.hash) {
       window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
     }
 
+    const element = document.querySelector(location.hash);
+
+    if (!element) return;
+
+    const timer = window.setTimeout(() => {
+      element.scrollIntoView({ behavior: "smooth" });
+    }, 150);
+
+    return () => window.clearTimeout(timer);
+  }, [location]);
+
+  // โหลดหมวดหมู่จาก API เมื่อเปิดหน้า
+  useEffect(() => {
     const fetchCategories = async () => {
       try {
-        setIsLoadingCategories(true);
         const response = await getCategories();
-        if (response?.data) {
+
+        if (Array.isArray(response?.data)) {
           setCategoriesList(response.data);
         }
       } catch (error) {
@@ -150,13 +161,15 @@ export default function Index() {
     };
 
     fetchCategories();
-  }, [location]);
+  }, []);
 
+  // เปลี่ยนสไลด์อัตโนมัติทุก 6 วินาที
   useEffect(() => {
-    const timer = setInterval(() => {
+    const timer = window.setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % CAROUSEL_SLIDES.length);
     }, 6000);
-    return () => clearInterval(timer);
+
+    return () => window.clearInterval(timer);
   }, []);
 
   const nextSlide = () => {
@@ -169,20 +182,11 @@ export default function Index() {
     );
   };
 
-  const totalCategoryPages = Math.ceil(categoriesList.length / itemsPerPage);
-  const currentCategories = categoriesList.slice(
-    categoryPage * itemsPerPage,
-    (categoryPage + 1) * itemsPerPage,
-  );
+  const changeCategoryPage = (direction: number) => {
+    if (totalCategoryPages <= 1) return;
 
-  const nextCategoryPage = () => {
-    setCategoryPage((prev) => (prev + 1) % (totalCategoryPages || 1));
-  };
-
-  const prevCategoryPage = () => {
     setCategoryPage(
-      (prev) =>
-        (prev - 1 + (totalCategoryPages || 1)) % (totalCategoryPages || 1),
+      (prev) => (prev + direction + totalCategoryPages) % totalCategoryPages,
     );
   };
 
@@ -191,7 +195,6 @@ export default function Index() {
       <Navbar />
 
       <main className="flex-1">
-        {/* HERO SECTION WITH CAROUSEL & CAPTIONS */}
         <section
           id="hero"
           className="relative w-full pt-28 pb-12 flex flex-col items-center justify-center overflow-hidden px-4 sm:px-6 bg-gradient-to-b from-muted/30 to-background"
@@ -204,6 +207,7 @@ export default function Index() {
 
               let styleClass =
                 "opacity-0 scale-75 pointer-events-none z-0 translate-x-full";
+
               if (diff === 0) {
                 styleClass =
                   "opacity-100 scale-100 z-30 translate-x-0 shadow-2xl pointer-events-auto";
@@ -239,8 +243,9 @@ export default function Index() {
             })}
 
             <button
-              onClick={(e) => {
-                e.stopPropagation();
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
                 prevSlide();
               }}
               className="absolute left-4 top-1/2 -translate-y-1/2 z-40 w-12 h-12 rounded-full bg-black/50 hover:bg-black/80 text-white flex items-center justify-center backdrop-blur-md shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-300 hover:scale-110"
@@ -248,9 +253,11 @@ export default function Index() {
             >
               <ChevronLeft className="w-6 h-6" />
             </button>
+
             <button
-              onClick={(e) => {
-                e.stopPropagation();
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
                 nextSlide();
               }}
               className="absolute right-4 top-1/2 -translate-y-1/2 z-40 w-12 h-12 rounded-full bg-black/50 hover:bg-black/80 text-white flex items-center justify-center backdrop-blur-md shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-300 hover:scale-110"
@@ -261,9 +268,10 @@ export default function Index() {
           </div>
 
           <div className="flex items-center gap-2 mt-4 z-30">
-            {CAROUSEL_SLIDES.map((_, index) => (
+            {CAROUSEL_SLIDES.map((slide, index) => (
               <button
-                key={index}
+                type="button"
+                key={slide.title}
                 onClick={() => setCurrentSlide(index)}
                 className={`h-2 rounded-full transition-all duration-300 ${
                   index === currentSlide
@@ -271,6 +279,7 @@ export default function Index() {
                     : "w-2 bg-muted-foreground/30 hover:bg-muted-foreground/60"
                 }`}
                 aria-label={`Go to slide ${index + 1}`}
+                aria-current={index === currentSlide ? "true" : undefined}
               />
             ))}
           </div>
@@ -302,7 +311,6 @@ export default function Index() {
           </div>
         </section>
 
-        {/* CATEGORIES SECTION */}
         <section
           id="categories"
           className="py-12 sm:py-16 bg-muted/20 border-y border-border/50"
@@ -324,17 +332,21 @@ export default function Index() {
               {totalCategoryPages > 1 && (
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={prevCategoryPage}
+                    type="button"
+                    onClick={() => changeCategoryPage(-1)}
                     className="w-10 h-10 rounded-full bg-card border border-border hover:border-primary text-foreground flex items-center justify-center shadow-sm transition-all hover:scale-105"
                     aria-label="Previous Category Page"
                   >
                     <ChevronLeft className="w-5 h-5" />
                   </button>
+
                   <span className="text-sm font-semibold px-2 text-muted-foreground">
                     {categoryPage + 1} / {totalCategoryPages}
                   </span>
+
                   <button
-                    onClick={nextCategoryPage}
+                    type="button"
+                    onClick={() => changeCategoryPage(1)}
                     className="w-10 h-10 rounded-full bg-card border border-border hover:border-primary text-foreground flex items-center justify-center shadow-sm transition-all hover:scale-105"
                     aria-label="Next Category Page"
                   >
@@ -346,9 +358,9 @@ export default function Index() {
 
             {isLoadingCategories ? (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                {[...Array(8)].map((_, i) => (
+                {Array.from({ length: 8 }, (_, index) => (
                   <div
-                    key={i}
+                    key={index}
                     className="animate-pulse bg-card border border-border/50 rounded-2xl p-5 h-36 flex flex-col items-center justify-center"
                   >
                     <div className="w-12 h-12 rounded-xl bg-muted mb-3" />
@@ -365,32 +377,30 @@ export default function Index() {
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 animate-in fade-in duration-500">
-                {currentCategories.map((cat, i) => {
-                  const catName = cat.CategoryName || "";
-                  const IconComponent = getCategoryIcon(cat.IconName);
+                {currentCategories.map((category, index) => {
+                  const IconComponent = getCategoryIcon(category.IconName);
                   const styleClass =
-                    CATEGORY_STYLES[i % CATEGORY_STYLES.length];
+                    CATEGORY_STYLES[index % CATEGORY_STYLES.length];
 
                   return (
                     <div
-                      key={cat.CategoryID || i}
+                      key={category.CategoryID}
                       className="group block outline-none cursor-default"
                     >
                       <div className="h-full bg-card border border-border/60 rounded-2xl p-6 flex flex-col items-center text-center transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl hover:border-primary/30">
                         <div
                           className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-110 ${styleClass}`}
                         >
-                          <IconComponent
-                            className="w-7 h-7"
-                            strokeWidth={1.5}
-                          />
+                          <IconComponent className="w-7 h-7" strokeWidth={1.5} />
                         </div>
+
                         <h3 className="font-bold text-base mb-1.5 text-foreground transition-colors line-clamp-1">
-                          {catName}
+                          {category.CategoryName || ""}
                         </h3>
+
                         <div className="inline-flex items-center justify-center px-4 py-1.5 rounded-full border border-slate-200 bg-white dark:bg-zinc-900 dark:border-zinc-700">
                           <span className="text-black dark:text-white text-xs font-semibold transition-colors">
-                            {cat.ItemCount ?? 0} ไอเทม
+                            {category.ItemCount ?? 0} ไอเทม
                           </span>
                         </div>
                       </div>
@@ -402,7 +412,6 @@ export default function Index() {
           </div>
         </section>
 
-        {/* ABOUT SECTION */}
         <section id="about" className="py-16 sm:py-24">
           <div className="mx-auto max-w-6xl px-4 sm:px-6">
             <div className="text-center max-w-2xl mx-auto mb-16 space-y-4">
@@ -418,11 +427,12 @@ export default function Index() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
-              {FEATURES.map((feature, i) => {
+              {FEATURES.map((feature) => {
                 const Icon = feature.icon;
+
                 return (
                   <Card
-                    key={i}
+                    key={feature.title}
                     className="bg-card/50 border-border/50 shadow-none hover:bg-card hover:shadow-sm transition-all duration-300"
                   >
                     <CardContent className="p-8 flex items-start gap-5">
@@ -443,7 +453,6 @@ export default function Index() {
           </div>
         </section>
 
-        {/* HOW IT WORKS SECTION */}
         <section className="py-16 sm:py-24 bg-muted/20 border-t border-border/50">
           <div className="mx-auto max-w-4xl px-4 sm:px-6">
             <div className="text-center mb-16 space-y-3">
@@ -459,14 +468,15 @@ export default function Index() {
             </div>
 
             <div className="space-y-8 relative before:absolute before:inset-0 before:ml-6 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-border before:to-transparent">
-              {STEPS.map((step, idx) => (
+              {STEPS.map((step, index) => (
                 <div
-                  key={idx}
+                  key={step.title}
                   className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active"
                 >
                   <div className="flex items-center justify-center w-12 h-12 rounded-full border-4 border-background bg-muted text-muted-foreground font-bold shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-sm z-10 transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
-                    {idx + 1}
+                    {index + 1}
                   </div>
+
                   <div className="w-[calc(100%-4rem)] md:w-[calc(50%-3rem)] bg-card border border-border/50 p-6 rounded-2xl shadow-sm transition-all hover:border-primary/30 hover:shadow-md ml-4 md:ml-0">
                     <h4 className="text-lg font-bold mb-2">{step.title}</h4>
                     <p className="text-sm text-muted-foreground leading-relaxed">
@@ -479,7 +489,6 @@ export default function Index() {
           </div>
         </section>
 
-        {/* CALL TO ACTION */}
         <section className="py-16 sm:py-24 bg-primary/5 border-t border-border/50 text-center">
           <div className="max-w-2xl mx-auto px-4 space-y-6">
             <Recycle className="w-10 h-10 text-primary mx-auto" />

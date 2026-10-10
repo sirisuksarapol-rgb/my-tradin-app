@@ -1,17 +1,11 @@
-import { useState, useEffect } from "react";
+
+import { useState, useEffect, type SyntheticEvent } from "react";
 import { Link } from "react-router-dom";
 import { Edit, Trash2, Eye, Plus, Package, ArrowRightLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import AppLayout from "@/components/AppLayout";
 import { useToast } from "@/hooks/use-toast";
 import { getItems, deleteItem, IMAGE_BASE_URL } from "@/api/api";
@@ -27,151 +21,175 @@ interface PostItem {
   member_id?: string | number;
   UserID?: string | number;
   user_id?: string | number;
-  ItemStatus?: string;
-  status?: string;
   ItemImage?: string;
   image_name?: string;
 }
 
-const statusMap = {
-  matched: { label: "จับคู่แล้ว", variant: "secondary" as const },
-  completed: { label: "สำเร็จ", variant: "outline" as const },
-  cancelled: { label: "ยกเลิก", variant: "destructive" as const },
-};
+interface LocalUser {
+  id?: string | number;
+  user_id?: string | number;
+  UserID?: string | number;
+  MemberID?: string | number;
+}
 
-// =========================================================================
-// COMPONENT: MyPosts (หน้าจอจัดการรายการสิ่งของของฉัน สำหรับดู แก้ไข และลบโพสต์)
-// =========================================================================
+const PLACEHOLDER_IMAGE = "/placeholder.jpg";
+
+function getCurrentUser(): LocalUser | null {
+  try {
+    const savedUser = sessionStorage.getItem("user");
+    return savedUser ? JSON.parse(savedUser) : null;
+  } catch {
+    return null;
+  }
+}
+
+function getCorrectImagePath(imageName?: string): string {
+  if (!imageName) return PLACEHOLDER_IMAGE;
+
+  let image = imageName.trim();
+
+  if (
+    !image ||
+    image === "undefined" ||
+    image === "null" ||
+    image === PLACEHOLDER_IMAGE
+  ) {
+    return PLACEHOLDER_IMAGE;
+  }
+
+  if (image.startsWith("[")) {
+    try {
+      const images = JSON.parse(image.split("'").join('"'));
+      image = Array.isArray(images) ? String(images[0] || "").trim() : "";
+    } catch {
+      image = image
+        .split("[").join("")
+        .split("]").join("")
+        .split('"').join("")
+        .split("'").join("");
+    }
+  }
+
+  image = image.split(",")[0]?.trim() || "";
+
+  if (
+    !image ||
+    image === "undefined" ||
+    image === "null"
+  ) {
+    return PLACEHOLDER_IMAGE;
+  }
+
+  return image.startsWith("http")
+    ? image
+    : `${IMAGE_BASE_URL}/uploads/${image}`;
+}
+
+function handleImageError(event: SyntheticEvent<HTMLImageElement>) {
+  const image = event.currentTarget;
+
+  if (image.src !== `${window.location.origin}${PLACEHOLDER_IMAGE}`) {
+    image.src = PLACEHOLDER_IMAGE;
+  }
+}
+
 export default function MyPosts() {
   const { toast } = useToast();
+
   const [posts, setPosts] = useState<PostItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        setIsLoading(true);
-        const savedUser = sessionStorage.getItem("user");
-        const user = savedUser ? JSON.parse(savedUser) : null;
+        const user = getCurrentUser();
 
-        if (!user) {
-          setIsLoading(false);
-          return;
-        }
+        if (!user) return;
 
         const currentUserId =
-          user.id !== undefined
-            ? user.id
-            : user.user_id !== undefined
-              ? user.user_id
-              : user.UserID !== undefined
-                ? user.UserID
-                : user.MemberID;
+          user.id ?? user.user_id ?? user.UserID ?? user.MemberID;
 
-        const res = await getItems();
-        const apiData = res && Array.isArray(res.data) ? res.data : [];
+        if (currentUserId == null) return;
 
-        const myPosts = apiData.filter((p: PostItem) => {
-          const itemOwnerId =
-            p.MemberID !== undefined
-              ? p.MemberID
-              : p.member_id !== undefined
-                ? p.member_id
-                : p.UserID !== undefined
-                  ? p.UserID
-                  : p.user_id;
+        const response = await getItems();
+        const items = Array.isArray(response?.data) ? response.data : [];
 
-          if (itemOwnerId === undefined || itemOwnerId === null) return false;
+        const myPosts = items.filter((post: PostItem) => {
+          const ownerId =
+            post.MemberID ??
+            post.member_id ??
+            post.UserID ??
+            post.user_id;
 
-          return String(itemOwnerId).trim() === String(currentUserId).trim();
+          return (
+            ownerId != null &&
+            String(ownerId).trim() === String(currentUserId).trim()
+          );
         });
 
         setPosts(myPosts);
       } catch (error) {
-        console.error("❌ เกิดข้อผิดพลาดในการดึงข้อมูล:", error);
+        console.error("เกิดข้อผิดพลาดในการดึงข้อมูล:", error);
         setPosts([]);
       } finally {
         setIsLoading(false);
       }
     };
+
     fetchData();
   }, []);
 
   const handleDelete = async () => {
-    if (!deleteTarget) return;
+    if (!deleteTarget || isDeleting) return;
+
     try {
+      setIsDeleting(true);
+
       await deleteItem(deleteTarget);
-      setPosts(
-        posts.filter(
-          (p) => String(p.ItemID || p.item_id) !== String(deleteTarget),
+
+      setPosts((prev) =>
+        prev.filter(
+          (post) => String(post.ItemID ?? post.item_id) !== deleteTarget,
         ),
       );
+
       setDeleteTarget(null);
       toast({ title: "ลบโพสต์เรียบร้อย" });
     } catch (error) {
+      console.error("เกิดข้อผิดพลาดในการลบโพสต์:", error);
+
       toast({
         title: "เกิดข้อผิดพลาด",
         description: "ไม่สามารถลบโพสต์ได้",
         variant: "destructive",
       });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
-  const getCorrectImagePath = (imageName: string | undefined) => {
-    if (!imageName || imageName.trim() === "undefined" || imageName === "null")
-      return "/placeholder.jpg";
-
-    try {
-      let cleanStr = imageName.trim();
-
-      if (cleanStr.startsWith("[")) {
-        const safeJsonStr = cleanStr.replace(/'/g, '"');
-        const parsed = JSON.parse(safeJsonStr);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          cleanStr = parsed[0].trim();
-        }
-      } else if (cleanStr.includes(",")) {
-        cleanStr = cleanStr.split(",")[0].trim();
-      }
-
-      if (cleanStr.startsWith("http")) {
-        return cleanStr;
-      }
-
-      return `${IMAGE_BASE_URL}/uploads/${cleanStr}`;
-    } catch {
-      const fallback = imageName
-        .replace(/\[\vert{}\]|"|'/g, "")
-        .split(",")[0]
-        .trim();
-      if (fallback) {
-        return fallback.startsWith("http")
-          ? fallback
-          : `${IMAGE_BASE_URL}/uploads/${fallback}`;
-      }
-    }
-    return "/placeholder.jpg";
+  const closeDeleteDialog = () => {
+    if (!isDeleting) setDeleteTarget(null);
   };
 
   return (
     <AppLayout>
       <div className="max-w-[1400px] mx-auto space-y-8 pb-20 font-sans">
-        <section className="relative -mt-6 py-8 md:py-10 border-b border-border/55">
-          <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-screen border-b border-border/50 -z-10 pointer-events-none" />
-
+        <section className="relative -mt-6 py-8 md:py-10">
           <div className="flex items-center justify-between px-4 sm:px-6 md:px-10">
-            <div className="space-y-1">
-              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight font-heading">
-                ของฉัน
-              </h1>
-            </div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight font-heading">
+              ของฉัน
+            </h1>
+
             <Button
               className="eco-gradient text-primary-foreground gap-2 rounded-xl"
               asChild
             >
               <Link to="/create-post">
-                <Plus className="h-4 w-4" /> โพสต์ใหม่
+                <Plus className="h-4 w-4" />
+                โพสต์ใหม่
               </Link>
             </Button>
           </div>
@@ -187,16 +205,16 @@ export default function MyPosts() {
           ) : posts.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
               {posts.map((post) => {
-                const id = String(post.ItemID || post.item_id || "");
+                const id = String(post.ItemID ?? post.item_id ?? "");
                 const title =
                   post.ItemName || post.item_name || "ไม่มีชื่อสิ่งของ";
                 const desired =
                   post.DesiredItem ||
                   post.desired_item ||
-                  "เปิดรับข้อเสนอทั้งหมด";
-
-                const imageName = post.ItemImage || post.image_name;
-                const imagePath = getCorrectImagePath(imageName);
+                  "อะไรก็ได้";
+                const imagePath = getCorrectImagePath(
+                  post.ItemImage || post.image_name,
+                );
 
                 return (
                   <Card
@@ -208,39 +226,31 @@ export default function MyPosts() {
                         src={imagePath}
                         alt={title}
                         className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          if (
-                            target.src !==
-                            window.location.origin + "/placeholder.jpg"
-                          ) {
-                            target.src = "/placeholder.jpg";
-                          }
-                        }}
+                        onError={handleImageError}
                       />
                     </div>
 
                     <CardContent className="p-4 space-y-3.5 flex-1 flex flex-col justify-between">
-                      <div className="space-y-1">
-                        <h3 className="font-bold text-sm leading-snug line-clamp-2 text-foreground">
-                          {post.ItemName}
-                        </h3>
-                      </div>
+                      <h3 className="font-bold text-sm leading-snug line-clamp-2 text-foreground">
+                        {title}
+                      </h3>
 
                       <div className="flex items-center gap-3 bg-white border border-black dark:bg-zinc-900 dark:border-zinc-100 rounded-2xl p-2.5 w-full">
                         <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-zinc-800 border border-black/20 flex items-center justify-center shrink-0 shadow-sm">
                           <ArrowRightLeft className="w-4 h-4 text-primary" />
                         </div>
+
                         <div className="min-w-0 flex-1">
                           <p className="text-[10px] text-slate-500 dark:text-zinc-400 font-semibold uppercase tracking-widest mb-0.5 leading-none">
                             อยากแลกกับ
                           </p>
                           <p className="text-sm font-bold text-slate-900 dark:text-white truncate">
-                            {post.DesiredItem || "อะไรก็ได้"}
+                            {desired}
                           </p>
                         </div>
                       </div>
                     </CardContent>
+
                     <div className="px-3 py-2.5 border-t border-border/40 bg-muted/20 flex items-center justify-around gap-1">
                       <Button
                         size="sm"
@@ -276,13 +286,12 @@ export default function MyPosts() {
                       <Button
                         size="sm"
                         variant="ghost"
+                        disabled={isDeleting}
                         className="flex-1 h-8 px-2 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-500/10 hover:text-red-700 transition-all rounded-lg"
                         onClick={() => setDeleteTarget(id)}
                       >
-                        <span className="flex items-center justify-center gap-1.5">
-                          <Trash2 className="h-3.5 w-3.5" />
-                          <span>ลบ</span>
-                        </span>
+                        <Trash2 className="h-3.5 w-3.5 mr-1" />
+                        <span>ลบ</span>
                       </Button>
                     </div>
                   </Card>
@@ -303,8 +312,21 @@ export default function MyPosts() {
         </section>
       </div>
 
-      <Dialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
-        <DialogContent className="rounded-3xl p-6 shadow-2xl border border-border/50 bg-card backdrop-blur-xl">
+      <Dialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) closeDeleteDialog();
+        }}
+      >
+        <DialogContent
+          className="rounded-3xl p-6 shadow-2xl border border-border/50 bg-card backdrop-blur-xl"
+          onEscapeKeyDown={(event) => {
+            if (isDeleting) event.preventDefault();
+          }}
+          onPointerDownOutside={(event) => {
+            if (isDeleting) event.preventDefault();
+          }}
+        >
           <DialogHeader className="space-y-2">
             <DialogTitle className="text-lg font-bold">
               ยืนยันการลบโพสต์
@@ -313,20 +335,24 @@ export default function MyPosts() {
               คุณต้องการลบโพสต์นี้หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้
             </DialogDescription>
           </DialogHeader>
+
           <DialogFooter className="flex flex-row gap-2.5 pt-4">
             <Button
               variant="outline"
-              onClick={() => setDeleteTarget(null)}
+              onClick={closeDeleteDialog}
+              disabled={isDeleting}
               className="flex-1 rounded-2xl h-10 text-xs font-semibold border-slate-300 dark:border-zinc-700 bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 hover:bg-slate-200 dark:hover:bg-zinc-700 hover:text-slate-900 dark:hover:text-white transition-all shadow-xs"
             >
               ยกเลิก
             </Button>
+
             <Button
               variant="destructive"
               onClick={handleDelete}
+              disabled={isDeleting}
               className="flex-1 rounded-2xl h-10 text-xs font-semibold shadow-md transition-all active:scale-95"
             >
-              ลบโพสต์
+              {isDeleting ? "กำลังลบ..." : "ลบโพสต์"}
             </Button>
           </DialogFooter>
         </DialogContent>

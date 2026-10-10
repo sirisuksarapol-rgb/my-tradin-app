@@ -1,48 +1,15 @@
+
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import {
-  ArrowLeft,
-  Clock,
-  CheckCircle,
-  ArrowRightLeft,
-  ShieldCheck,
-  Star,
-  Package,
-  XCircle,
-  AlertCircle,
-  Phone,
-  MapPin,
-  UserCheck,
-  Check,
-  FileText,
-  MessageSquareQuote,
-} from "lucide-react";
+import { ArrowLeft, Clock, CheckCircle, ArrowRightLeft, ShieldCheck, Star, Package, XCircle, AlertCircle, Phone, MapPin, UserCheck, Check, FileText, MessageSquareQuote, PackageSearch } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import AppLayout from "@/components/AppLayout";
 import { useToast } from "@/hooks/use-toast";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogFooter,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import {
-  completeExchange,
-  getExchanges,
-  IMAGE_BASE_URL,
-  verifyExchangeCode,
-  cancelExchange,
-} from "@/api/api";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogFooter, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { completeExchange, getExchanges, IMAGE_BASE_URL, verifyExchangeCode, cancelExchange } from "@/api/api";
 
-// ========================================================
-// 📐 TYPES & INTERFACES
-// ========================================================
 interface ExchangeItem {
   ExchangeID: number | string;
   ExchangeStatus: string;
@@ -68,15 +35,47 @@ interface ExchangeItem {
   PartnerScore?: number | null;
   Comment?: string | null;
   PartnerComment?: string | null;
-  CancelReason?: string | null; 
-  myAuthorName?: string;       
-  theirAuthorName?: string;    
-  myMeetingLocation?: string;   
+  CancelReason?: string | null;
+  myAuthorName?: string;
+  theirAuthorName?: string;
+  myMeetingLocation?: string;
   theirMeetingLocation?: string;
 }
 
 interface ErrorResponse {
   message?: string;
+}
+
+interface TrackedItem {
+  title: string;
+  image: string;
+  description: string;
+  location: string;
+}
+
+interface ExchangeState {
+  matchId: string;
+  status: string;
+  exchangeType: string;
+  matchScore: number;
+  score: number | null;
+  partnerScore: number | null;
+  comment: string;
+  partnerComment: string;
+  cancelReasonDb: string;
+  myAuthorName: string;
+  theirAuthorName: string;
+  myItem: TrackedItem;
+  theirItem: TrackedItem;
+  partnerPhone: string;
+  exchangeLocation: string;
+  reasonOptions: string[];
+  memberId: number;
+  targetMemberId: number;
+  isMemberVerified: number;
+  isTargetMemberVerified: number;
+  isMemberReceived: number;
+  isTargetMemberReceived: number;
 }
 
 const stepIndex: Record<string, number> = {
@@ -94,56 +93,49 @@ const statusConfig = {
     label: "รอตอบรับ",
     icon: Clock,
     circleClass: "bg-amber-500 text-white border-amber-500",
-    currentCircleClass:
-      "bg-amber-500 text-white border-amber-500 ring-4 ring-amber-500/20",
+    currentCircleClass: "bg-amber-500 text-white border-amber-500 ring-4 ring-amber-500/20",
     textClass: "text-amber-600",
   },
   accepted: {
     label: "ตอบรับแล้ว",
     icon: CheckCircle,
     circleClass: "bg-blue-500 text-white border-blue-500",
-    currentCircleClass:
-      "bg-blue-500 text-white border-blue-500 ring-4 ring-blue-500/20",
+    currentCircleClass: "bg-blue-500 text-white border-blue-500 ring-4 ring-blue-500/20",
     textClass: "text-blue-600",
   },
   in_progress: {
     label: "ระหว่างดำเนินการ",
     icon: ArrowRightLeft,
     circleClass: "bg-purple-500 text-white border-purple-500",
-    currentCircleClass:
-      "bg-purple-500 text-white border-purple-500 ring-4 ring-purple-500/20",
+    currentCircleClass: "bg-purple-500 text-white border-purple-500 ring-4 ring-purple-500/20",
     textClass: "text-purple-600",
   },
   completed: {
     label: "สำเร็จแล้ว",
     icon: Star,
     circleClass: "bg-emerald-500 text-white border-emerald-500",
-    currentCircleClass:
-      "bg-emerald-500 text-white border-emerald-500 ring-4 ring-emerald-500/20",
+    currentCircleClass: "bg-emerald-500 text-white border-emerald-500 ring-4 ring-emerald-500/20",
     textClass: "text-emerald-600",
   },
   rejected: {
     label: "ถูกปฏิเสธ",
     icon: XCircle,
     circleClass: "bg-orange-500 text-white border-orange-500",
-    currentCircleClass:
-      "bg-orange-500 text-white border-orange-500 ring-4 ring-orange-500/20",
+    currentCircleClass: "bg-orange-500 text-white border-orange-500 ring-4 ring-orange-500/20",
     textClass: "text-orange-600",
   },
   failed: {
     label: "ยกเลิกแล้ว",
     icon: AlertCircle,
     circleClass: "bg-red-500 text-white border-red-500",
-    currentCircleClass:
-      "bg-red-500 text-white border-red-500 ring-4 ring-red-500/20",
+    currentCircleClass: "bg-red-500 text-white border-red-500 ring-4 ring-red-500/20",
     textClass: "text-red-600",
   },
   auto_cancelled: {
     label: "ยกเลิกอัตโนมัติ",
     icon: AlertCircle,
     circleClass: "bg-slate-600 text-white border-slate-600",
-    currentCircleClass:
-      "bg-slate-600 text-white border-slate-600 ring-4 ring-slate-600/20",
+    currentCircleClass: "bg-slate-600 text-white border-slate-600 ring-4 ring-slate-600/20",
     textClass: "text-slate-700 dark:text-slate-300",
   },
 };
@@ -156,26 +148,169 @@ const defaultReasonOptions = [
   "เหตุผลอื่นๆ",
 ];
 
-// =========================================================================
-// COMPONENT: ExchangeTracking (หน้าจอติดตามสถานะและจัดการรายการแลกเปลี่ยน)[cite: 14]
-// =========================================================================
+function getSavedUser() {
+  try {
+    const savedUser = sessionStorage.getItem("user");
+    return savedUser ? JSON.parse(savedUser) : null;
+  } catch {
+    return null;
+  }
+}
+
+function getCorrectImagePath(imageName?: string) {
+  if (!imageName || imageName.trim() === "undefined" || imageName.trim() === "null") {
+    return "/placeholder.jpg";
+  }
+
+  let image = imageName.trim();
+
+  if (image.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(image.split("'").join('"'));
+
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        image = String(parsed[0] ?? "").trim();
+      }
+    } catch {
+      image = image
+        .split("[").join("")
+        .split("]").join("")
+        .split('"').join("")
+        .split("'").join("")
+        .split(",")[0]?.trim() || "";
+    }
+  } else if (image.includes(",")) {
+    image = image.split(",")[0].trim();
+  }
+
+  if (!image || image === "undefined" || image === "null") {
+    return "/placeholder.jpg";
+  }
+
+  return image.startsWith("http")
+    ? image
+    : `${IMAGE_BASE_URL}/uploads/${image}`;
+}
+
+function handleImageError(event: React.SyntheticEvent<HTMLImageElement>) {
+  const image = event.currentTarget;
+  const placeholder = `${window.location.origin}/placeholder.jpg`;
+
+  if (image.src !== placeholder) {
+    image.src = "/placeholder.jpg";
+  }
+}
+
+function ExchangeItemCard({
+  item,
+  ownerName,
+  isCancelled,
+  isReceived,
+  waitingText,
+}: {
+  item: TrackedItem;
+  ownerName: string;
+  isCancelled: boolean;
+  isReceived: boolean;
+  waitingText: string;
+}) {
+  const cardClass = isCancelled
+    ? "border-2 border-rose-300 bg-rose-50/10"
+    : isReceived
+      ? "border-2 border-emerald-300 bg-emerald-50/10"
+      : "border bg-card";
+
+  const headerClass = isCancelled
+    ? "bg-rose-500/10 border-rose-200 text-rose-700"
+    : isReceived
+      ? "bg-emerald-500/10 border-emerald-200 text-emerald-700"
+      : "bg-muted border-border text-muted-foreground";
+
+  return (
+    <Card className={`${cardClass} shadow-sm rounded-2xl overflow-hidden flex flex-col justify-between`}>
+      <div>
+        <div className={`${headerClass} px-4 py-2.5 border-b flex items-center justify-between font-bold text-xs`}>
+          <span className="flex items-center gap-1.5">
+            <UserCheck className="h-4 w-4" />
+            ของ: {ownerName}
+          </span>
+        </div>
+
+        <CardContent className="p-4 space-y-3">
+          <div className="aspect-square w-full rounded-xl bg-muted overflow-hidden border">
+            <img
+              src={getCorrectImagePath(item.image)}
+              alt={item.title}
+              className="w-full h-full object-cover"
+              onError={handleImageError}
+            />
+          </div>
+
+          <div>
+            <h3 className="font-bold text-base line-clamp-2 text-foreground">
+              {item.title}
+            </h3>
+
+            <p className="text-xs text-muted-foreground mt-1 flex items-start gap-1.5">
+              <FileText className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+              <span className="line-clamp-2">{item.description}</span>
+            </p>
+
+            <div className="flex items-center gap-2 mt-3 bg-muted p-2.5 rounded-xl border">
+              <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-xs font-semibold">{item.location}</span>
+            </div>
+          </div>
+        </CardContent>
+      </div>
+
+      <div className="p-4 pt-0">
+        <div className="pt-3 border-t text-xs">
+          <p className="text-muted-foreground font-medium mb-1.5">
+            สถานะการรับสินค้า:
+          </p>
+
+          {isCancelled ? (
+            <Badge className="bg-rose-600 hover:bg-rose-700 text-white w-full justify-center py-1.5 rounded-lg">
+              <XCircle className="h-3.5 w-3.5 mr-1" />
+              รายการถูกยกเลิก / ปฏิเสธ
+            </Badge>
+          ) : isReceived ? (
+            <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white w-full justify-center py-1.5 rounded-lg">
+              <CheckCircle className="h-3.5 w-3.5 mr-1" />
+              ยืนยันได้รับของแล้ว
+            </Badge>
+          ) : (
+            <Badge
+              variant="outline"
+              className="w-full justify-center py-1.5 text-muted-foreground bg-muted/30 rounded-lg"
+            >
+              {waitingText}
+            </Badge>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 export default function ExchangeTracking() {
   const { matchId } = useParams<{ matchId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
 
   const [isLoading, setIsLoading] = useState(true);
-  const [exchange, setExchange] = useState({
+  const [exchange, setExchange] = useState<ExchangeState>({
     matchId: matchId || "unknown",
     status: "pending",
     exchangeType: "manual",
     matchScore: 0,
-    score: null as number | null,
-    partnerScore: null as number | null,
+    score: null,
+    partnerScore: null,
     comment: "",
     partnerComment: "",
     cancelReasonDb: "",
-    myAuthorName: "",    
+    myAuthorName: "",
     theirAuthorName: "",
     myItem: {
       title: "กำลังโหลด...",
@@ -206,96 +341,70 @@ export default function ExchangeTracking() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
 
-  /**
-   * ฟังก์ชัน: getCorrectImagePath[cite: 14]
-   * มีไว้สำหรับ: จัดรูปแบบและตรวจสอบเส้นทางรูปภาพสินค้าให้ถูกต้องพร้อมแสดงผล[cite: 14]
-   */
-  const getCorrectImagePath = (imageName: string | undefined) => {
-    if (!imageName || imageName.trim() === "undefined" || imageName === "null")
-      return "/placeholder.jpg";
-    try {
-      let cleanStr = imageName.trim();
-      if (cleanStr.startsWith("[")) {
-        const safeJsonStr = cleanStr.replace(/'/g, '"');
-        const parsed = JSON.parse(safeJsonStr);
-        if (Array.isArray(parsed) && parsed.length > 0)
-          cleanStr = parsed[0].trim();
-      } else if (cleanStr.includes(",")) {
-        cleanStr = cleanStr.split(",")[0].trim();
-      }
-      if (cleanStr.startsWith("http")) return cleanStr;
-      return `${IMAGE_BASE_URL}/uploads/${cleanStr}`;
-    } catch {
-      const fallback = imageName
-        .replace(/\[|\]|"|'/g, "")
-        .split(",")[0]
-        .trim();
-      return fallback.startsWith("http")
-        ? fallback
-        : `${IMAGE_BASE_URL}/uploads/${fallback}`;
-    }
-  };
-
-  /**
-   * ฟังก์ชัน: fetchTrackingData[cite: 14]
-   * มีไว้สำหรับ: ดึงข้อมูลการติดตามสถานะการแลกเปลี่ยนจาก API และอัปเดตสถานะลงใน State[cite: 14]
-   */
   const fetchTrackingData = useCallback(async () => {
     if (!matchId) return;
+
     try {
       setIsLoading(true);
-      const res = await getExchanges();
-      if (res && Array.isArray(res.data)) {
-        const matchData = res.data.find(
-          (e: ExchangeItem) => String(e.ExchangeID) === String(matchId),
-        );
 
-        if (matchData) {
-          const savedUser = sessionStorage.getItem("user");
-          const currentUser = savedUser ? JSON.parse(savedUser) : null;
-          const currentUserId =
-            currentUser?.id ?? currentUser?.user_id ?? currentUser?.MemberID;
-          const isMember = String(currentUserId) === String(matchData.MemberID);
+      const response = await getExchanges();
 
-          setExchange({
-            score: matchData.Score || null,
-            partnerScore: matchData.PartnerScore || null,
-            comment: matchData.Comment || "",
-            partnerComment: matchData.PartnerComment || "",
-            cancelReasonDb: matchData.CancelReason || "",
-            matchId: String(matchData.ExchangeID),
-            status: (matchData.ExchangeStatus || "pending").toLowerCase(),
-            exchangeType: matchData.ExchangeType || "manual",
-            matchScore: matchData.MatchScore || 0,
-            myAuthorName: matchData.myAuthorName || currentUser?.DisplayName || "คุณ",
-            theirAuthorName: matchData.theirAuthorName || "คู่แลกเปลี่ยน",
-            myItem: {
-              title: matchData.myPostTitle || "สิ่งของของคุณ",
-              image: matchData.myPostImage || "",
-              description: matchData.myPostDescription || "รายละเอียดเพิ่มเติมของสิ่งของ...",
-              location: matchData.myMeetingLocation || matchData.ExchangeLocation || "ไม่ได้ระบุสถานที่",
-            },
-            theirItem: {
-              title: matchData.theirPostTitle || "ของที่สนใจแลก",
-              image: matchData.theirPostImage || "",
-              description: matchData.theirPostDescription || "รายละเอียดเพิ่มเติมของสิ่งของ...",
-              location: matchData.theirMeetingLocation || matchData.ExchangeLocation || "ไม่ได้ระบุสถานที่",
-            },
-            partnerPhone: isMember
-              ? matchData.TargetPhoneNumber || matchData.partnerPhone || "-"
-              : matchData.PhoneNumber || "-",
-            exchangeLocation: matchData.ExchangeLocation || "นัดเจอตามตกลง",
-            reasonOptions: defaultReasonOptions,
-            memberId: matchData.MemberID ?? 0,
-            targetMemberId: matchData.TargetMemberID ?? 0,
-            isMemberVerified: matchData.IsMemberVerified ?? 0,
-            isTargetMemberVerified: matchData.IsTargetMemberVerified ?? 0,
-            isMemberReceived: matchData.IsMemberReceived ?? 0,
-            isTargetMemberReceived: matchData.IsTargetMemberReceived ?? 0,
-          });
-        }
-      }
-    } catch (error: unknown) {
+      if (!response || !Array.isArray(response.data)) return;
+
+      const matchData = response.data.find(
+        (item: ExchangeItem) => String(item.ExchangeID) === String(matchId),
+      );
+
+      if (!matchData) return;
+
+      const currentUser = getSavedUser();
+      const currentUserId =
+        currentUser?.id ?? currentUser?.user_id ?? currentUser?.MemberID;
+      const isMember = String(currentUserId) === String(matchData.MemberID);
+
+      setExchange({
+        score: matchData.Score || null,
+        partnerScore: matchData.PartnerScore || null,
+        comment: matchData.Comment || "",
+        partnerComment: matchData.PartnerComment || "",
+        cancelReasonDb: matchData.CancelReason || "",
+        matchId: String(matchData.ExchangeID),
+        status: (matchData.ExchangeStatus || "pending").toLowerCase(),
+        exchangeType: matchData.ExchangeType || "manual",
+        matchScore: matchData.MatchScore || 0,
+        myAuthorName: matchData.myAuthorName || currentUser?.DisplayName || "คุณ",
+        theirAuthorName: matchData.theirAuthorName || "คู่แลกเปลี่ยน",
+        myItem: {
+          title: matchData.myPostTitle || "สิ่งของของคุณ",
+          image: matchData.myPostImage || "",
+          description: matchData.myPostDescription || "รายละเอียดเพิ่มเติมของสิ่งของ...",
+          location:
+            matchData.myMeetingLocation ||
+            matchData.ExchangeLocation ||
+            "ไม่ได้ระบุสถานที่",
+        },
+        theirItem: {
+          title: matchData.theirPostTitle || "ของที่สนใจแลก",
+          image: matchData.theirPostImage || "",
+          description: matchData.theirPostDescription || "รายละเอียดเพิ่มเติมของสิ่งของ...",
+          location:
+            matchData.theirMeetingLocation ||
+            matchData.ExchangeLocation ||
+            "ไม่ได้ระบุสถานที่",
+        },
+        partnerPhone: isMember
+          ? matchData.TargetPhoneNumber || matchData.partnerPhone || "-"
+          : matchData.PhoneNumber || "-",
+        exchangeLocation: matchData.ExchangeLocation || "นัดเจอตามตกลง",
+        reasonOptions: defaultReasonOptions,
+        memberId: matchData.MemberID ?? 0,
+        targetMemberId: matchData.TargetMemberID ?? 0,
+        isMemberVerified: matchData.IsMemberVerified ?? 0,
+        isTargetMemberVerified: matchData.IsTargetMemberVerified ?? 0,
+        isMemberReceived: matchData.IsMemberReceived ?? 0,
+        isTargetMemberReceived: matchData.IsTargetMemberReceived ?? 0,
+      });
+    } catch (error) {
       console.error("Error fetching tracking data:", error);
       toast({
         title: "เกิดข้อผิดพลาด",
@@ -311,12 +420,9 @@ export default function ExchangeTracking() {
     fetchTrackingData();
   }, [fetchTrackingData]);
 
-  /**
-   * ฟังก์ชัน: handleVerifyCode[cite: 14]
-   * มีไว้สำหรับ: ตรวจสอบและยืนยันรหัสความปลอดภัย (OTP)[cite: 14]
-   */
   const handleVerifyCode = async () => {
     if (!matchId) return;
+
     if (!verificationCode || verificationCode.length < 6) {
       toast({
         title: "ข้อมูลไม่ครบ",
@@ -326,44 +432,57 @@ export default function ExchangeTracking() {
       return;
     }
 
-    setIsVerifying(true);
     try {
-      const res = await verifyExchangeCode(matchId, verificationCode);
-      if (res && res.success) {
-        setIsVerifying(false);
-        setIsVerifyModalOpen(false);
-        setVerificationCode("");
+      setIsVerifying(true);
 
+      const response = await verifyExchangeCode(matchId, verificationCode);
+
+      if (!response || !response.success) {
         toast({
-          title: "ยืนยันสำเร็จ",
-          description: "ปลดล็อกเบอร์โทรศัพท์สำหรับติดต่อแล้ว",
+          title: "รหัสไม่ถูกต้อง",
+          description: "รหัสไม่ถูกต้องหรือหมดอายุ",
+          variant: "destructive",
         });
-        fetchTrackingData();
+        return;
       }
+
+      setIsVerifyModalOpen(false);
+      setVerificationCode("");
+
+      toast({
+        title: "ยืนยันสำเร็จ",
+        description: "ปลดล็อกเบอร์โทรศัพท์สำหรับติดต่อแล้ว",
+      });
+
+      await fetchTrackingData();
     } catch (error: unknown) {
-      setIsVerifying(false);
-      let errorMsg = "รหัสไม่ถูกต้องหรือหมดอายุ";
-      if (error && typeof error === "object" && "message" in error) {
-        errorMsg = (error as ErrorResponse).message || errorMsg;
+      let errorMessage = "รหัสไม่ถูกต้องหรือหมดอายุ";
+
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === "object" && error !== null) {
+        errorMessage = (error as ErrorResponse).message || errorMessage;
       }
+
       toast({
         title: "รหัสไม่ถูกต้อง",
-        description: errorMsg,
+        description: errorMessage,
         variant: "destructive",
       });
+    } finally {
+      setIsVerifying(false);
     }
   };
 
-  /**
-   * ฟังก์ชัน: handleConfirmCancel[cite: 14]
-   * มีไว้สำหรับ: ยืนยันการขอยกเลิกรายการแลกเปลี่ยนพร้อมระบุสาเหตุ[cite: 14]
-   */
   const handleConfirmCancel = async () => {
     if (!cancelReason || !matchId) return;
+
     try {
       await cancelExchange(matchId, cancelReason);
+
       setFinalReason(cancelReason);
       setExchange((prev) => ({ ...prev, status: "failed" }));
+
       toast({
         title: "ยกเลิกรายการแล้ว",
         description: `สาเหตุ: ${cancelReason}`,
@@ -379,23 +498,22 @@ export default function ExchangeTracking() {
     }
   };
 
-  /**
-   * ฟังก์ชัน: handleConfirmReceive[cite: 14]
-   * มีไว้สำหรับ: ยืนยันสถานะการได้รับสินค้าเรียบร้อยแล้วผ่าน API[cite: 14]
-   */
   const handleConfirmReceive = async () => {
     if (!matchId) return;
+
     try {
-      const res = await completeExchange(matchId, {
+      const response = await completeExchange(matchId, {
         score: null,
         comment: null,
       });
-      if (res) {
+
+      if (response) {
         toast({
           title: "ยืนยันการรับของสำเร็จ",
           description: "ระบบบันทึกว่าคุณได้รับสินค้าเรียบร้อยแล้ว",
         });
-        fetchTrackingData();
+
+        await fetchTrackingData();
       }
     } catch (error) {
       console.error("Error confirming receive:", error);
@@ -422,9 +540,7 @@ export default function ExchangeTracking() {
 
   const currentStatus = exchange.status;
   const currentIdx = stepIndex[currentStatus] ?? 0;
-
-  const savedUser = sessionStorage.getItem("user");
-  const currentUser = savedUser ? JSON.parse(savedUser) : null;
+  const currentUser = getSavedUser();
   const currentUserId =
     currentUser?.id ?? currentUser?.user_id ?? currentUser?.MemberID;
   const isMember = String(currentUserId) === String(exchange.memberId);
@@ -432,20 +548,32 @@ export default function ExchangeTracking() {
   const myVerifyStatus = isMember
     ? exchange.isMemberVerified
     : exchange.isTargetMemberVerified;
+
   const myReceiveStatus = isMember
     ? exchange.isMemberReceived
     : exchange.isTargetMemberReceived;
+
   const partnerReceiveStatus = isMember
     ? exchange.isTargetMemberReceived
     : exchange.isMemberReceived;
 
   const showOtpScreen =
-    (currentStatus === "accepted" || currentStatus === "in_progress") &&
+    ["accepted", "in_progress"].includes(currentStatus) &&
     myVerifyStatus === 0;
+
   const showProgressScreen =
-    (currentStatus === "accepted" || currentStatus === "in_progress") &&
+    ["accepted", "in_progress"].includes(currentStatus) &&
     myVerifyStatus === 1;
+
   const hasReceived = myReceiveStatus === 1;
+
+  const isCancelled = ["failed", "auto_cancelled", "rejected"].includes(
+    currentStatus,
+  );
+
+  const userRating = isMember ? exchange.score : exchange.partnerScore;
+  const userComment = isMember ? exchange.comment : exchange.partnerComment;
+  const hasReviewed = userRating !== null && userRating !== undefined && userRating > 0;
 
   const steps = [
     currentStatus === "rejected"
@@ -456,10 +584,7 @@ export default function ExchangeTracking() {
     currentStatus === "failed" || currentStatus === "auto_cancelled"
       ? {
           key: currentStatus,
-          label:
-            currentStatus === "auto_cancelled"
-              ? "ยกเลิกอัตโนมัติ"
-              : "ยกเลิกแล้ว",
+          label: currentStatus === "auto_cancelled" ? "ยกเลิกอัตโนมัติ" : "ยกเลิกแล้ว",
           icon: XCircle,
         }
       : { key: "completed", label: "สำเร็จ", icon: Star },
@@ -478,17 +603,15 @@ export default function ExchangeTracking() {
             >
               <ArrowLeft className="h-5 w-5 text-foreground" />
             </Button>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">
-                ติดตามการแลกเปลี่ยน
-              </h1>
-            </div>
+            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+              <PackageSearch className="h-6 w-6 text-primary" />
+              ติดตามการแลกเปลี่ยน
+            </h1>
           </div>
 
           {exchange.exchangeType === "match" && exchange.matchScore > 0 && (
             <span className="inline-flex items-center justify-center rounded-full bg-primary border border-primary/20 px-3 py-1 text-xs font-bold text-white shadow-sm shrink-0 whitespace-nowrap">
-              เหมาะสม{" "}
-              {exchange.matchScore ? Math.round(exchange.matchScore) : 0}%
+              เหมาะสม {Math.round(exchange.matchScore)}%
             </span>
           )}
         </div>
@@ -496,7 +619,8 @@ export default function ExchangeTracking() {
         <Card className="border bg-card shadow-sm rounded-2xl">
           <CardContent className="p-6 sm:p-8">
             <h2 className="text-base font-bold text-foreground flex items-center gap-2 mb-8">
-              <Clock className="h-5 w-5 text-primary" /> สถานะการดำเนินการ
+              <Clock className="h-5 w-5 text-primary" />
+              สถานะการดำเนินการ
             </h2>
 
             <div className="relative flex flex-col sm:flex-row justify-between items-start w-full gap-6 sm:gap-0">
@@ -505,7 +629,6 @@ export default function ExchangeTracking() {
                 const isDone = idx <= currentIdx;
                 const isPast = idx < currentIdx;
                 const isCurrent = idx === currentIdx;
-
                 const config =
                   statusConfig[step.key as keyof typeof statusConfig] ||
                   statusConfig.pending;
@@ -516,7 +639,9 @@ export default function ExchangeTracking() {
                       {idx < steps.length - 1 && (
                         <div className="sm:hidden absolute left-6 top-[56px] w-[2px] h-6 -ml-[1px]">
                           <div
-                            className={`w-full h-full rounded-full transition-all duration-500 ${isPast ? "bg-primary" : "bg-muted/60"}`}
+                            className={`w-full h-full rounded-full transition-all duration-500 ${
+                              isPast ? "bg-primary" : "bg-muted/60"
+                            }`}
                           />
                         </div>
                       )}
@@ -541,10 +666,10 @@ export default function ExchangeTracking() {
                         >
                           {step.label}
                         </p>
+
                         {isCurrent && (
                           <span className="text-[10px] text-muted-foreground block mt-0.5 font-medium">
-                            {step.key === "failed" ||
-                            step.key === "auto_cancelled"
+                            {step.key === "failed" || step.key === "auto_cancelled"
                               ? "รายการถูกยกเลิก"
                               : step.key === "rejected"
                                 ? "คำขอถูกปฏิเสธ"
@@ -581,66 +706,55 @@ export default function ExchangeTracking() {
               </p>
             </div>
 
-            {(() => {
-              const userRating = isMember
-                ? exchange.score
-                : exchange.partnerScore;
-              const userComment = isMember
-                ? exchange.comment
-                : exchange.partnerComment;
-              const hasReviewed =
-                userRating !== null &&
-                userRating !== undefined &&
-                userRating > 0;
+            {hasReviewed ? (
+              <Card className="border border-border/50 shadow-sm bg-background">
+                <CardContent className="p-6 space-y-6">
+                  <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
+                    <MessageSquareQuote className="w-5 h-5 text-primary" />
+                    การประเมินและรีวิวของคุณ
+                  </h2>
 
-              return hasReviewed ? (
-                <Card className="border border-border/50 shadow-sm bg-background">
-                  <CardContent className="p-6 space-y-6">
-                    <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
-                      <MessageSquareQuote className="w-5 h-5 text-primary" />{" "}
-                      การประเมินและรีวิวของคุณ
-                    </h2>
-
-                    <div className="space-y-4">
-                      <div className="bg-background border shadow-sm rounded-xl p-5 space-y-3 relative overflow-hidden">
-                        <div className="absolute top-0 left-0 w-1.5 h-full bg-primary"></div>
-                        <p className="text-xs font-bold text-primary">
-                          คะแนนที่คุณให้กับคู่แลกเปลี่ยน
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <div className="flex gap-1">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <Star
-                                key={star}
-                                className={`h-4 w-4 ${star <= (userRating || 0) ? "text-amber-500 fill-amber-500" : "text-gray-200 fill-gray-200"}`}
-                              />
-                            ))}
-                          </div>
-                          <span className="text-sm font-bold">
-                            {Number(userRating || 0).toFixed(1)}
-                          </span>
-                        </div>
-                        <div className="bg-secondary/20 p-3.5 rounded-lg border border-border/50">
-                          <p className="text-[13px] text-foreground italic">
-                            "{userComment || "ไม่มีคำบรรยายเพิ่มเติม"}"
-                          </p>
-                        </div>
+                  <div className="bg-background border shadow-sm rounded-xl p-5 space-y-3 relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-1.5 h-full bg-primary" />
+                    <p className="text-xs font-bold text-primary">
+                      คะแนนที่คุณให้กับคู่แลกเปลี่ยน
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <div className="flex gap-1">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Star
+                            key={star}
+                            className={`h-4 w-4 ${
+                              star <= (userRating || 0)
+                                ? "text-amber-500 fill-amber-500"
+                                : "text-gray-200 fill-gray-200"
+                            }`}
+                          />
+                        ))}
                       </div>
+                      <span className="text-sm font-bold">
+                        {Number(userRating || 0).toFixed(1)}
+                      </span>
                     </div>
-                  </CardContent>
-                </Card>
-              ) : (
-                <div className="text-center pt-2">
-                  <Button
-                    className="rounded-xl bg-primary px-8 h-11 font-semibold shadow-md hover:bg-primary/90"
-                    onClick={() => navigate(`/review/${exchange.matchId}`)}
-                  >
-                    <Star className="h-4 w-4 mr-2 fill-current" />{" "}
-                    ให้คะแนนและรีวิว
-                  </Button>
-                </div>
-              );
-            })()}
+                    <div className="bg-secondary/20 p-3.5 rounded-lg border border-border/50">
+                      <p className="text-[13px] text-foreground italic">
+                        "{userComment || "ไม่มีคำบรรยายเพิ่มเติม"}"
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="text-center pt-2">
+                <Button
+                  className="rounded-xl bg-primary px-8 h-11 font-semibold shadow-md hover:bg-primary/90"
+                  onClick={() => navigate(`/review/${exchange.matchId}`)}
+                >
+                  <Star className="h-4 w-4 mr-2 fill-current" />
+                  ให้คะแนนและรีวิว
+                </Button>
+              </div>
+            )}
           </Card>
         )}
 
@@ -648,237 +762,58 @@ export default function ExchangeTracking() {
           <Card className="border border-orange-300 shadow-sm bg-orange-500/10 rounded-2xl mt-6">
             <CardContent className="p-6 space-y-4">
               <h2 className="text-sm font-bold text-orange-700 dark:text-orange-400 flex items-center gap-2">
-                <XCircle className="w-5 h-5 text-orange-600" /> คำขอถูกปฏิเสธ
+                <XCircle className="w-5 h-5 text-orange-600" />
+                คำขอถูกปฏิเสธ
               </h2>
-              <div className="space-y-3 text-xs">
-                <div className="bg-background/70 p-3 rounded-xl border border-orange-200 space-y-1">
-                  <span className="text-muted-foreground font-medium block">
-                    สถานะปัจจุบัน:
-                  </span>
-                  <p className="font-semibold text-foreground italic">
-                    "คู่แลกเปลี่ยนได้ปฏิเสธคำขอแลกเปลี่ยนนี้ รายการจึงถูกยกเลิก"
-                  </p>
-                </div>
+              <div className="bg-background/70 p-3 rounded-xl border border-orange-200 space-y-1 text-xs">
+                <span className="text-muted-foreground font-medium block">
+                  สถานะปัจจุบัน:
+                </span>
+                <p className="font-semibold text-foreground italic">
+                  "คู่แลกเปลี่ยนได้ปฏิเสธคำขอแลกเปลี่ยนนี้ รายการจึงถูกยกเลิก"
+                </p>
               </div>
             </CardContent>
           </Card>
         )}
 
-        {currentStatus === "failed" && (
+        {(currentStatus === "failed" || currentStatus === "auto_cancelled") && (
           <Card className="border border-rose-300 shadow-sm bg-rose-500/10 rounded-2xl mt-6">
             <CardContent className="p-6 space-y-4">
               <h2 className="text-sm font-bold text-rose-700 dark:text-rose-400 flex items-center gap-2">
-                <AlertCircle className="w-5 h-5 text-rose-600" />{" "}
-                สรุปข้อมูลการยกเลิกรายการ
+                <AlertCircle className="w-5 h-5 text-rose-600" />
+                {currentStatus === "auto_cancelled"
+                  ? "รายการถูกยกเลิกอัตโนมัติโดยระบบ"
+                  : "สรุปข้อมูลการยกเลิกรายการ"}
               </h2>
-              <div className="space-y-3 text-xs">
-                <div className="bg-background/70 p-3 rounded-xl border border-rose-200 space-y-1">
-                  <span className="text-muted-foreground font-medium block">
-                    เหตุผลในการยกเลิก:
-                  </span>
-                  <p className="font-semibold text-foreground italic">
-                    "
-                    {exchange.cancelReasonDb ||
-                      finalReason ||
-                      "ไม่มีระบุเหตุผลเพิ่มเติม"}
-                    "
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {currentStatus === "auto_cancelled" && (
-          <Card className="border border-slate-300 shadow-sm bg-slate-500/10 rounded-2xl mt-6">
-            <CardContent className="p-6 space-y-4">
-              <h2 className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                <AlertCircle className="w-5 h-5 text-slate-600" />{" "}
-                รายการถูกยกเลิกอัตโนมัติโดยระบบ
-              </h2>
-              <div className="space-y-3 text-xs">
-                <div className="bg-background/70 p-3 rounded-xl border border-slate-200 space-y-1">
-                  <span className="text-muted-foreground font-medium block">
-                    เหตุผล:
-                  </span>
-                  <p className="font-semibold text-foreground italic">
-                    "
-                    {exchange.cancelReasonDb ||
-                      finalReason ||
-                      "ไม่มีระบุเหตุผลเพิ่มเติม"}
-                    "
-                  </p>
-                </div>
+              <div className="bg-background/70 p-3 rounded-xl border border-rose-200 space-y-1 text-xs">
+                <span className="text-muted-foreground font-medium block">
+                  เหตุผล:
+                </span>
+                <p className="font-semibold text-foreground italic">
+                  "{exchange.cancelReasonDb || finalReason || "ไม่มีระบุเหตุผลเพิ่มเติม"}"
+                </p>
               </div>
             </CardContent>
           </Card>
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {(() => {
-            const isCancelled =
-              currentStatus === "failed" ||
-              currentStatus === "auto_cancelled" ||
-              currentStatus === "rejected";
+          <ExchangeItemCard
+            item={exchange.myItem}
+            ownerName="คุณ"
+            isCancelled={isCancelled}
+            isReceived={hasReceived}
+            waitingText="ยังไม่ได้กดรับสินค้า"
+          />
 
-            const myCardClass = isCancelled
-              ? "border-2 border-rose-300 bg-rose-50/10 shadow-sm rounded-2xl overflow-hidden flex flex-col justify-between"
-              : hasReceived
-                ? "border-2 border-emerald-300 bg-emerald-50/10 shadow-sm rounded-2xl overflow-hidden flex flex-col justify-between"
-                : "border bg-card shadow-sm rounded-2xl overflow-hidden flex flex-col justify-between";
-
-            const myHeaderClass = isCancelled
-              ? "bg-rose-500/10 px-4 py-2.5 border-b border-rose-200 flex items-center justify-between text-rose-700 font-bold text-xs"
-              : hasReceived
-                ? "bg-emerald-500/10 px-4 py-2.5 border-b border-emerald-200 flex items-center justify-between text-emerald-700 font-bold text-xs"
-                : "bg-muted px-4 py-2.5 border-b flex items-center justify-between text-muted-foreground font-bold text-xs";
-
-            const theirCardClass = isCancelled
-              ? "border-2 border-rose-300 bg-rose-50/10 shadow-sm rounded-2xl overflow-hidden flex flex-col justify-between"
-              : partnerReceiveStatus === 1
-                ? "border-2 border-emerald-300 bg-emerald-50/10 shadow-sm rounded-2xl overflow-hidden flex flex-col justify-between"
-                : "border bg-card shadow-sm rounded-2xl overflow-hidden flex flex-col justify-between";
-
-            const theirHeaderClass = isCancelled
-              ? "bg-rose-500/10 px-4 py-2.5 border-b border-rose-200 flex items-center justify-between text-rose-700 font-bold text-xs"
-              : partnerReceiveStatus === 1
-                ? "bg-emerald-500/10 px-4 py-2.5 border-b border-emerald-200 flex items-center justify-between text-emerald-700 font-bold text-xs"
-                : "bg-muted px-4 py-2.5 border-b flex items-center justify-between text-muted-foreground font-bold text-xs";
-
-            return (
-              <>
-                <Card className={myCardClass}>
-                  <div>
-                    <div className={myHeaderClass}>
-                      <span className="flex items-center gap-1.5">
-                        <UserCheck className="h-4 w-4" /> ของ: คุณ
-                      </span>
-                    </div>
-                    <CardContent className="p-4 space-y-3">
-                      <div className="aspect-square w-full rounded-xl bg-muted overflow-hidden border">
-                        <img
-                          src={getCorrectImagePath(exchange.myItem.image)}
-                          alt={exchange.myItem.title}
-                          className="w-full h-full object-cover"
-                          onError={(e) =>
-                            (e.currentTarget.src = "/placeholder.jpg")
-                          }
-                        />
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-base line-clamp-2 text-foreground">
-                          {exchange.myItem.title}
-                        </h3>
-                        <p className="text-xs text-muted-foreground mt-1 flex items-start gap-1.5">
-                          <FileText className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                          <span className="line-clamp-2">
-                            {exchange.myItem.description}
-                          </span>
-                        </p>
-                        <div className="flex items-center gap-2 mt-3 bg-muted p-2.5 rounded-xl border">
-                          <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
-                          <span className="text-xs font-semibold">
-                            {exchange.myItem.location}
-                          </span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </div>
-
-                  <div className="p-4 pt-0">
-                    <div className="pt-3 border-t text-xs">
-                      <p className="text-muted-foreground font-medium mb-1.5">
-                        สถานะการรับสินค้า:
-                      </p>
-                      {isCancelled ? (
-                        <Badge className="bg-rose-600 hover:bg-rose-700 text-white w-full justify-center py-1.5 rounded-lg">
-                          <XCircle className="h-3.5 w-3.5 mr-1" />{" "}
-                          รายการถูกยกเลิก / ปฏิเสธ
-                        </Badge>
-                      ) : hasReceived ? (
-                        <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white w-full justify-center py-1.5 rounded-lg">
-                          <CheckCircle className="h-3.5 w-3.5 mr-1" />{" "}
-                          ยืนยันได้รับของแล้ว
-                        </Badge>
-                      ) : (
-                        <Badge
-                          variant="outline"
-                          className="w-full justify-center py-1.5 text-muted-foreground bg-muted/30 rounded-lg"
-                        >
-                          ยังไม่ได้กดรับสินค้า
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </Card>
-
-                <Card className={theirCardClass}>
-                  <div>
-                    <div className={theirHeaderClass}>
-                      <span className="flex items-center gap-1.5">
-                        <UserCheck className="h-4 w-4" /> ของ: {exchange.theirAuthorName || "คู่แลกเปลี่ยน"}
-                      </span>
-                    </div>
-                    <CardContent className="p-4 space-y-3">
-                      <div className="aspect-square w-full rounded-xl bg-muted overflow-hidden border">
-                        <img
-                          src={getCorrectImagePath(exchange.theirItem.image)}
-                          alt={exchange.theirItem.title}
-                          className="w-full h-full object-cover"
-                          onError={(e) =>
-                            (e.currentTarget.src = "/placeholder.jpg")
-                          }
-                        />
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-base line-clamp-2 text-foreground">
-                          {exchange.theirItem.title}
-                        </h3>
-                        <p className="text-xs text-muted-foreground mt-1 flex items-start gap-1.5">
-                          <FileText className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                          <span className="line-clamp-2">
-                            {exchange.theirItem.description}
-                          </span>
-                        </p>
-                        <div className="flex items-center gap-2 mt-3 bg-muted p-2.5 rounded-xl border">
-                          <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
-                          <span className="text-xs font-semibold">
-                            {exchange.theirItem.location}
-                          </span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </div>
-
-                  <div className="p-4 pt-0">
-                    <div className="pt-3 border-t text-xs">
-                      <p className="text-muted-foreground font-medium mb-1.5">
-                        สถานะการรับสินค้า:
-                      </p>
-                      {isCancelled ? (
-                        <Badge className="bg-rose-600 hover:bg-rose-700 text-white w-full justify-center py-1.5 rounded-lg">
-                          <XCircle className="h-3.5 w-3.5 mr-1" />{" "}
-                          รายการถูกยกเลิก / ปฏิเสธ
-                        </Badge>
-                      ) : partnerReceiveStatus === 1 ? (
-                        <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white w-full justify-center py-1.5 rounded-lg">
-                          <CheckCircle className="h-3.5 w-3.5 mr-1" />{" "}
-                          ยืนยันได้รับของแล้ว
-                        </Badge>
-                      ) : (
-                        <Badge
-                          variant="outline"
-                          className="w-full justify-center py-1.5 text-muted-foreground bg-muted/30 rounded-lg"
-                        >
-                          รอคู่แลกเปลี่ยนกดยืนยัน
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </Card>
-              </>
-            );
-          })()}
+          <ExchangeItemCard
+            item={exchange.theirItem}
+            ownerName={exchange.theirAuthorName || "คู่แลกเปลี่ยน"}
+            isCancelled={isCancelled}
+            isReceived={partnerReceiveStatus === 1}
+            waitingText="รอคู่แลกเปลี่ยนกดยืนยัน"
+          />
         </div>
 
         <div className="space-y-4">
@@ -904,6 +839,7 @@ export default function ExchangeTracking() {
                   >
                     ยืนยันรหัสความปลอดภัย
                   </Button>
+
                   <AlertDialogContent className="rounded-2xl max-w-sm">
                     <AlertDialogHeader>
                       <AlertDialogTitle className="text-center text-xl font-bold text-primary">
@@ -914,18 +850,23 @@ export default function ExchangeTracking() {
                         หลักไปยังอีเมลและการแจ้งเตือนของคุณแล้ว
                       </p>
                     </AlertDialogHeader>
+
                     <div className="my-4">
                       <input
                         type="text"
+                        inputMode="numeric"
                         maxLength={6}
                         value={verificationCode}
-                        onChange={(e) =>
-                          setVerificationCode(e.target.value.replace(/\D/g, ""))
+                        onChange={(event) =>
+                          setVerificationCode(
+                            event.target.value.split("").filter((char) => char >= "0" && char <= "9").join(""),
+                          )
                         }
                         placeholder="******"
                         className="w-full text-center tracking-[0.4em] font-bold text-2xl h-14 border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-background"
                       />
                     </div>
+
                     <AlertDialogFooter className="flex flex-row gap-3 mt-2">
                       <AlertDialogCancel
                         className="flex-1 mt-0 rounded-2xl h-11 text-xs font-semibold border border-border/60 bg-card text-foreground hover:bg-slate-100 dark:hover:bg-zinc-800 hover:text-foreground transition-all shadow-xs"
@@ -959,6 +900,7 @@ export default function ExchangeTracking() {
                     กรุณารอคู่แลกเปลี่ยนส่งของและยืนยันการรับของ
                   </p>
                 </div>
+
                 <div className="flex items-center justify-center gap-3 bg-card p-4 rounded-xl border border-primary/10 w-fit mx-auto shadow-sm">
                   <Phone className="h-5 w-5 text-primary animate-pulse" />
                   <a
@@ -968,14 +910,16 @@ export default function ExchangeTracking() {
                     {exchange.partnerPhone}
                   </a>
                 </div>
+
                 {!hasReceived ? (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button className="w-full max-w-md mx-auto eco-gradient text-primary-foreground rounded-xl h-12 shadow-md block">
-                        <CheckCircle className="h-5 w-5 mr-2 inline" />{" "}
+                        <CheckCircle className="h-5 w-5 mr-2 inline" />
                         ฉันได้รับของแล้ว
                       </Button>
                     </AlertDialogTrigger>
+
                     <AlertDialogContent className="rounded-2xl">
                       <AlertDialogHeader>
                         <AlertDialogTitle className="text-center text-xl font-bold text-primary">
@@ -988,6 +932,7 @@ export default function ExchangeTracking() {
                           </p>
                         </div>
                       </AlertDialogHeader>
+
                       <AlertDialogFooter className="flex flex-row gap-3 mt-4">
                         <AlertDialogCancel className="flex-1 mt-0 rounded-xl h-12">
                           ย้อนกลับ
@@ -1019,90 +964,87 @@ export default function ExchangeTracking() {
           )}
         </div>
 
-        {currentStatus !== "completed" &&
-          currentStatus !== "failed" &&
-          currentStatus !== "rejected" &&
-          currentStatus !== "auto_cancelled" && (
-            <Card className="border border-destructive/20 bg-destructive/5 rounded-2xl p-5 sm:p-6 transition-all mt-8">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="space-y-1">
-                  <p className="text-sm font-bold text-destructive flex items-center gap-1.5">
-                    <AlertCircle className="h-4 w-4 shrink-0" />{" "}
-                    พบปัญหาหรือต้องการยกเลิก?
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    หากไม่สะดวกแลกเปลี่ยน หรือติดต่อคู่แลกเปลี่ยนไม่ได้
-                    สามารถขอยกเลิกรายการได้ที่นี่
-                  </p>
-                </div>
+        {!["completed", "failed", "rejected", "auto_cancelled"].includes(currentStatus) && (
+          <Card className="border border-destructive/20 bg-destructive/5 rounded-2xl p-5 sm:p-6 transition-all mt-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <p className="text-sm font-bold text-destructive flex items-center gap-1.5">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  พบปัญหาหรือต้องการยกเลิก?
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  หากไม่สะดวกแลกเปลี่ยน หรือติดต่อคู่แลกเปลี่ยนไม่ได้
+                  สามารถขอยกเลิกรายการได้ที่นี่
+                </p>
+              </div>
 
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="border-destructive/30 text-destructive hover:bg-destructive hover:text-white rounded-xl text-xs h-10 shadow-sm transition-all shrink-0 w-full sm:w-auto"
-                    >
-                      <XCircle className="h-4 w-4 mr-1.5" /> ยกเลิกการแลกเปลี่ยน
-                    </Button>
-                  </AlertDialogTrigger>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="border-destructive/30 text-destructive hover:bg-destructive hover:text-white rounded-xl text-xs h-10 shadow-sm transition-all shrink-0 w-full sm:w-auto"
+                  >
+                    <XCircle className="h-4 w-4 mr-1.5" />
+                    ยกเลิกการแลกเปลี่ยน
+                  </Button>
+                </AlertDialogTrigger>
 
-                  <AlertDialogContent className="rounded-2xl max-w-md">
-                    <AlertDialogHeader>
-                      <AlertDialogTitle className="text-center text-xl font-bold text-foreground">
-                        ระบุสาเหตุการยกเลิก
-                      </AlertDialogTitle>
-                      <p className="text-center text-xs text-muted-foreground mt-1">
-                        เลือกเหตุผลหลักที่ทำให้คุณต้องการยกเลิกรายการนี้
-                      </p>
-                    </AlertDialogHeader>
+                <AlertDialogContent className="rounded-2xl max-w-md">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="text-center text-xl font-bold text-foreground">
+                      ระบุสาเหตุการยกเลิก
+                    </AlertDialogTitle>
+                    <p className="text-center text-xs text-muted-foreground mt-1">
+                      เลือกเหตุผลหลักที่ทำให้คุณต้องการยกเลิกรายการนี้
+                    </p>
+                  </AlertDialogHeader>
 
-                    <div className="space-y-2.5 my-4 max-h-[45vh] overflow-y-auto pr-1">
-                      {exchange.reasonOptions.map((reason) => {
-                        const isSelected = cancelReason === reason;
-                        return (
-                          <button
-                            key={reason}
-                            onClick={() => setCancelReason(reason)}
-                            className={`w-full p-3.5 rounded-xl border text-left text-sm transition-all flex items-center justify-between gap-3 ${
+                  <div className="space-y-2.5 my-4 max-h-[45vh] overflow-y-auto pr-1">
+                    {exchange.reasonOptions.map((reason) => {
+                      const isSelected = cancelReason === reason;
+
+                      return (
+                        <button
+                          key={reason}
+                          onClick={() => setCancelReason(reason)}
+                          className={`w-full p-3.5 rounded-xl border text-left text-sm transition-all flex items-center justify-between gap-3 ${
+                            isSelected
+                              ? "border-destructive bg-destructive/10 text-destructive font-bold ring-2 ring-destructive/20 shadow-sm"
+                              : "border-border bg-background text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                          }`}
+                        >
+                          <span>{reason}</span>
+                          <div
+                            className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-all ${
                               isSelected
-                                ? "border-destructive bg-destructive/10 text-destructive font-bold ring-2 ring-destructive/20 shadow-sm"
-                                : "border-border bg-background text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                                ? "border-destructive bg-destructive text-white"
+                                : "border-muted-foreground/30"
                             }`}
                           >
-                            <span>{reason}</span>
-                            <div
-                              className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-all ${
-                                isSelected
-                                  ? "border-destructive bg-destructive text-white"
-                                  : "border-muted-foreground/30"
-                              }`}
-                            >
-                              {isSelected && (
-                                <Check className="h-3.5 w-3.5 stroke-[3]" />
-                              )}
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
+                            {isSelected && <Check className="h-3.5 w-3.5 stroke-[3]" />}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
 
-                    <AlertDialogFooter className="flex flex-row gap-3">
-                      <AlertDialogCancel className="w-full sm:flex-1 rounded-2xl h-11 text-xs font-semibold border-border/60 bg-card text-foreground hover:bg-slate-100 dark:hover:bg-zinc-800 hover:text-foreground transition-all mt-0 shadow-xs">
-                        ย้อนกลับ
-                      </AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={handleConfirmCancel}
-                        disabled={!cancelReason}
-                        className="flex-1 rounded-xl h-11 bg-destructive hover:bg-destructive/90 text-destructive-foreground font-bold text-xs sm:text-sm shadow-md"
-                      >
-                        ยืนยันยกเลิก
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
-            </Card>
-          )}
+                  <AlertDialogFooter className="flex flex-row gap-3">
+                    <AlertDialogCancel className="w-full sm:flex-1 rounded-2xl h-11 text-xs font-semibold border-border/60 bg-card text-foreground hover:bg-slate-100 dark:hover:bg-zinc-800 hover:text-foreground transition-all mt-0 shadow-xs">
+                      ย้อนกลับ
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleConfirmCancel}
+                      disabled={!cancelReason}
+                      className="flex-1 rounded-xl h-11 bg-destructive hover:bg-destructive/90 text-destructive-foreground font-bold text-xs sm:text-sm shadow-md"
+                    >
+                      ยืนยันยกเลิก
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          </Card>
+        )}
       </section>
     </AppLayout>
   );

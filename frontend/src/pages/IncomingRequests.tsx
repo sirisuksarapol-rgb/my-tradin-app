@@ -1,14 +1,14 @@
-import { useState, useEffect } from "react";
+
+import { useState, useEffect, type ComponentType } from "react";
 import { useNavigate } from "react-router-dom";
-import axios, { AxiosError } from "axios";
+import axios from "axios";
 import { ArrowRightLeft, CheckCircle, XCircle, Inbox, ArrowLeft, Eye, Loader2, Phone, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import AppLayout from "@/components/AppLayout";
 import { useToast } from "@/hooks/use-toast";
-import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogFooter, AlertDialogCancel,
-} from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogFooter } from "@/components/ui/alert-dialog";
 
 interface ExchangeRequest {
   ExchangeID: number;
@@ -59,12 +59,133 @@ interface LoggedInUser {
   name?: string;
 }
 
+interface RequestItemPreviewProps {
+  image?: string;
+  title: string;
+  owner: string;
+}
+
 const API_BASE_URL = "http://localhost:5000/api/exchanges";
 const IMAGE_BASE_URL = "http://localhost:5000/uploads/";
+const PLACEHOLDER_IMAGE = "/placeholder.jpg";
 
-// =========================================================================
-// COMPONENT: IncomingRequests (หน้าจอจัดการคำขอแลกเปลี่ยนที่ได้รับเข้ามา)[cite: 16]
-// =========================================================================
+function getSavedUser(): LoggedInUser | null {
+  try {
+    const savedUser = sessionStorage.getItem("user");
+    return savedUser ? JSON.parse(savedUser) : null;
+  } catch {
+    return null;
+  }
+}
+
+function getSavedIds(storage: Storage, key: string): number[] {
+  try {
+    const saved = JSON.parse(storage.getItem(key) || "[]");
+    return Array.isArray(saved) ? saved : [];
+  } catch {
+    return [];
+  }
+}
+
+function getRequestAgeText(startDate: string | null): string {
+  if (!startDate) return "เมื่อเร็วๆ นี้";
+
+  const createdDate = new Date(startDate);
+
+  if (isNaN(createdDate.getTime())) return "เมื่อเร็วๆ นี้";
+
+  const now = new Date();
+  const createdDay = new Date(
+    createdDate.getFullYear(),
+    createdDate.getMonth(),
+    createdDate.getDate(),
+  );
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  const diffDays = Math.floor(
+    (today.getTime() - createdDay.getTime()) / (1000 * 60 * 60 * 24),
+  );
+
+  return diffDays <= 0 ? "วันนี้" : `${diffDays} วันที่แล้ว`;
+}
+
+function getImageUrl(imagePath?: string | null): string {
+  if (!imagePath) return PLACEHOLDER_IMAGE;
+
+  let image = imagePath.trim();
+
+  if (
+    !image ||
+    image === "undefined" ||
+    image === "null" ||
+    image === PLACEHOLDER_IMAGE
+  ) {
+    return PLACEHOLDER_IMAGE;
+  }
+
+  if (image.startsWith("http")) return image;
+
+  if (image.startsWith("[")) {
+    try {
+      const images = JSON.parse(image.split("'").join('"'));
+      image = Array.isArray(images) ? String(images[0] || "").trim() : "";
+    } catch {
+      image = image
+        .split("[").join("")
+        .split("]").join("")
+        .split('"').join("")
+        .split("'").join("");
+    }
+  }
+
+  image = image.split(",")[0]?.trim() || "";
+
+  if (!image || image === "undefined" || image === "null") {
+    return PLACEHOLDER_IMAGE;
+  }
+
+  return image.startsWith("http")
+    ? image
+    : `${IMAGE_BASE_URL}${image}`;
+}
+
+function handleImageError(event: React.SyntheticEvent<HTMLImageElement>) {
+  const image = event.currentTarget;
+
+  if (image.src !== `${window.location.origin}${PLACEHOLDER_IMAGE}`) {
+    image.src = PLACEHOLDER_IMAGE;
+  }
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (axios.isAxiosError<ErrorResponse>(error)) {
+    return error.response?.data?.message || error.message || fallback;
+  }
+
+  if (error instanceof Error) return error.message;
+
+  return fallback;
+}
+
+function RequestItemPreview({
+  image,
+  title,
+  owner,
+}: RequestItemPreviewProps) {
+  return (
+    <div className="flex-1 text-center space-y-1 min-w-0">
+      <img
+        src={getImageUrl(image)}
+        alt={title}
+        className="w-16 h-16 rounded-lg object-cover mx-auto bg-muted shadow-sm"
+        onError={handleImageError}
+      />
+      <p className="text-xs font-medium truncate">{title}</p>
+      <p className="text-[10px] text-muted-foreground truncate">{owner}</p>
+    </div>
+  );
+}
+
 export default function IncomingRequests() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -92,109 +213,86 @@ export default function IncomingRequests() {
   });
 
   const [requests, setRequests] = useState<ExchangeRequest[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState(true);
 
-  const [seenIds, setSeenIds] = useState<number[]>(() => {
-    const saved = sessionStorage.getItem("seen_exchange_ids");
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  /**
-   * ฟังก์ชัน: คำนวณระยะเวลาของคำขอแลกเปลี่ยนนับจากวันที่สร้าง[cite: 16]
-   */
-  const getRequestAgeText = (startDateStr: string | null): string => {
-    if (!startDateStr) return "เมื่อเร็วๆ นี้";
-
-    const createdDate = new Date(startDateStr);
-    const now = new Date();
-
-    const createdZero = new Date(
-      createdDate.getFullYear(),
-      createdDate.getMonth(),
-      createdDate.getDate(),
-    );
-    const nowZero = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-    const diffTime = nowZero.getTime() - createdZero.getTime();
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays <= 0) {
-      return "วันนี้";
-    } else {
-      return `${diffDays} วันที่แล้ว`;
-    }
-  };
-
-  const savedUser = sessionStorage.getItem("user");
-  const user: LoggedInUser | null = savedUser ? JSON.parse(savedUser) : null;
-
-  /**
-   * ฟังก์ชัน: ดึงข้อมูลคำขอแลกเปลี่ยนที่ส่งมาถึงผู้ใช้ปัจจุบัน[cite: 16]
-   */
-  const fetchIncomingRequests = async () => {
-    const currentUserId = user?.id || user?.MemberID;
-
-    if (!currentUserId) {
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const response = await axios.get<ApiResponse<ExchangeRequest[]>>(
-        `${API_BASE_URL}?member_id=${currentUserId}`,
-      );
-
-      if (response.data.success) {
-        const dataList = response.data.data || [];
-
-        const incoming = dataList.filter((req) => {
-          const status = (req.ExchangeStatus || "").toLowerCase();
-          return (
-            status === "pending" &&
-            String(req.TargetMemberID) === String(currentUserId)
-          );
-        });
-
-        setRequests(incoming);
-
-        const currentSeen: number[] = JSON.parse(
-          localStorage.getItem("seen_exchange_ids") || "[]",
-        );
-        const incomingIds = incoming.map((item) => item.ExchangeID);
-        const updatedSeen = Array.from(
-          new Set([...currentSeen, ...incomingIds]),
-        );
-
-        localStorage.setItem("seen_exchange_ids", JSON.stringify(updatedSeen));
-      }
-    } catch (error) {
-      console.error("Error fetching incoming requests:", error);
-      toast({
-        title: "เกิดข้อผิดพลาด",
-        description: "ไม่สามารถโหลดข้อมูลคำขอแลกเปลี่ยนได้",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [seenIds] = useState<number[]>(() =>
+    getSavedIds(sessionStorage, "seen_exchange_ids"),
+  );
 
   useEffect(() => {
-    fetchIncomingRequests();
-  }, []);
+    const fetchIncomingRequests = async () => {
+      const user = getSavedUser();
+      const currentUserId = user?.id || user?.MemberID;
 
-  const handleAccept = (req: ExchangeRequest) => {
-    setSelectedRequest(req);
+      if (!currentUserId) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+
+        const response = await axios.get<ApiResponse<ExchangeRequest[]>>(
+          `${API_BASE_URL}?member_id=${currentUserId}`,
+        );
+
+        if (response.data.success) {
+          const dataList = response.data.data || [];
+
+          const incoming = dataList.filter(
+            (request) =>
+              request.ExchangeStatus?.toLowerCase() === "pending" &&
+              String(request.TargetMemberID) === String(currentUserId),
+          );
+
+          setRequests(incoming);
+
+          // บันทึกรหัสคำขอสำหรับระบบแจ้งเตือนส่วนอื่น
+          const currentSeen = getSavedIds(
+            localStorage,
+            "seen_exchange_ids",
+          );
+          const incomingIds = incoming.map((item) => item.ExchangeID);
+          const updatedSeen = Array.from(
+            new Set([...currentSeen, ...incomingIds]),
+          );
+
+          localStorage.setItem(
+            "seen_exchange_ids",
+            JSON.stringify(updatedSeen),
+          );
+        }
+      } catch (error) {
+        console.error("Error fetching incoming requests:", error);
+        toast({
+          title: "เกิดข้อผิดพลาด",
+          description: "ไม่สามารถโหลดข้อมูลคำขอแลกเปลี่ยนได้",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchIncomingRequests();
+  }, [toast]);
+
+  const handleAccept = (request: ExchangeRequest) => {
+    setSelectedRequest(request);
     setPhoneInput("");
     setIsPhoneModalOpen(true);
   };
 
-  /**
-   * ฟังก์ชัน: ยืนยันการตอบรับคำขอแลกเปลี่ยนและส่งเบอร์โทรศัพท์[cite: 16]
-   */
+  const closePhoneModal = () => {
+    if (isAccepting) return;
+
+    setPhoneInput("");
+    setSelectedRequest(null);
+    setIsPhoneModalOpen(false);
+  };
+
   const confirmAccept = async () => {
-    if (!selectedRequest) return;
+    if (!selectedRequest || isAccepting) return;
 
     if (!phoneInput || phoneInput.trim().length < 9) {
       toast({
@@ -205,46 +303,50 @@ export default function IncomingRequests() {
       return;
     }
 
-    setIsAccepting(true);
-    const req = selectedRequest;
+    const request = selectedRequest;
 
     try {
+      setIsAccepting(true);
+
       const response = await axios.put<ApiResponse<null>>(
-        `${API_BASE_URL}/${req.ExchangeID}`,
+        `${API_BASE_URL}/${request.ExchangeID}`,
         {
           action: "accept",
           phone_number: phoneInput.trim(),
         },
       );
 
-      if (response.data.success) {
-        try {
-          await axios.post(`${API_BASE_URL}/${req.ExchangeID}/request-code`, {
-            user_id: req.MemberID,
-          });
-          await axios.post(`${API_BASE_URL}/${req.ExchangeID}/request-code`, {
-            user_id: req.TargetMemberID,
-          });
-        } catch (otpError) {
-          console.error("แจ้งเตือน: ไม่สามารถส่ง OTP อัตโนมัติได้", otpError);
-        }
-
-        setIsPhoneModalOpen(false);
-        setSuccessModal({
-          isOpen: true,
-          title: "ตอบรับคำขอสำเร็จ! 🎉",
-          description:
-            "ระบบกำลังส่งรหัส OTP ให้คุณและคู่แลกเปลี่ยน สามารถตรวจสอบสถานะได้ที่หน้าติดตามการแลกเปลี่ยน",
-          type: "accept",
-          exchangeId: req.ExchangeID,
-        });
+      if (!response.data.success) {
+        throw new Error(response.data.message || "ไม่สามารถตอบรับคำขอได้");
       }
+
+      try {
+        await axios.post(
+          `${API_BASE_URL}/${request.ExchangeID}/request-code`,
+          { user_id: request.MemberID },
+        );
+        await axios.post(
+          `${API_BASE_URL}/${request.ExchangeID}/request-code`,
+          { user_id: request.TargetMemberID },
+        );
+      } catch (error) {
+        console.error("ไม่สามารถส่ง OTP อัตโนมัติได้:", error);
+      }
+
+      setIsPhoneModalOpen(false);
+
+      setSuccessModal({
+        isOpen: true,
+        title: "ตอบรับคำขอสำเร็จ! 🎉",
+        description:
+          "ระบบกำลังส่งรหัส OTP ให้คุณและคู่แลกเปลี่ยน สามารถตรวจสอบสถานะได้ที่หน้าติดตามการแลกเปลี่ยน",
+        type: "accept",
+        exchangeId: request.ExchangeID,
+      });
     } catch (error) {
-      const axiosError = error as AxiosError<ErrorResponse>;
       toast({
         title: "เกิดข้อผิดพลาด",
-        description:
-          axiosError.response?.data?.message || "ไม่สามารถตอบรับคำขอได้",
+        description: getErrorMessage(error, "ไม่สามารถตอบรับคำขอได้"),
         variant: "destructive",
       });
     } finally {
@@ -252,39 +354,39 @@ export default function IncomingRequests() {
     }
   };
 
-  /**
-   * ฟังก์ชัน: ยืนยันการปฏิเสธคำขอแลกเปลี่ยน[cite: 16]
-   */
   const confirmReject = async () => {
-    if (!rejectRequest) return;
-    setIsRejecting(true);
+    if (!rejectRequest || isRejecting) return;
+
+    const request = rejectRequest;
 
     try {
+      setIsRejecting(true);
+
       const response = await axios.put<ApiResponse<null>>(
-        `${API_BASE_URL}/${rejectRequest.ExchangeID}`,
+        `${API_BASE_URL}/${request.ExchangeID}`,
         { action: "reject" },
       );
 
-      if (response.data.success) {
-        setRequests((prev) =>
-          prev.filter((item) => item.ExchangeID !== rejectRequest.ExchangeID),
-        );
-
-        setRejectRequest(null);
-        setSuccessModal({
-          isOpen: true,
-          title: "ปฏิเสธคำขอเรียบร้อย",
-          description: `แจ้งผลไปยัง ${rejectRequest.theirAuthorName || "ผู้ใช้งาน"} เรียบร้อยแล้ว`,
-          type: "reject",
-          exchangeId: null,
-        });
+      if (!response.data.success) {
+        throw new Error(response.data.message || "ไม่สามารถปฏิเสธคำขอได้");
       }
+
+      setRequests((previous) =>
+        previous.filter((item) => item.ExchangeID !== request.ExchangeID),
+      );
+      setRejectRequest(null);
+
+      setSuccessModal({
+        isOpen: true,
+        title: "ปฏิเสธคำขอเรียบร้อย",
+        description: `แจ้งผลไปยัง ${request.theirAuthorName || "ผู้ใช้งาน"} เรียบร้อยแล้ว`,
+        type: "reject",
+        exchangeId: null,
+      });
     } catch (error) {
-      const axiosError = error as AxiosError<ErrorResponse>;
       toast({
         title: "เกิดข้อผิดพลาด",
-        description:
-          axiosError.response?.data?.message || "ไม่สามารถปฏิเสธคำขอได้",
+        description: getErrorMessage(error, "ไม่สามารถปฏิเสธคำขอได้"),
         variant: "destructive",
       });
     } finally {
@@ -292,23 +394,16 @@ export default function IncomingRequests() {
     }
   };
 
-  /**
-   * ฟังก์ชัน: จัดรูปแบบ URL รูปภาพสินค้าให้ถูกต้องพร้อมใช้งาน[cite: 16]
-   */
-  const getImageUrl = (imagePath: string | null | undefined): string => {
-    if (
-      !imagePath ||
-      imagePath.trim() === "undefined" ||
-      imagePath === "null" ||
-      imagePath === "/placeholder.jpg"
-    )
-      return "/placeholder.jpg";
-    if (imagePath.startsWith("http")) return imagePath;
+  const closeSuccessModal = () => {
+    const { type, exchangeId } = successModal;
 
-    let cleanPath = imagePath.trim().replace(/\|"|'/g, "");
-    cleanPath = cleanPath.split(",")[0];
+    setSuccessModal((previous) => ({ ...previous, isOpen: false }));
 
-    return `${IMAGE_BASE_URL}${cleanPath}`;
+    if (type === "accept" && exchangeId) {
+      navigate(`/exchange-tracking/${exchangeId}`, {
+        state: { newStatus: "accepted" },
+      });
+    }
   };
 
   return (
@@ -320,6 +415,7 @@ export default function IncomingRequests() {
             size="icon"
             onClick={() => navigate(-1)}
             className="-ml-2 hover:bg-slate-200/60 dark:hover:bg-zinc-800/60 text-foreground transition-all"
+            aria-label="ย้อนกลับ"
           >
             <ArrowLeft className="h-5 w-5 text-foreground" />
           </Button>
@@ -343,179 +439,152 @@ export default function IncomingRequests() {
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {requests.map((req) => (
-              <Card
-                key={req.ExchangeID}
-                className="glass-card border-primary/20"
-              >
-                <CardContent className="p-4 space-y-3">
-                  <div className="grid grid-cols-3 items-center gap-1">
-                    <div className="justify-self-start">
-                      {!seenIds.includes(req.ExchangeID) ? (
-                        <Badge className="bg-orange-500/15 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400 hover:bg-orange-500/15 dark:hover:bg-orange-500/20 pointer-events-none border-0 text-xs font-medium">
-                          คำขอใหม่
-                        </Badge>
-                      ) : (
-                        <Badge
-                          variant="outline"
-                          className="text-muted-foreground border-muted text-xs font-normal"
+            {requests.map((request) => {
+              const theirTitle =
+                request.theirPostTitle ||
+                request.their_post_title ||
+                request.MyItemName ||
+                request.my_item_name ||
+                "ไม่มีชื่อสิ่งของของเขา";
+
+              const myTitle =
+                request.myPostTitle ||
+                request.my_post_title ||
+                request.TargetItemName ||
+                request.target_item_name ||
+                "ไม่มีชื่อสิ่งของของเรา";
+
+              return (
+                <Card
+                  key={request.ExchangeID}
+                  className="glass-card border-primary/20"
+                >
+                  <CardContent className="p-4 space-y-3">
+                    <div className="grid grid-cols-3 items-center gap-1">
+                      <div className="justify-self-start">
+                        {!seenIds.includes(request.ExchangeID) ? (
+                          <Badge className="bg-orange-500/15 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400 hover:bg-orange-500/15 dark:hover:bg-orange-500/20 pointer-events-none border-0 text-xs font-medium">
+                            คำขอใหม่
+                          </Badge>
+                        ) : (
+                          <Badge
+                            variant="outline"
+                            className="text-muted-foreground border-muted text-xs font-normal"
+                          >
+                            {getRequestAgeText(request.StartDate)}
+                          </Badge>
+                        )}
+                      </div>
+
+                      <div className="justify-self-center">
+                        {request.MatchScore && request.MatchScore > 0 && (
+                          <Badge className="bg-primary text-white hover:bg-primary pointer-events-none border-0 text-[10px] px-1.5 py-0.5 font-semibold shadow-xs whitespace-nowrap">
+                            คะแนนจับคู่ {request.MatchScore}%
+                          </Badge>
+                        )}
+                      </div>
+
+                      <div className="justify-self-end">
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                          {request.StartDate
+                            ? new Date(request.StartDate).toLocaleDateString("th-TH")
+                            : "เมื่อเร็วๆ นี้"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <RequestItemPreview
+                        image={
+                          request.theirPostImage ||
+                          request.their_post_image ||
+                          request.MyItemImage ||
+                          request.my_item_image
+                        }
+                        title={theirTitle}
+                        owner={
+                          request.theirAuthorName ||
+                          request.sender_name ||
+                          request.MemberName ||
+                          "ผู้ใช้งาน"
+                        }
+                      />
+
+                      <ArrowRightLeft className="h-4 w-4 text-primary shrink-0" />
+
+                      <RequestItemPreview
+                        image={
+                          request.myPostImage ||
+                          request.my_post_image ||
+                          request.TargetItemImage ||
+                          request.target_item_image
+                        }
+                        title={myTitle}
+                        owner="ของคุณ"
+                      />
+                    </div>
+
+                    <div className="space-y-2 pt-2 border-t border-border/50 mt-3">
+                      <Button
+                        variant="secondary"
+                        className="w-full text-xs h-8"
+                        onClick={() =>
+                          navigate(`/post/${request.MyItemID}`, {
+                            state: {
+                              fromPage: "incoming",
+                              fromIncomingRequest: true,
+                            },
+                          })
+                        }
+                      >
+                        <Eye className="h-3.5 w-3.5 mr-1.5" />
+                        ดูรายละเอียดของที่สนใจแลก
+                      </Button>
+
+                      <div className="flex gap-2">
+                        <Button
+                          className="flex-1 eco-gradient text-primary-foreground"
+                          size="sm"
+                          onClick={() => handleAccept(request)}
                         >
-                          {getRequestAgeText(req.StartDate)}
-                        </Badge>
-                      )}
+                          <CheckCircle className="h-4 w-4 mr-1" />
+                          ตอบรับ
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          className="flex-1 border-border/60 text-foreground hover:bg-slate-200/60 dark:hover:bg-zinc-800/60 hover:text-foreground transition-all"
+                          size="sm"
+                          onClick={() => setRejectRequest(request)}
+                        >
+                          <XCircle className="h-4 w-4 mr-1 text-muted-foreground" />
+                          ปฏิเสธ
+                        </Button>
+                      </div>
                     </div>
-
-                    <div className="justify-self-center">
-                      {req.MatchScore && req.MatchScore > 0 ? (
-                        <Badge className="bg-primary text-white hover:bg-primary pointer-events-none border-0 text-[10px] px-1.5 py-0.5 font-semibold shadow-xs whitespace-nowrap">
-                          คะแนนจับคู่ {req.MatchScore}%
-                        </Badge>
-                      ) : null}
-                    </div>
-
-                    <div className="justify-self-end">
-                      <span className="text-xs text-muted-foreground whitespace-nowrap">
-                        {req.StartDate
-                          ? new Date(req.StartDate).toLocaleDateString("th-TH")
-                          : "เมื่อเร็วๆ นี้"}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 text-center space-y-1 min-w-0">
-                      <img
-                        src={getImageUrl(
-                          req.theirPostImage ||
-                            req.their_post_image ||
-                            req.MyItemImage ||
-                            req.my_item_image,
-                        )}
-                        alt={
-                          req.theirPostTitle ||
-                          req.their_post_title ||
-                          req.MyItemName ||
-                          req.my_item_name
-                        }
-                        className="w-16 h-16 rounded-lg object-cover mx-auto bg-muted shadow-sm"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          if (
-                            target.src !==
-                            window.location.origin + "/placeholder.jpg"
-                          ) {
-                            target.src = "/placeholder.jpg";
-                          }
-                        }}
-                      />
-                      <p className="text-xs font-medium truncate">
-                        {req.theirPostTitle ||
-                          req.their_post_title ||
-                          req.MyItemName ||
-                          req.my_item_name ||
-                          "ไม่มีชื่อสิ่งของของเขา"}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground truncate">
-                        {req.theirAuthorName ||
-                          req.sender_name ||
-                          req.MemberName ||
-                          "ผู้ใช้งาน"}
-                      </p>
-                    </div>
-
-                    <ArrowRightLeft className="h-4 w-4 text-primary shrink-0" />
-
-                    <div className="flex-1 text-center space-y-1 min-w-0">
-                      <img
-                        src={getImageUrl(
-                          req.myPostImage ||
-                            req.my_post_image ||
-                            req.TargetItemImage ||
-                            req.target_item_image,
-                        )}
-                        alt={
-                          req.myPostTitle ||
-                          req.my_post_title ||
-                          req.TargetItemName ||
-                          req.target_item_name
-                        }
-                        className="w-16 h-16 rounded-lg object-cover mx-auto bg-muted shadow-sm"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          if (
-                            target.src !==
-                            window.location.origin + "/placeholder.jpg"
-                          ) {
-                            target.src = "/placeholder.jpg";
-                          }
-                        }}
-                      />
-                      <p className="text-xs font-medium truncate">
-                        {req.myPostTitle ||
-                          req.my_post_title ||
-                          req.TargetItemName ||
-                          req.target_item_name ||
-                          "ไม่มีชื่อสิ่งของของเรา"}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground">
-                        ของคุณ
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 pt-2 border-t border-border/50 mt-3">
-                    <Button
-                      variant="secondary"
-                      className="w-full text-xs h-8"
-                      onClick={() =>
-                        navigate(`/post/${req.MyItemID}`, {
-                          state: {
-                            fromPage: "incoming",
-                            fromIncomingRequest: true,
-                          },
-                        })
-                      }
-                    >
-                      <Eye className="h-3.5 w-3.5 mr-1.5" />{" "}
-                      ดูรายละเอียดของที่สนใจแลก
-                    </Button>
-
-                    <div className="flex gap-2">
-                      <Button
-                        className="flex-1 eco-gradient text-primary-foreground"
-                        size="sm"
-                        onClick={() => handleAccept(req)}
-                      >
-                        <CheckCircle className="h-4 w-4 mr-1" /> ตอบรับ
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="flex-1 border-border/60 text-foreground hover:bg-slate-200/60 dark:hover:bg-zinc-800/60 hover:text-foreground transition-all"
-                        size="sm"
-                        onClick={() => setRejectRequest(req)}
-                      >
-                        <XCircle className="h-4 w-4 mr-1 text-muted-foreground" />{" "}
-                        ปฏิเสธ
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
 
-      <AlertDialog open={isPhoneModalOpen} onOpenChange={setIsPhoneModalOpen}>
+      <AlertDialog
+        open={isPhoneModalOpen}
+        onOpenChange={(open) => {
+          if (!open) closePhoneModal();
+          else setIsPhoneModalOpen(true);
+        }}
+      >
         <AlertDialogContent className="rounded-3xl max-w-md p-6 sm:p-8 shadow-2xl border border-border/50 bg-card backdrop-blur-xl space-y-4">
           <div className="flex items-center justify-end">
             <button
-              onClick={() => {
-                setPhoneInput("");
-                setSelectedRequest(null);
-                setIsPhoneModalOpen(false);
-              }}
-              className="p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+              type="button"
+              aria-label="ปิดหน้าต่าง"
+              onClick={closePhoneModal}
+              disabled={isAccepting}
+              className="p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors disabled:opacity-50"
             >
               <X className="h-4 w-4" />
             </button>
@@ -525,13 +594,15 @@ export default function IncomingRequests() {
             <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center text-primary shadow-inner border border-primary/25">
               <Phone className="h-6 w-6" />
             </div>
+
             <AlertDialogTitle className="text-xl font-bold tracking-tight text-foreground">
               ข้อมูลการติดต่อผู้แลกเปลี่ยน
             </AlertDialogTitle>
+
             <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed px-2">
               กรอกเบอร์โทรศัพท์มือถือของคุณ เพื่อให้{" "}
               <strong className="text-foreground">
-                {selectedRequest?.theirAuthorName}
+                {selectedRequest?.theirAuthorName || "คู่แลกเปลี่ยน"}
               </strong>{" "}
               สามารถติดต่อประสานงานนัดรับสินค้าได้สะดวกยิ่งขึ้น
             </p>
@@ -546,13 +617,17 @@ export default function IncomingRequests() {
                 type="tel"
                 maxLength={10}
                 value={phoneInput}
-                onChange={(e) =>
-                  setPhoneInput(e.target.value.replace(/\D/g, ""))
+                onChange={(event) =>
+                  setPhoneInput(
+                    event.target.value.split("").filter((char) => char >= "0" && char <= "9").join(""),
+                  )
                 }
                 placeholder="8XXXXXXXX"
+                disabled={isAccepting}
                 className="w-full text-center tracking-widest font-bold text-lg h-14 pl-12 pr-4 border rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/40 bg-background/50 shadow-inner transition-all text-foreground placeholder:text-muted-foreground/50"
               />
             </div>
+
             <p className="text-[11px] text-center text-muted-foreground">
               ระบุเบอร์โทรศัพท์ 10 หลัก (เช่น 0812345678)
             </p>
@@ -561,14 +636,12 @@ export default function IncomingRequests() {
           <AlertDialogFooter className="flex flex-col sm:flex-row gap-2.5 pt-2">
             <AlertDialogCancel
               className="w-full sm:flex-1 rounded-2xl h-11 text-xs font-semibold border-border/60 bg-card text-foreground hover:bg-slate-100 dark:hover:bg-zinc-800 hover:text-foreground transition-all mt-0 shadow-xs"
-              onClick={() => {
-                setPhoneInput("");
-                setSelectedRequest(null);
-              }}
+              onClick={closePhoneModal}
               disabled={isAccepting}
             >
               ยกเลิก
             </AlertDialogCancel>
+
             <Button
               onClick={confirmAccept}
               disabled={phoneInput.length < 9 || isAccepting}
@@ -576,7 +649,7 @@ export default function IncomingRequests() {
             >
               {isAccepting ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />{" "}
+                  <Loader2 className="h-4 w-4 mr-2" />
                   กำลังประมวลผล...
                 </>
               ) : (
@@ -589,36 +662,41 @@ export default function IncomingRequests() {
 
       <AlertDialog
         open={!!rejectRequest}
-        onOpenChange={(open) => !open && !isRejecting && setRejectRequest(null)}
+        onOpenChange={(open) => {
+          if (!open && !isRejecting) setRejectRequest(null);
+        }}
       >
         <AlertDialogContent className="rounded-3xl max-w-sm p-6 text-center shadow-xl">
           <AlertDialogTitle className="text-xl text-center">
             ยืนยันการปฏิเสธ
           </AlertDialogTitle>
+
           <p className="text-sm text-muted-foreground mt-2">
             คุณต้องการปฏิเสธคำขอแลกเปลี่ยนจาก{" "}
-            <strong>{rejectRequest?.theirAuthorName}</strong> ใช่หรือไม่?
+            <strong>{rejectRequest?.theirAuthorName || "ผู้ใช้งาน"}</strong>{" "}
+            ใช่หรือไม่?
           </p>
+
           <AlertDialogFooter className="flex flex-col sm:flex-row gap-2 mt-5 sm:space-x-0">
-            <Button
-              variant="outline"
+            <AlertDialogCancel
               className="w-full sm:flex-1 rounded-2xl h-11 text-xs font-semibold border-border/60 bg-card text-foreground hover:bg-slate-100 dark:hover:bg-zinc-800 hover:text-foreground transition-all mt-0 shadow-xs"
               onClick={() => setRejectRequest(null)}
               disabled={isRejecting}
             >
               ยกเลิก
-            </Button>
-            <Button
-              variant="destructive"
-              className="w-full sm:flex-1 rounded-xl h-11 text-xs font-semibold"
-              onClick={confirmReject}
+            </AlertDialogCancel>
+
+            <AlertDialogAction
+              className="w-full sm:flex-1 rounded-xl h-11 text-xs font-semibold bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(event) => {
+                event.preventDefault();
+                confirmReject();
+              }}
               disabled={isRejecting}
             >
-              {isRejecting ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : null}
+              {isRejecting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               ยืนยันการปฏิเสธ
-            </Button>
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -626,36 +704,25 @@ export default function IncomingRequests() {
       <AlertDialog
         open={successModal.isOpen}
         onOpenChange={(open) => {
-          if (!open) {
-            setSuccessModal((prev) => ({ ...prev, isOpen: false }));
-            if (successModal.type === "accept" && successModal.exchangeId) {
-              navigate(`/exchange-tracking/${successModal.exchangeId}`, {
-                state: { newStatus: "accepted" },
-              });
-            }
-          }
+          if (!open) closeSuccessModal();
         }}
       >
         <AlertDialogContent className="rounded-3xl max-w-sm p-6 text-center shadow-xl">
           <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner">
             <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
           </div>
+
           <AlertDialogTitle className="text-xl text-center">
             {successModal.title}
           </AlertDialogTitle>
+
           <p className="text-sm text-muted-foreground mt-2">
             {successModal.description}
           </p>
+
           <Button
             className="w-full rounded-xl mt-6 h-11 font-semibold"
-            onClick={() => {
-              setSuccessModal((prev) => ({ ...prev, isOpen: false }));
-              if (successModal.type === "accept" && successModal.exchangeId) {
-                navigate(`/exchange-tracking/${successModal.exchangeId}`, {
-                  state: { newStatus: "accepted" },
-                });
-              }
-            }}
+            onClick={closeSuccessModal}
           >
             ตกลง
           </Button>

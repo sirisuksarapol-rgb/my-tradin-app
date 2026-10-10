@@ -29,27 +29,27 @@ export default function ExchangeReview() {
       <div className="max-w-xl mx-auto p-6 space-y-4">
         <h1 className="text-2xl font-bold">รีวิวการแลกเปลี่ยน</h1>
 
-        {/* การ์ดสำหรับห่อหุ้มและแสดงข้อมูลรายละเอียดการแลกเปลี่ยนและคะแนนรีวิว[cite: 13] */}
+        {/* การ์ดสำหรับห่อหุ้มและแสดงข้อมูลรายละเอียดการแลกเปลี่ยนและคะแนนรีวิว */}
         <Card>
           <CardContent className="space-y-3 py-4">
-            {/* แสดงชื่อสิ่งของที่ทำการแลกเปลี่ยนระหว่างกัน[cite: 13] */}
+            {/* แสดงชื่อสิ่งของที่ทำการแลกเปลี่ยนระหว่างกัน */}
             <p className="font-semibold">
               {exchange.itemA} ↔ {exchange.itemB}
             </p>
 
-            {/* แสดงชื่อของคู่แลกเปลี่ยนในรายการนี้[cite: 13] */}
+            {/* แสดงชื่อของคู่แลกเปลี่ยนในรายการนี้ */}
             <p className="text-sm text-muted-foreground">
               แลกกับ {exchange.partnerName}
             </p>
 
-            {/* วนลูปสร้างไอคอนรูปดาวตามระดับคะแนนรีวิวที่ได้รับ[cite: 13] */}
+            {/* วนลูปสร้างไอคอนรูปดาวตามระดับคะแนนรีวิวที่ได้รับ */}
             <div className="flex items-center gap-1">
               {[...Array(exchange.rating)].map((_, i) => (
                 <Star key={i} className="h-4 w-4 text-yellow-500 fill-yellow-500" />
               ))}
             </div>
 
-            {/* แสดงข้อความความคิดเห็นหรือรีวิวรายละเอียดการแลกเปลี่ยน[cite: 13] */}
+            {/* แสดงข้อความความคิดเห็นหรือรีวิวรายละเอียดการแลกเปลี่ยน */}
             <p className="text-sm">{exchange.review}</p>
           </CardContent>
         </Card>

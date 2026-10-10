@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Camera, MapPin, Globe, Trash2, X, Package, AlignLeft, ArrowRightLeft, Loader2, icons } from "lucide-react";
+import { Camera, MapPin, Globe, Trash2, X, Package, AlignLeft, ArrowRightLeft, Loader2, icons,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import AppLayout from "@/components/AppLayout";
 import { useToast } from "@/hooks/use-toast";
 import { createItem, getCategories } from "@/api/api";
@@ -20,27 +22,34 @@ interface DBCategory {
   icon_color?: string;
 }
 
-const DynamicIcon = ({ name, className, style }: { name?: string; className?: string; style?: React.CSSProperties }) => {
+const DynamicIcon = ({
+  name,
+  className,
+  style,
+}: {
+  name?: string;
+  className?: string;
+  style?: React.CSSProperties;
+}) => {
   if (!name) return null;
   if (name.startsWith("http") || name.startsWith("/")) {
     return <img src={name} alt="" className={className} style={style} />;
   }
   if (name.length <= 2) {
-    return <span className={className} style={style}>{name}</span>;
+    return (
+      <span className={className} style={style}>
+        {name}
+      </span>
+    );
   }
-  const iconsMap = icons as unknown as Record<string, React.ComponentType<{ className?: string; style?: React.CSSProperties }>>;
+  const iconsMap = icons as unknown as Record<
+    string,
+    React.ComponentType<{ className?: string; style?: React.CSSProperties }>
+  >;
   const IconComponent = iconsMap[name] || icons.Folder;
   return <IconComponent className={className} style={style} />;
 };
-
-// =========================================================================
-// COMPONENT: CreatePost (หน้าจอสำหรับสร้างและลงประกาศแลกเปลี่ยนสินค้าใหม่)
-// =========================================================================
 export default function CreatePost() {
-  
-  // =====================================================================
-  // EFFECT: เลื่อนหน้าจอขึ้นไปด้านบนสุดโดยอัตโนมัติเมื่อคอมโพเนนต์ถูกโหลด (Scroll to Top)
-  // =====================================================================
   useEffect(() => {
     const fetchCategoriesData = async () => {
       try {
@@ -56,142 +65,120 @@ export default function CreatePost() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // สถานะจัดการรูปภาพ ตัวไฟล์ และสถานะการโหลดข้อมูล
   const [images, setImages] = useState<string[]>([]);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-
-  // สถานะฟอร์มข้อมูลสินค้า
   const [title, setTitle] = useState("");
-  const [category, setCategory] = useState("");
-  const [categoryId, setCategoryId] = useState<number | string>(""); // <- เพิ่ม State นี้
-  const [categoriesList, setCategoriesList] = useState<DBCategory[]>([]); // <- เพิ่ม State นี้
+  const [categoryId, setCategoryId] = useState<number | string>("");
+  const [categoriesList, setCategoriesList] = useState<DBCategory[]>([]);
   const [description, setDescription] = useState("");
   const [wanted, setWanted] = useState("");
   const [location, setLocation] = useState("");
   const [mapLink, setMapLink] = useState("");
-
-  // สถานะควบคุมข้อผิดพลาด (Validation Errors) ในแต่ละฟิลด์
   const [errors, setErrors] = useState<Record<string, string>>({});
-
-  // =====================================================================
-  // ฟังก์ชัน: จัดการการเลือกและอัปโหลดไฟล์รูปภาพสินค้า (HANDLE FILE CHANGE)
-  // =====================================================================
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
-    
-    // ตรวจสอบเงื่อนไขจำกัดจำนวนรูปภาพสูงสุดไม่เกิน 6 รูป
     if (images.length + files.length > 6) {
-      toast({ title: "จำกัดรูปภาพ", description: "สามารถอัปโหลดได้สูงสุด 6 รูปเท่านั้น", variant: "destructive" });
+      toast({
+        title: "จำกัดรูปภาพ",
+        description: "สามารถอัปโหลดได้สูงสุด 6 รูปเท่านั้น",
+        variant: "destructive",
+      });
       return;
     }
 
     const newFilesArray = Array.from(files);
-    setSelectedFiles(prev => [...prev, ...newFilesArray]);
-
-    // แปลงไฟล์รูปภาพเป็น Data URL สำหรับใช้แสดงตัวอย่างภาพ (Image Preview) บนหน้าจอ
+    setSelectedFiles((prev) => [...prev, ...newFilesArray]);
     newFilesArray.forEach((file) => {
       const reader = new FileReader();
       reader.onloadend = () => {
         setImages((prev) => {
           const newImages = [...prev, reader.result as string];
-          if (newImages.length >= 3 && errors.images) setErrors((curr) => ({ ...curr, images: "" }));
+          if (newImages.length >= 3 && errors.images)
+            setErrors((curr) => ({ ...curr, images: "" }));
           return newImages;
         });
       };
       reader.readAsDataURL(file);
     });
-    
+
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
-
-  // =====================================================================
-  // ฟังก์ชัน: ลบรูปภาพที่เลือกออกจากรายการพรีวิวและอาเรย์ไฟล์
-  // =====================================================================
   const removeImage = (index: number) => {
     setImages(images.filter((_, i) => i !== index));
     setSelectedFiles(selectedFiles.filter((_, i) => i !== index));
   };
-
-  // =====================================================================
-  // ฟังก์ชัน: ตรวจสอบความถูกต้องของฟอร์มและส่งข้อมูลประกาศใหม่ไปยัง API
-  // =====================================================================
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const newErrors: Record<string, string> = {};
-    
-    // ตรวจสอบข้อมูลจำเป็นและเงื่อนไขความถูกต้อง (Client-side Validation)
     if (images.length < 3) newErrors.images = "กรุณาลงรูปสินค้าอย่างน้อย 3 รูป";
     if (!title.trim()) newErrors.title = "กรุณาระบุชื่อสิ่งของ";
-    if (!category) newErrors.category = "กรุณาเลือกหมวดหมู่สิ่งของ";
-    if (!description.trim()) newErrors.description = "กรุณาระบุรายละเอียดสิ่งของ";
+    if (!categoryId) newErrors.category = "กรุณาเลือกหมวดหมู่สิ่งของ";
+    if (!description.trim())
+      newErrors.description = "กรุณาระบุรายละเอียดสิ่งของ";
     if (!wanted.trim()) newErrors.wanted = "กรุณาระบุสิ่งที่ต้องการแลก";
     if (!location.trim()) newErrors.location = "กรุณาระบุสถานที่นัดรับ";
-    
+
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      toast({ variant: "destructive", title: "ข้อมูลไม่ครบถ้วน", description: "กรุณากรอกข้อมูลในช่องที่จำเป็นให้ครบถ้วน" });
+      toast({
+        variant: "destructive",
+        title: "ข้อมูลไม่ครบถ้วน",
+        description: "กรุณากรอกข้อมูลในช่องที่จำเป็นให้ครบถ้วน",
+      });
       return;
     }
 
     setIsLoading(true);
 
     try {
-      // ตรวจสอบข้อมูลผู้ใช้งานจาก sessionStorage เพื่อระบุตัวตนผู้โพสต์
       const savedUser = sessionStorage.getItem("user");
       const user = savedUser ? JSON.parse(savedUser) : null;
-      if (!user) {
-        toast({ variant: "destructive", title: "กรุณาเข้าสู่ระบบก่อนทำการโพสต์" });
-        setIsLoading(false);
-        return;
-      }
-      
-      const currentMemberId = user.id || user.user_id || user.UserID || user.MemberID;
 
-      // จัดเตรียมข้อมูลในรูปแบบ FormData สำหรับรองรับการอัปโหลดไฟล์หลายไฟล์
+      const currentMemberId =
+        user.id || user.user_id || user.UserID || user.MemberID;
       const formData = new FormData();
       formData.append("item_name", title);
-      formData.append("item_detail", description); 
+      formData.append("item_detail", description);
       formData.append("wanted_item", wanted);
-      formData.append("meeting_place", location);   
-      formData.append("location_link", mapLink);   
+      formData.append("meeting_place", location);
+      formData.append("location_link", mapLink);
       formData.append("category_id", String(categoryId));
-      formData.append("member_id", String(currentMemberId)); 
+      formData.append("member_id", String(currentMemberId));
 
       if (selectedFiles.length > 0) {
         selectedFiles.forEach((file) => {
-          formData.append("images", file); 
+          formData.append("images", file);
         });
       }
-
-      // เรียกใช้งาน API สร้างโพสต์สินค้า
       await createItem(formData);
 
-      toast({ 
-        title: "สำเร็จ", 
-        description: "ลงประกาศแลกเปลี่ยนเรียบร้อย" 
+      toast({
+        title: "สำเร็จ",
+        description: "ลงประกาศแลกเปลี่ยนเรียบร้อย",
       });
 
       navigate("/my-posts");
-      
     } catch (error) {
       console.error("Error creating post:", error);
-      toast({ 
-        variant: "destructive", 
-        title: "เกิดข้อผิดพลาด", 
-        description: "ไม่สามารถสร้างโพสต์ได้ กรุณาลองใหม่อีกครั้ง" 
+      toast({
+        variant: "destructive",
+        title: "เกิดข้อผิดพลาด",
+        description: "ไม่สามารถสร้างโพสต์ได้ กรุณาลองใหม่อีกครั้ง",
       });
     } finally {
       setIsLoading(false);
     }
   };
 
+  const selectedCat = categoriesList.find(
+    (cat) => String(cat.CategoryID) === String(categoryId),
+  );
+
   return (
     <AppLayout>
-      {/* ส่วนหัวข้อหน้าจอ (Header) */}
-      <section className="border-b border-border/50 w-screen relative left-1/2 -translate-x-1/2 -mt-6 px-4 sm:px-6">
+      <section className="w-screen relative left-1/2 -translate-x-1/2 -mt-6 px-4 sm:px-6">
         <div className="mx-auto max-w-5xl py-8">
           <div className="flex items-center justify-between">
             <div>
@@ -212,13 +199,10 @@ export default function CreatePost() {
           </div>
         </div>
       </section>
-
-      {/* ส่วนฟอร์มกรอกรายละเอียดสินค้า (Form Section) */}
       <section className="py-8 sm:py-10">
         <div className="mx-auto max-w-5xl">
           <form onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 lg:gap-12">
-              {/* คอลัมน์ซ้าย: จัดการรูปภาพสินค้า */}
               <div className="lg:col-span-2 space-y-4">
                 <div className="flex justify-between items-center">
                   <Label
@@ -284,10 +268,7 @@ export default function CreatePost() {
                   className="hidden"
                 />
               </div>
-
-              {/* คอลัมน์ขวา: ฟิลด์กรอกข้อมูลรายละเอียดสินค้า */}
               <div className="lg:col-span-3 space-y-5">
-                {/* ชื่อสิ่งของ */}
                 <div className="space-y-1.5">
                   <Label
                     htmlFor="title"
@@ -315,8 +296,6 @@ export default function CreatePost() {
                     <p className="text-xs text-destructive">{errors.title}</p>
                   )}
                 </div>
-
-                {/* หมวดหมู่ */}
                 <div className="space-y-2">
                   <Label
                     className={`font-semibold ${errors.category ? "text-red-500" : ""}`}
@@ -328,12 +307,6 @@ export default function CreatePost() {
                     value={categoryId ? String(categoryId) : ""}
                     onValueChange={(val) => {
                       setCategoryId(Number(val));
-                      const selectedCat = categoriesList.find(
-                        (cat) => String(cat.CategoryID) === val
-                      );
-                      if (selectedCat) {
-                        setCategory(selectedCat.CategoryName);
-                      }
                       if (errors.category)
                         setErrors((prev) => ({ ...prev, category: "" }));
                     }}
@@ -341,22 +314,15 @@ export default function CreatePost() {
                     <SelectTrigger
                       className={`relative pl-10 h-11 ${errors.category ? "border-red-500 ring-red-500" : ""}`}
                     >
-                      <DynamicIcon 
-                        name={
-                          categoryId 
-                            ? categoriesList.find(c => String(c.CategoryID) === String(categoryId))?.IconName 
-                            : "LayoutGrid"
-                        } 
+                      <DynamicIcon
+                        name={categoryId ? selectedCat?.IconName : "LayoutGrid"}
                         className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${
                           errors.category ? "text-red-500" : "text-primary"
                         }`}
                       />
-                      
+
                       <SelectValue placeholder="เลือกหมวดหมู่">
-                        {categoryId && (() => {
-                          const currentCat = categoriesList.find((c) => String(c.CategoryID) === String(categoryId));
-                          return currentCat ? currentCat.CategoryName : "เลือกหมวดหมู่";
-                        })()}
+                        {categoryId && (selectedCat?.CategoryName || "เลือกหมวดหมู่")}
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
@@ -364,7 +330,11 @@ export default function CreatePost() {
                         .filter((c) => c.CategoryName !== "ทั้งหมด")
                         .map((cat) => {
                           const iconName = cat.IconName;
-                          const iconColor = cat.Color || cat.CategoryColor || cat.color || cat.icon_color;
+                          const iconColor =
+                            cat.Color ||
+                            cat.CategoryColor ||
+                            cat.color ||
+                            cat.icon_color;
                           return (
                             <SelectItem
                               key={cat.CategoryID}
@@ -372,16 +342,16 @@ export default function CreatePost() {
                               className="hover:bg-slate-200/60 dark:hover:bg-zinc-800/60 hover:text-black dark:hover:text-black focus:bg-slate-200/60 dark:focus:bg-zinc-800/60 focus:text-black dark:focus:text-black cursor-pointer"
                             >
                               <span className="inline-flex items-center gap-2">
-                                <DynamicIcon 
-                                  name={iconName} 
-                                  className="w-4 h-4 shrink-0" 
-                                  style={{ color: iconColor || undefined }} 
+                                <DynamicIcon
+                                  name={iconName}
+                                  className="w-4 h-4 shrink-0"
+                                  style={{ color: iconColor || undefined }}
                                 />
                                 <span>{cat.CategoryName}</span>
                               </span>
                             </SelectItem>
                           );
-                        })} 
+                        })}
                     </SelectContent>
                   </Select>
 
@@ -389,8 +359,6 @@ export default function CreatePost() {
                     <p className="text-xs text-red-500">{errors.category}</p>
                   )}
                 </div>
-
-                {/* รายละเอียด */}
                 <div className="space-y-1.5">
                   <Label
                     htmlFor="desc"
@@ -420,8 +388,6 @@ export default function CreatePost() {
                     </p>
                   )}
                 </div>
-
-                {/* สิ่งที่ต้องการแลก */}
                 <div className="space-y-1.5">
                   <Label
                     htmlFor="wanted"
@@ -450,8 +416,6 @@ export default function CreatePost() {
                     <p className="text-xs text-destructive">{errors.wanted}</p>
                   )}
                 </div>
-
-                {/* สถานที่นัดรับและลิงก์แผนที่ */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <Label
@@ -498,8 +462,6 @@ export default function CreatePost() {
                     </div>
                   </div>
                 </div>
-
-                {/* ปุ่มควบคุมการทำงาน (Actions) */}
                 <div className="pt-4 flex flex-col sm:flex-row gap-3">
                   <Button
                     type="submit"

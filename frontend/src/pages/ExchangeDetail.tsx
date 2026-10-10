@@ -1,12 +1,23 @@
+
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, ArrowRightLeft, Star, MapPin, Calendar, CheckCircle2, XCircle, Package, MessageSquareQuote, FileText,
-} from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
+import {
+  ArrowLeft,
+  ArrowRightLeft,
+  Star,
+  MapPin,
+  Calendar,
+  CheckCircle2,
+  XCircle,
+  Package,
+  MessageSquareQuote,
+  FileText,
+} from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import AppLayout from "@/components/AppLayout";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import AppLayout from "@/components/AppLayout";
 import { getExchanges, getUserStats, IMAGE_BASE_URL } from "@/api/api";
 
 interface ExchangeDetailData {
@@ -48,9 +59,37 @@ interface PartnerStats {
   reviewScore: string;
 }
 
-// =========================================================================
-// COMPONENT: ExchangeDetail (หน้าจอแสดงรายละเอียดเชิงลึกของรายการแลกเปลี่ยน)
-// =========================================================================
+function getCurrentUserId() {
+  const savedUser = sessionStorage.getItem("user");
+  const currentUser = savedUser ? JSON.parse(savedUser) : null;
+
+  return currentUser
+    ? currentUser.id || currentUser.UserID || currentUser.MemberID
+    : "";
+}
+
+function getImageUrl(imageString?: string) {
+  if (!imageString) return "/placeholder-image.png";
+
+  return `${IMAGE_BASE_URL}/uploads/${imageString.split(",")[0].trim()}`;
+}
+
+function formatDate(dateString?: string) {
+  if (!dateString) return "-";
+
+  const date = new Date(dateString);
+
+  if (isNaN(date.getTime())) {
+    return dateString.split(" ")[0];
+  }
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
 export default function ExchangeDetail() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -60,118 +99,92 @@ export default function ExchangeDetail() {
     successfulExchanges: 0,
     reviewScore: "0.0",
   });
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState(true);
 
-  /**
-   * ฟังก์ชัน: fetchDetailData[cite: 10]
-   * มีไว้สำหรับ: ดึงข้อมูลรายการแลกเปลี่ยนทั้งหมดจาก API กรองเฉพาะรายการที่ตรงกับ ID บน URL[cite: 10]
-   * และดึงข้อมูลสถิติคะแนนรีวิวของคู่แลกเปลี่ยนมาแสดงผลประกอบกัน[cite: 10]
-   */
-  const fetchDetailData = async () => {
-    try {
-      setLoading(true);
-      const response = await getExchanges();
-      if (response && response.success) {
+  useEffect(() => {
+    const fetchDetailData = async () => {
+      try {
+        setLoading(true);
+        setItem(null);
+        setPartnerStats({
+          successfulExchanges: 0,
+          reviewScore: "0.0",
+        });
+
+        const response = await getExchanges();
+
+        if (!response?.success) return;
+
         const foundItem = response.data.find(
-          (e: ExchangeDetailData) => String(e.ExchangeID) === String(id),
+          (exchange: ExchangeDetailData) =>
+            String(exchange.ExchangeID) === String(id),
         );
 
-        if (foundItem) {
-          setItem(foundItem);
+        if (!foundItem) return;
 
-          const savedUser = sessionStorage.getItem("user");
-          const currentUser = savedUser ? JSON.parse(savedUser) : null;
-          const currentUserId = currentUser
-            ? currentUser.id || currentUser.UserID || currentUser.MemberID
-            : "";
+        setItem(foundItem);
 
-          const partnerId =
-            String(foundItem.MemberID) === String(currentUserId)
-              ? foundItem.TargetMemberID
-              : foundItem.MemberID;
+        const currentUserId = getCurrentUserId();
+        const partnerId =
+          String(foundItem.MemberID) === String(currentUserId)
+            ? foundItem.TargetMemberID
+            : foundItem.MemberID;
 
-          if (partnerId) {
-            const statsResponse = await getUserStats(partnerId);
-            if (statsResponse && statsResponse.success && statsResponse.data) {
-              const avgScore = parseFloat(
-                statsResponse.data.reviewScore || "0",
-              );
-              setPartnerStats({
-                successfulExchanges:
-                  statsResponse.data.successfulExchanges || 0,
-                reviewScore: avgScore > 0 ? avgScore.toFixed(1) : "0.0",
-              });
-            }
-          }
+        if (!partnerId) return;
+
+        const statsResponse = await getUserStats(partnerId);
+
+        if (statsResponse?.success && statsResponse.data) {
+          const averageScore = parseFloat(
+            statsResponse.data.reviewScore || "0",
+          );
+
+          setPartnerStats({
+            successfulExchanges:
+              statsResponse.data.successfulExchanges || 0,
+            reviewScore: averageScore > 0 ? averageScore.toFixed(1) : "0.0",
+          });
         }
+      } catch (error) {
+        console.error("Error fetching exchange details:", error);
+      } finally {
+        setLoading(false);
       }
-    } catch (error: unknown) {
-      console.error("Error fetching exchange details:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
-  /**
-   * EFFECT: เรียกใช้งานฟังก์ชัน fetchDetailData และเลื่อนหน้าจอขึ้นด้านบนสุดอัตโนมัติเมื่อค่า id เปลี่ยนแปลง[cite: 10]
-   */
-  useEffect(() => {
     fetchDetailData();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [id]);
 
-  if (loading)
+  if (loading) {
     return (
       <div className="text-center py-20 font-medium text-muted-foreground">
         กำลังโหลดข้อมูลการแลกเปลี่ยน...
       </div>
     );
-  if (!item)
+  }
+
+  if (!item) {
     return (
       <div className="text-center py-20 font-medium text-muted-foreground">
         ไม่พบข้อมูลรายการนี้
       </div>
     );
+  }
 
-  const savedUser = sessionStorage.getItem("user");
-  const currentUser = savedUser ? JSON.parse(savedUser) : null;
-  const currentUserId = currentUser
-    ? currentUser.id || currentUser.UserID || currentUser.MemberID
-    : "";
-
+  const currentUserId = getCurrentUserId();
   const isRequester = String(item.MemberID) === String(currentUserId);
   const status = item.ExchangeStatus.toLowerCase();
+
   const isCompleted = status === "completed";
   const isRejected = status === "rejected";
   const isFailed = status === "failed" || status === "cancelled";
   const isAutoCancelled = status === "auto_cancelled";
-  const isFailedOrCancelled = isRejected || isFailed || isAutoCancelled;
+  const isFailedOrCancelled =
+    isRejected || isFailed || isAutoCancelled;
 
   const receivedScore = isRequester ? item.PartnerScore : item.Score;
   const receivedComment = isRequester ? item.PartnerComment : item.Comment;
-
-  /**
-   * ฟังก์ชัน: getImageUrl[cite: 10]
-   * มีไว้สำหรับ: จัดรูปแบบ URL ของรูปภาพสินค้า โดยดึงชื่อไฟล์ภาพแรกและเชื่อมต่อกับ Base URL ของระบบอัปโหลด[cite: 10]
-   */
-  const getImageUrl = (imageString: string): string => {
-    if (!imageString) return "/placeholder-image.png";
-    return `${IMAGE_BASE_URL}/uploads/${imageString.split(",")[0].trim()}`;
-  };
-
-  /**
-   * ฟังก์ชัน: formatDate[cite: 10]
-   * มีไว้สำหรับ: แปลงรูปแบบสตริงวันที่ให้อยู่ในรูปแบบมาตรฐาน YYYY-MM-DD เพื่อให้อ่านง่าย[cite: 10]
-   */
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return "-";
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return dateString.split(" ")[0];
-    const yyyy = date.getFullYear();
-    const mm = String(date.getMonth() + 1).padStart(2, "0");
-    const dd = String(date.getDate()).padStart(2, "0");
-    return `${yyyy}-${mm}-${dd}`;
-  };
 
   return (
     <AppLayout>
@@ -179,6 +192,7 @@ export default function ExchangeDetail() {
         <div className="mx-auto max-w-5xl px-4 sm:px-6 space-y-6">
           <div className="flex items-center gap-2 mb-6">
             <Button
+              type="button"
               variant="ghost"
               size="icon"
               onClick={() => navigate(-1)}
@@ -186,6 +200,7 @@ export default function ExchangeDetail() {
             >
               <ArrowLeft className="h-5 w-5 text-foreground" />
             </Button>
+
             <div className="flex items-center gap-2">
               <FileText className="h-6 w-6 text-primary" />
               <h1 className="text-xl sm:text-2xl font-bold font-heading">
@@ -207,6 +222,7 @@ export default function ExchangeDetail() {
                           className="w-full h-full object-contain"
                         />
                       </div>
+
                       <div className="text-center w-full min-w-0 flex flex-col items-center">
                         <span className="text-[11px] text-primary bg-primary/10 rounded-full px-3 py-1 inline-block mb-2 font-bold">
                           ของของคุณ
@@ -243,6 +259,7 @@ export default function ExchangeDetail() {
                           className="w-full h-full object-contain"
                         />
                       </div>
+
                       <div className="text-center w-full min-w-0 flex flex-col items-center">
                         <span className="text-[11px] text-primary bg-primary/10 rounded-full px-3 py-1 inline-block mb-2 font-bold">
                           สิ่งที่ได้รับ
@@ -273,7 +290,7 @@ export default function ExchangeDetail() {
                   <DetailRow
                     icon={<Calendar />}
                     label="วันที่เริ่มแลกเปลี่ยน"
-                    value={item.StartDate ? formatDate(item.StartDate) : "-"}
+                    value={formatDate(item.StartDate)}
                   />
                   <DetailRow
                     icon={<CheckCircle2 />}
@@ -284,9 +301,7 @@ export default function ExchangeDetail() {
                     }
                     value={
                       isFailedOrCancelled
-                        ? item.CancelDate
-                          ? formatDate(item.CancelDate)
-                          : "-"
+                        ? formatDate(item.CancelDate)
                         : item.SuccessDate
                           ? formatDate(item.SuccessDate)
                           : "ยังไม่สำเร็จ"
@@ -296,27 +311,32 @@ export default function ExchangeDetail() {
               </CardContent>
             </Card>
 
-            {/* แสดงส่วนรีวิวเฉพาะเมื่อสำเร็จและมีคะแนน */}
             {isCompleted && receivedScore != null && (
               <Card className="border border-border/50 shadow-sm bg-background">
                 <CardContent className="p-6 space-y-6">
                   <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
-                    <MessageSquareQuote className="w-5 h-5 text-primary" />{" "}
+                    <MessageSquareQuote className="w-5 h-5 text-primary" />
                     การประเมินและรีวิว
                   </h2>
 
                   <div className="space-y-4">
                     <div className="bg-background border shadow-sm rounded-xl p-5 space-y-3 relative overflow-hidden">
-                      <div className="absolute top-0 left-0 w-1.5 h-full bg-primary"></div>
+                      <div className="absolute top-0 left-0 w-1.5 h-full bg-primary" />
+
                       <p className="text-xs font-bold text-primary">
                         คะแนนที่คุณได้รับ
                       </p>
+
                       <div className="flex items-center gap-2">
                         <div className="flex gap-1">
                           {[1, 2, 3, 4, 5].map((star) => (
                             <Star
                               key={star}
-                              className={`h-4 w-4 ${star <= receivedScore ? "text-amber-500 fill-amber-500" : "text-gray-200 fill-gray-200"}`}
+                              className={`h-4 w-4 ${
+                                star <= receivedScore
+                                  ? "text-amber-500 fill-amber-500"
+                                  : "text-gray-200 fill-gray-200"
+                              }`}
                             />
                           ))}
                         </div>
@@ -324,6 +344,7 @@ export default function ExchangeDetail() {
                           {Number(receivedScore).toFixed(1)}
                         </span>
                       </div>
+
                       <div className="bg-secondary/20 p-3.5 rounded-lg border border-border/50">
                         <p className="text-[13px] text-foreground italic">
                           "{receivedComment || "ไม่มีคำบรรยายเพิ่มเติม"}"
@@ -335,7 +356,6 @@ export default function ExchangeDetail() {
               </Card>
             )}
 
-            {/* แสดงสรุปข้อมูลการยกเลิก / ปฏิเสธ แยกตามสถานะและโทนสี */}
             {isFailedOrCancelled && (
               <Card
                 className={`border shadow-sm ${
@@ -371,15 +391,17 @@ export default function ExchangeDetail() {
                         ? "รายการถูกยกเลิกอัตโนมัติโดยระบบ"
                         : "สรุปข้อมูลการยกเลิกรายการ"}
                   </h2>
+
                   <div className="space-y-3 text-xs">
                     <div className="flex items-center justify-between bg-white/70 dark:bg-zinc-900/40 p-3 rounded-xl border border-border/50">
                       <span className="text-muted-foreground font-medium">
                         วันที่ยกเลิก / ปฏิเสธ:
                       </span>
                       <span className="font-bold text-foreground">
-                        {item.CancelDate ? formatDate(item.CancelDate) : "-"}
+                        {formatDate(item.CancelDate)}
                       </span>
                     </div>
+
                     <div className="bg-white/70 dark:bg-zinc-900/40 p-3 rounded-xl border border-border/50 space-y-1">
                       <span className="text-muted-foreground font-medium block">
                         เหตุผล:
@@ -398,6 +420,7 @@ export default function ExchangeDetail() {
                 <h2 className="text-sm font-bold text-foreground">
                   ข้อมูลคู่แลกเปลี่ยน
                 </h2>
+
                 <div className="flex items-center gap-4 bg-background border border-border/60 p-4 rounded-xl shadow-sm">
                   <Avatar className="h-14 w-14 shadow-sm border border-border">
                     {item.theirProfileImage ? (
@@ -405,8 +428,8 @@ export default function ExchangeDetail() {
                         src={`${IMAGE_BASE_URL}/uploads/${item.theirProfileImage}`}
                         alt="profile"
                         className="w-full h-full object-cover rounded-full"
-                        onError={(e) => {
-                          e.currentTarget.style.display = "none";
+                        onError={(event) => {
+                          event.currentTarget.style.display = "none";
                         }}
                       />
                     ) : (
@@ -415,18 +438,21 @@ export default function ExchangeDetail() {
                       </AvatarFallback>
                     )}
                   </Avatar>
+
                   <div className="flex-1">
                     <p className="font-bold text-base">
                       {item.theirAuthorName}
                     </p>
+
                     <div className="flex flex-wrap gap-2 mt-2">
                       <span className="flex items-center gap-1.5 bg-amber-50 text-amber-600 px-3 py-1 rounded-full font-semibold border border-amber-200 text-[11px]">
-                        <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />{" "}
+                        <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
                         คะแนนเฉลี่ย {partnerStats.reviewScore}
                       </span>
+
                       <span className="flex items-center gap-1.5 bg-primary/10 text-primary px-3 py-1 rounded-full font-semibold border border-primary/20 text-[11px]">
-                        <Package className="h-3.5 w-3.5" /> แลกสำเร็จ{" "}
-                        {partnerStats.successfulExchanges} ครั้ง
+                        <Package className="h-3.5 w-3.5" />
+                        แลกสำเร็จ {partnerStats.successfulExchanges} ครั้ง
                       </span>
                     </div>
                   </div>
@@ -453,7 +479,9 @@ function DetailRow({
 }) {
   return (
     <div
-      className={`flex items-start gap-3 p-0 ${full ? "sm:col-span-2" : ""}`}
+      className={`flex items-start gap-3 p-0 ${
+        full ? "sm:col-span-2" : ""
+      }`}
     >
       <div className="bg-transparent p-1 text-muted-foreground">{icon}</div>
       <div className="space-y-0.5 mt-1">

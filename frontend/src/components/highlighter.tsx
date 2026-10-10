@@ -1,11 +1,9 @@
-// src/components/highlighter.tsx
-"use client"
 
-import { useLayoutEffect, useRef } from "react"
-import type React from "react"
-import { useInView } from "motion/react"
-import { annotate } from "rough-notation"
-import { type RoughAnnotation } from "rough-notation/lib/model"
+"use client";
+
+import { useLayoutEffect, useRef, type ReactNode } from "react";
+import { useInView } from "motion/react";
+import { annotate } from "rough-notation";
 
 type AnnotationAction =
   | "highlight"
@@ -14,18 +12,18 @@ type AnnotationAction =
   | "circle"
   | "strike-through"
   | "crossed-off"
-  | "bracket"
+  | "bracket";
 
 interface HighlighterProps {
-  children: React.ReactNode
-  action?: AnnotationAction
-  color?: string
-  strokeWidth?: number
-  animationDuration?: number
-  iterations?: number
-  padding?: number
-  multiline?: boolean
-  isView?: boolean
+  children: ReactNode;
+  action?: AnnotationAction;
+  color?: string;
+  strokeWidth?: number;
+  animationDuration?: number;
+  iterations?: number;
+  padding?: number;
+  multiline?: boolean;
+  isView?: boolean;
 }
 
 export function Highlighter({
@@ -39,52 +37,44 @@ export function Highlighter({
   multiline = true,
   isView = false,
 }: HighlighterProps) {
-  const elementRef = useRef<HTMLSpanElement>(null)
+  const elementRef = useRef<HTMLSpanElement>(null);
 
   const isInView = useInView(elementRef, {
     once: true,
     margin: "-10%",
-  })
-
-  const shouldShow = !isView || isInView
+  });
 
   useLayoutEffect(() => {
-    const element = elementRef.current
-    let annotation: RoughAnnotation | null = null
-    let resizeObserver: ResizeObserver | null = null
+    const element = elementRef.current;
 
-    if (shouldShow && element) {
-      const annotationConfig = {
-        type: action,
-        color,
-        strokeWidth,
-        animationDuration,
-        iterations,
-        padding,
-        multiline,
-      }
+    if (!element || (isView && !isInView)) return;
 
-      const currentAnnotation = annotate(element, annotationConfig)
-      annotation = currentAnnotation
-      currentAnnotation.show()
+    const annotation = annotate(element, {
+      type: action,
+      color,
+      strokeWidth,
+      animationDuration,
+      iterations,
+      padding,
+      multiline,
+    });
 
-      resizeObserver = new ResizeObserver(() => {
-        currentAnnotation.hide()
-        currentAnnotation.show()
-      })
+    annotation.show();
 
-      resizeObserver.observe(element)
-      resizeObserver.observe(document.body)
-    }
+    const resizeObserver = new ResizeObserver(() => {
+      annotation.hide();
+      annotation.show();
+    });
+
+    resizeObserver.observe(element);
 
     return () => {
-      annotation?.remove()
-      if (resizeObserver) {
-        resizeObserver.disconnect()
-      }
-    }
+      resizeObserver.disconnect();
+      annotation.remove();
+    };
   }, [
-    shouldShow,
+    isView,
+    isInView,
     action,
     color,
     strokeWidth,
@@ -92,11 +82,11 @@ export function Highlighter({
     iterations,
     padding,
     multiline,
-  ])
+  ]);
 
   return (
     <span ref={elementRef} className="relative inline-block bg-transparent">
       {children}
     </span>
-  )
+  );
 }

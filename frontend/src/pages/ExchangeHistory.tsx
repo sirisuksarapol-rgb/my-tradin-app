@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Clock, ArrowRightLeft, ChevronRight, Calendar, CheckCircle2, XCircle, RefreshCw } from "lucide-react";
@@ -29,25 +30,77 @@ interface ExchangeItem {
   theirAuthorName: string;
 }
 
-// =========================================================================
-// COMPONENT: ExchangeHistory (หน้าจอสำหรับแสดงประวัติรายการแลกเปลี่ยนทั้งหมดของผู้ใช้)
-// =========================================================================
+type StatusBadge = {
+  label: string;
+  style: string;
+  icon: typeof RefreshCw;
+};
+
+const FAILED_STATUSES = ["rejected", "failed", "auto_cancelled"];
+
+const STATUS_BADGES: Record<string, StatusBadge> = {
+  completed: {
+    label: "แลกสำเร็จ",
+    style: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    icon: CheckCircle2,
+  },
+  rejected: {
+    label: "ถูกปฏิเสธ",
+    style: "bg-orange-50 text-orange-700 border-orange-200",
+    icon: XCircle,
+  },
+  failed: {
+    label: "ยกเลิกแล้ว",
+    style: "bg-rose-50 text-rose-700 border-rose-200",
+    icon: XCircle,
+  },
+  auto_cancelled: {
+    label: "ยกเลิกอัตโนมัติ",
+    style: "bg-slate-100 text-slate-700 border-slate-200",
+    icon: XCircle,
+  },
+};
+
+const DEFAULT_STATUS_BADGE: StatusBadge = {
+  label: "รอดำเนินการ",
+  style: "bg-amber-100 text-amber-800 border-amber-200",
+  icon: RefreshCw,
+};
+
+function getImageUrl(imageString: string) {
+  if (!imageString) return "/placeholder-image.png";
+
+  const firstImage = imageString.split(",")[0].trim();
+  return `${IMAGE_BASE_URL}/uploads/${firstImage}`;
+}
+
+function formatDate(dateString?: string) {
+  if (!dateString) return "-";
+
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return "-";
+
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 export default function ExchangeHistory() {
   const navigate = useNavigate();
   const [userExchanges, setUserExchanges] = useState<ExchangeItem[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"success" | "failed">("success");
 
-  /**
-   * ฟังก์ชัน: fetchHistoryData
-   * มีไว้สำหรับ: ดึงข้อมูลประวัติการแลกเปลี่ยนทั้งหมดจาก API และอัปเดตลงใน State พร้อมจัดการสถานะกำลังโหลด
-   */
   useEffect(() => {
     const fetchHistoryData = async () => {
       try {
         setLoading(true);
+
         const response = await getExchanges();
-        if (response && response.success) {
+
+        if (response?.success) {
           setUserExchanges(response.data || []);
         }
       } catch (error) {
@@ -64,11 +117,17 @@ export default function ExchangeHistory() {
   const completedList = userExchanges.filter(
     (item) => item.ExchangeStatus.toLowerCase() === "completed",
   );
+
   const failedList = userExchanges.filter((item) =>
-    ["rejected", "failed", "auto_cancelled"].includes(
-      item.ExchangeStatus.toLowerCase(),
-    ),
+    FAILED_STATUSES.includes(item.ExchangeStatus.toLowerCase()),
   );
+
+  const activeList = activeTab === "success" ? completedList : failedList;
+
+  const emptyMessage =
+    activeTab === "success"
+      ? "คุณยังไม่มีรายการแลกเปลี่ยนที่สำเร็จ"
+      : "ไม่มีรายการที่ถูกยกเลิกหรือปฏิเสธ";
 
   return (
     <AppLayout>
@@ -102,15 +161,15 @@ export default function ExchangeHistory() {
                 className="h-52 rounded-2xl bg-muted/60 animate-pulse p-4 space-y-3"
               >
                 <div className="flex justify-between items-center">
-                  <div className="h-4 w-24 bg-muted rounded"></div>
-                  <div className="h-5 w-16 bg-muted rounded-full"></div>
+                  <div className="h-4 w-24 bg-muted rounded" />
+                  <div className="h-5 w-16 bg-muted rounded-full" />
                 </div>
                 <div className="flex justify-between items-center gap-2 py-4">
-                  <div className="w-16 h-16 bg-muted rounded-lg"></div>
-                  <div className="w-8 h-8 bg-muted rounded-full"></div>
-                  <div className="w-16 h-16 bg-muted rounded-lg"></div>
+                  <div className="w-16 h-16 bg-muted rounded-lg" />
+                  <div className="w-8 h-8 bg-muted rounded-full" />
+                  <div className="w-16 h-16 bg-muted rounded-lg" />
                 </div>
-                <div className="h-4 w-full bg-muted rounded"></div>
+                <div className="h-4 w-full bg-muted rounded" />
               </div>
             ))}
           </div>
@@ -125,9 +184,10 @@ export default function ExchangeHistory() {
                     : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                 }`}
               >
-                <CheckCircle2 className="h-4 w-4" /> สำเร็จ (
-                {completedList.length})
+                <CheckCircle2 className="h-4 w-4" />
+                สำเร็จ ({completedList.length})
               </button>
+
               <button
                 onClick={() => setActiveTab("failed")}
                 className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs sm:text-sm font-bold rounded-full transition-all ${
@@ -136,46 +196,28 @@ export default function ExchangeHistory() {
                     : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                 }`}
               >
-                <XCircle className="h-4 w-4" /> ไม่สำเร็จ ({failedList.length})
+                <XCircle className="h-4 w-4" />
+                ไม่สำเร็จ ({failedList.length})
               </button>
             </div>
 
             <AnimatePresence mode="wait">
-              {activeTab === "success" ? (
-                <motion.div
-                  key="success"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                >
-                  {completedList.length > 0 ? (
-                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {completedList.map((item) => (
-                        <ExchangeDetailCard key={item.ExchangeID} item={item} />
-                      ))}
-                    </div>
-                  ) : (
-                    <EmptyState message="คุณยังไม่มีรายการแลกเปลี่ยนที่สำเร็จ" />
-                  )}
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="failed"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                >
-                  {failedList.length > 0 ? (
-                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {failedList.map((item) => (
-                        <ExchangeDetailCard key={item.ExchangeID} item={item} />
-                      ))}
-                    </div>
-                  ) : (
-                    <EmptyState message="ไม่มีรายการที่ถูกยกเลิกหรือปฏิเสธ" />
-                  )}
-                </motion.div>
-              )}
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+              >
+                {activeList.length > 0 ? (
+                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {activeList.map((item) => (
+                      <ExchangeDetailCard key={item.ExchangeID} item={item} />
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState message={emptyMessage} />
+                )}
+              </motion.div>
             </AnimatePresence>
           </div>
         )}
@@ -184,90 +226,30 @@ export default function ExchangeHistory() {
   );
 }
 
-// =========================================================================
-// COMPONENT: ExchangeDetailCard (คอมโพเนนต์ย่อยแสดงการ์ดสรุปข้อมูลรายการแลกเปลี่ยนแต่ละรายการ)[cite: 11]
-// =========================================================================
 function ExchangeDetailCard({ item }: { item: ExchangeItem }) {
   const navigate = useNavigate();
   const status = item.ExchangeStatus.toLowerCase();
-  const partnerName = item.theirAuthorName;
-
-  /**
-   * ฟังก์ชัน: getImageUrl[cite: 11]
-   * มีไว้สำหรับ: จัดรูปแบบและดึง URL ของรูปภาพสินค้า โดยตัดเอาชื่อภาพแรกมาเชื่อมต่อกับ Base URL[cite: 11]
-   */
-  const getImageUrl = (imageString: string) => {
-    if (!imageString) return "/placeholder-image.png";
-    const firstImage = imageString.split(",")[0].trim();
-    return `${IMAGE_BASE_URL}/uploads/${firstImage}`;
-  };
-
-  /**
-   * ฟังก์ชัน: formatDate[cite: 11]
-   * มีไว้สำหรับ: แปลงสตริงวันที่ให้อยู่ในรูปแบบมาตรฐาน YYYY-MM-DD พร้อมตรวจสอบความถูกต้องของข้อมูล[cite: 11]
-   */
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return "-";
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return "-";
-
-    const yyyy = date.getFullYear();
-    const mm = String(date.getMonth() + 1).padStart(2, "0");
-    const dd = String(date.getDate()).padStart(2, "0");
-
-    return `${yyyy}-${mm}-${dd}`;
-  };
+  const statusBadge = STATUS_BADGES[status] || DEFAULT_STATUS_BADGE;
+  const StatusIcon = statusBadge.icon;
 
   const myItemImage = getImageUrl(item.myPostImage);
   const theirItemImage = getImageUrl(item.theirPostImage);
-
-  let statusBadge = {
-    label: "รอดำเนินการ",
-    style: "bg-amber-100 text-amber-800 border-amber-200",
-    icon: RefreshCw,
-  };
-
-  if (status === "completed") {
-    statusBadge = {
-      label: "แลกสำเร็จ",
-      style: "bg-emerald-50 text-emerald-700 border-emerald-200",
-      icon: CheckCircle2,
-    };
-  } else if (status === "rejected") {
-    statusBadge = {
-      label: "ถูกปฏิเสธ",
-      style: "bg-orange-50 text-orange-700 border-orange-200",
-      icon: XCircle,
-    };
-  } else if (status === "failed") {
-    statusBadge = {
-      label: "ยกเลิกแล้ว",
-      style: "bg-rose-50 text-rose-700 border-rose-200",
-      icon: XCircle,
-    };
-  } else if (status === "auto_cancelled") {
-    statusBadge = {
-      label: "ยกเลิกอัตโนมัติ",
-      style: "bg-slate-100 text-slate-700 border-slate-200",
-      icon: XCircle,
-    };
-  }
-
-  const StatusIcon = statusBadge.icon;
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
       <Card className="glass-card border-none shadow-sm hover:shadow-md transition-all h-full flex flex-col justify-between">
         <CardContent className="p-4 space-y-4">
           <div className="flex items-center justify-between border-b border-border/50 pb-3">
-            <div>
-              <p className="font-bold text-sm line-clamp-1">{partnerName}</p>
-            </div>
+            <p className="font-bold text-sm line-clamp-1">
+              {item.theirAuthorName}
+            </p>
+
             <Badge
               variant="outline"
               className={`text-[11px] font-medium gap-1 px-2 py-0.5 ${statusBadge.style}`}
             >
-              <StatusIcon className="w-3 h-3" /> {statusBadge.label}
+              <StatusIcon className="w-3 h-3" />
+              {statusBadge.label}
             </Badge>
           </div>
 
@@ -283,9 +265,11 @@ function ExchangeDetailCard({ item }: { item: ExchangeItem }) {
                 {item.myPostTitle}
               </p>
             </div>
+
             <div className="bg-muted p-2 rounded-full flex-shrink-0">
               <ArrowRightLeft className="h-4 w-4 text-muted-foreground" />
             </div>
+
             <div className="flex-1 text-center">
               <img
                 src={theirItemImage}
@@ -299,12 +283,11 @@ function ExchangeDetailCard({ item }: { item: ExchangeItem }) {
             </div>
           </div>
 
-          {["rejected", "failed", "auto_cancelled"].includes(status) &&
-            item.CancelReason && (
-              <p className="text-[11px] text-destructive bg-destructive/5 p-2 rounded-md line-clamp-1">
-                เหตุผล: {item.CancelReason}
-              </p>
-            )}
+          {FAILED_STATUSES.includes(status) && item.CancelReason && (
+            <p className="text-[11px] text-destructive bg-destructive/5 p-2 rounded-md line-clamp-1">
+              เหตุผล: {item.CancelReason}
+            </p>
+          )}
 
           <div className="flex flex-col text-[11px] text-muted-foreground bg-secondary/30 p-2.5 rounded-lg space-y-1">
             <div className="flex items-center justify-between">
@@ -318,6 +301,7 @@ function ExchangeDetailCard({ item }: { item: ExchangeItem }) {
                 </span>
               </div>
             </div>
+
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 {status === "completed" ? (
@@ -328,9 +312,9 @@ function ExchangeDetailCard({ item }: { item: ExchangeItem }) {
                 <span>
                   {status === "completed" ? "วันที่สำเร็จ: " : "วันที่ยกเลิก: "}
                   <span className="font-medium text-foreground">
-                    {status === "completed"
-                      ? formatDate(item.SuccessDate)
-                      : formatDate(item.CancelDate)}
+                    {formatDate(
+                      status === "completed" ? item.SuccessDate : item.CancelDate,
+                    )}
                   </span>
                 </span>
               </div>
@@ -351,9 +335,6 @@ function ExchangeDetailCard({ item }: { item: ExchangeItem }) {
   );
 }
 
-// =========================================================================
-// COMPONENT: EmptyState (คอมโพเนนต์ย่อยสำหรับแสดงผลเมื่อไม่มีข้อมูลในรายการ)[cite: 11]
-// =========================================================================
 function EmptyState({ message }: { message: string }) {
   return (
     <div className="text-center py-16 opacity-60">

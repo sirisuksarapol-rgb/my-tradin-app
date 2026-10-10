@@ -1,27 +1,62 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+
+import { useState, useEffect, useMemo, useCallback, type SyntheticEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  ArrowRightLeft,
-  CheckCircle,
-  XCircle,
-  Clock,
-  Sparkles,
-  Inbox,
-  Package,
-  AlertCircle,
-  ArrowLeftRight,
-} from "lucide-react";
+import { ArrowRightLeft, CheckCircle, XCircle, Clock, Sparkles, Inbox, Package, AlertCircle, ChevronRight } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import AppLayout from "@/components/AppLayout";
-import {
-  getItems as fetchItemsAPI,
-  IMAGE_BASE_URL,
-  getExchanges,
-} from "@/api/api";
+import { getItems as fetchItemsAPI, IMAGE_BASE_URL, getExchanges } from "@/api/api";
 
-const statusConfig = {
+type StatusFilterType =
+  | "all"
+  | "pending"
+  | "accepted"
+  | "in_progress"
+  | "completed"
+  | "rejected"
+  | "failed"
+  | "auto_cancelled";
+
+type ExchangeStatus = Exclude<StatusFilterType, "all">;
+
+interface DBItem {
+  ItemID: string | number;
+  ItemName: string;
+  CategoryName?: string;
+  DesiredItem?: string;
+  ItemImage?: string;
+  MemberID: string | number;
+}
+
+interface DBExchange {
+  ExchangeID: number;
+  ExchangeLocation?: string;
+  ExchangeStatus: string;
+  Score?: number;
+  MatchScore?: number;
+  ExchangeType?: string;
+  SenderID?: number | string;
+  ReceiverID?: number | string;
+  TargetMemberID?: number | string;
+  MemberID: number | string;
+  myPostTitle?: string;
+  myPostImage?: string;
+  theirPostTitle?: string;
+  theirPostImage?: string;
+  theirAuthorName?: string;
+}
+
+interface StatusInfo {
+  label: string;
+  icon: LucideIcon;
+  className: string;
+}
+
+const PLACEHOLDER_IMAGE = "/placeholder.jpg";
+
+const statusConfig: Record<ExchangeStatus, StatusInfo> = {
   pending: {
     label: "รอตอบรับ",
     icon: Clock,
@@ -55,79 +90,127 @@ const statusConfig = {
   auto_cancelled: {
     label: "ยกเลิกอัตโนมัติ",
     icon: AlertCircle,
-    className:
-      "bg-slate-500/10 text-slate-700 border border-slate-300 dark:text-slate-300",
+    className: "bg-slate-500/10 text-slate-700 border border-slate-300 dark:text-slate-300",
   },
 };
 
-type StatusFilterType =
-  | "all"
-  | "pending"
-  | "accepted"
-  | "in_progress"
-  | "completed"
-  | "rejected"
-  | "failed"
-  | "auto_cancelled";
+const statusFilters: {
+  id: StatusFilterType;
+  label: string;
+  icon?: LucideIcon;
+}[] = [
+  { id: "all", label: "ทั้งหมด" },
+  { id: "pending", label: "รอตอบรับ", icon: Clock },
+  { id: "accepted", label: "ตอบรับแล้ว", icon: CheckCircle },
+  { id: "in_progress", label: "กำลังดำเนินการ", icon: ArrowRightLeft },
+  { id: "completed", label: "สำเร็จแล้ว", icon: CheckCircle },
+  { id: "rejected", label: "ถูกปฏิเสธ", icon: XCircle },
+  { id: "failed", label: "ยกเลิกแล้ว", icon: AlertCircle },
+  { id: "auto_cancelled", label: "ยกเลิกอัตโนมัติ", icon: AlertCircle },
+];
 
-interface DBItem {
-  ItemID: string | number;
-  ItemName: string;
-  CategoryName?: string;
-  DesiredItem?: string;
-  ItemImage?: string;
-  MemberID: string | number;
+function getSavedUserId(): string | null {
+  try {
+    const savedUser = sessionStorage.getItem("user");
+    if (!savedUser) return null;
+
+    const user = JSON.parse(savedUser);
+    const userId = user.id ?? user.user_id ?? user.UserID ?? user.MemberID;
+
+    return userId == null ? null : String(userId);
+  } catch {
+    return null;
+  }
 }
 
-interface DBExchange {
-  ExchangeID: number;
-  ExchangeLocation?: string;
-  ExchangeStatus: string;
-  Score?: number;
-  MatchScore?: number;
-  ExchangeType?: string;
-  SenderID?: number | string;
-  ReceiverID?: number | string;
-  TargetMemberID?: number | string;
-  MemberID: number | string;
-  myPostTitle?: string;
-  myPostImage?: string;
-  theirPostTitle?: string;
-  theirPostImage?: string;
-  theirAuthorName?: string;
+function getSeenExchangeIds(): number[] {
+  try {
+    const savedIds = JSON.parse(
+      localStorage.getItem("seen_exchange_ids") || "[]",
+    );
+
+    return Array.isArray(savedIds) ? savedIds : [];
+  } catch {
+    return [];
+  }
 }
 
-// =========================================================================
-// COMPONENT: Matching (หน้าจอจัดการและค้นหาคู่แมตช์การแลกเปลี่ยนสิ่งของ)
-// =========================================================================
+function getCorrectImagePath(imageName?: string | null): string {
+  if (!imageName) return PLACEHOLDER_IMAGE;
+
+  let image = imageName.trim();
+
+  if (
+    !image ||
+    image === "undefined" ||
+    image === "null" ||
+    image === PLACEHOLDER_IMAGE
+  ) {
+    return PLACEHOLDER_IMAGE;
+  }
+
+  if (image.startsWith("[")) {
+    try {
+      const images = JSON.parse(image.split("'").join('"'));
+      image = Array.isArray(images) ? String(images[0] || "").trim() : "";
+    } catch {
+      image = image
+        .split("[").join("")
+        .split("]").join("")
+        .split('"').join("")
+        .split("'").join("");
+    }
+  }
+
+  image = image.split(",")[0]?.trim() || "";
+
+  if (!image || image === "undefined" || image === "null") {
+    return PLACEHOLDER_IMAGE;
+  }
+
+  return image.startsWith("http")
+    ? image
+    : `${IMAGE_BASE_URL}/uploads/${image}`;
+}
+
+function handleImageError(event: SyntheticEvent<HTMLImageElement>) {
+  const image = event.currentTarget;
+
+  if (image.src !== `${window.location.origin}${PLACEHOLDER_IMAGE}`) {
+    image.src = PLACEHOLDER_IMAGE;
+  }
+}
+
+function getRequestStatus(status: string): ExchangeStatus {
+  const normalizedStatus = (status || "pending").toLowerCase();
+
+  return normalizedStatus in statusConfig
+    ? (normalizedStatus as ExchangeStatus)
+    : "pending";
+}
+
 export default function Matching() {
   const navigate = useNavigate();
+
   const [activeTab, setActiveTab] = useState<"items" | "status">("items");
   const [statusFilter, setStatusFilter] = useState<StatusFilterType>("all");
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-
   const [items, setItems] = useState<DBItem[]>([]);
   const [exchanges, setExchanges] = useState<DBExchange[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  /**
-   * ฟังก์ชัน: loadData
-   * มีไว้สำหรับ: ดึงข้อมูลรายการสินค้าทั้งหมดและข้อมูลการแลกเปลี่ยนจาก API พร้อมจัดการสถานะกำลังโหลดข้อมูล
-   */
   const loadData = useCallback(async () => {
     try {
       setIsLoading(true);
 
-      const itemsRes = await fetchItemsAPI();
-      if (itemsRes && Array.isArray(itemsRes.data)) {
-        setItems(itemsRes.data);
+      const itemsResponse = await fetchItemsAPI();
+      if (Array.isArray(itemsResponse?.data)) {
+        setItems(itemsResponse.data);
       }
 
-      if (typeof getExchanges === "function") {
-        const exchangeRes = await getExchanges();
-        if (exchangeRes && Array.isArray(exchangeRes.data)) {
-          setExchanges(exchangeRes.data);
-        }
+      const exchangeResponse = await getExchanges();
+      if (Array.isArray(exchangeResponse?.data)) {
+        setExchanges(exchangeResponse.data);
       }
     } catch (error) {
       console.error("Error loading matching data:", error);
@@ -136,131 +219,72 @@ export default function Matching() {
     }
   }, []);
 
-  /**
-   * EFFECT: ดึงข้อมูลผู้ใช้งานปัจจุบันจาก sessionStorage และเรียกฟังก์ชันโหลดข้อมูลเมื่อคอมโพเนนต์พร้อมทำงาน
-   */
   useEffect(() => {
-    const savedUser = sessionStorage.getItem("user");
-    if (savedUser) {
-      const user = JSON.parse(savedUser);
-      const uid = String(
-        user.id ?? user.user_id ?? user.UserID ?? user.MemberID,
-      );
-      setCurrentUserId(uid);
-    }
+    setCurrentUserId(getSavedUserId());
     loadData();
   }, [loadData]);
 
-  /**
-   * EFFECT: โหลดข้อมูลใหม่โดยอัตโนมัติเมื่อผู้ใช้สลับมายังแท็บแสดงสถานะการแมตช์
-   */
   useEffect(() => {
     if (activeTab === "status") {
       loadData();
     }
   }, [activeTab, loadData]);
 
-  /**
-   * ฟังก์ชัน: getCorrectImagePath
-   * มีไว้สำหรับ: จัดรูปแบบและทำความสะอาดพาธรูปภาพสินค้าให้ถูกต้อง รองรับทั้งกรณีเป็น URL ภายนอก รูปภาพหลายรูป หรือรูปแบบ JSON
-   */
-  const getCorrectImagePath = (imageName: string | undefined) => {
-    if (!imageName || imageName.trim() === "undefined" || imageName === "null")
-      return "/placeholder.jpg";
-    try {
-      let cleanStr = imageName.trim();
-      if (cleanStr.startsWith("[")) {
-        const safeJsonStr = cleanStr.replace(/'/g, '"');
-        const parsed = JSON.parse(safeJsonStr);
-        if (Array.isArray(parsed) && parsed.length > 0)
-          cleanStr = parsed[0].trim();
-      } else if (cleanStr.includes(",")) {
-        cleanStr = cleanStr.split(",")[0].trim();
-      }
-      if (cleanStr.startsWith("http")) return cleanStr;
-      return `${IMAGE_BASE_URL}/uploads/${cleanStr}`;
-    } catch {
-      const fallback = imageName
-        .replace(/\[\vert{}\]|"|'/g, "")
-        .split(",")[0]
-        .trim();
-      return fallback.startsWith("http")
-        ? fallback
-        : `${IMAGE_BASE_URL}/uploads/${fallback}`;
-    }
-  };
-
-  /**
-   * ตัวแปรคำนวณ (Computed): displayItems
-   * มีไว้สำหรับ: กรองรายการสิ่งของที่เป็นของสมาชิกปัจจุบันเพื่อนำมาแสดงในหน้าเลือกหาคู่แมตช์
-   */
   const displayItems = useMemo(() => {
     if (!currentUserId) return [];
-    return items.filter((item) => String(item.MemberID) === currentUserId);
+
+    return items.filter(
+      (item) => String(item.MemberID) === currentUserId,
+    );
   }, [items, currentUserId]);
 
-  /**
-   * ตัวแปรคำนวณ (Computed): incomingCount
-   * มีไว้สำหรับ: คำนวณจำนวนคำขอแลกเปลี่ยนขาเข้าใหม่ที่อยู่ในสถานะรอตอบรับและยังไม่เคยเปิดดู
-   */
   const incomingCount = useMemo(() => {
     if (!currentUserId) return 0;
 
-    const seenIds: number[] = JSON.parse(
-      sessionStorage.getItem("seen_exchange_ids") || "[]",
-    );
+    const seenIds = getSeenExchangeIds();
 
-    return exchanges.filter((exch) => {
-      const isReceiver = exch.ReceiverID
-        ? String(exch.ReceiverID) === currentUserId
-        : String(exch.TargetMemberID) === currentUserId;
-
-      const isPending = (exch.ExchangeStatus || "").toLowerCase() === "pending";
-      const isUnseen = !seenIds.includes(exch.ExchangeID);
+    return exchanges.filter((exchange) => {
+      const receiverId = exchange.ReceiverID ?? exchange.TargetMemberID;
+      const isReceiver = String(receiverId) === currentUserId;
+      const isPending = exchange.ExchangeStatus?.toLowerCase() === "pending";
+      const isUnseen = !seenIds.includes(exchange.ExchangeID);
 
       return isReceiver && isPending && isUnseen;
     }).length;
   }, [exchanges, currentUserId]);
 
-  /**
-   * ตัวแปรคำนวณ (Computed): filteredMatches
-   * มีไว้สำหรับ: กรองรายการแลกเปลี่ยนที่ผู้ใช้งานปัจจุบันเป็นผู้ส่งหรือผู้รับ จัดเรียงตามคะแนนความเหมาะสม (Score)
-   * และกรองตามประเภทสถานะที่ผู้ใช้เลือกดู
-   */
   const filteredMatches = useMemo(() => {
     if (!currentUserId) return [];
 
-    const myExchanges = exchanges.filter((exch) => {
-      const isSender = String(exch.MemberID) === currentUserId;
-      const isReceiver = String(exch.TargetMemberID) === currentUserId;
+    const myExchanges = exchanges.filter((exchange) => {
+      const senderId = exchange.SenderID ?? exchange.MemberID;
+      const receiverId = exchange.ReceiverID ?? exchange.TargetMemberID;
 
-      return isSender || isReceiver;
+      return (
+        String(senderId) === currentUserId ||
+        String(receiverId) === currentUserId
+      );
     });
 
-    const sorted = [...myExchanges].sort(
-      (a, b) => (b.Score || 0) - (a.Score || 0),
-    );
+    return myExchanges
+      .sort((a, b) => (b.Score || 0) - (a.Score || 0))
+      .filter((exchange) => {
+        const status = getRequestStatus(exchange.ExchangeStatus);
 
-    return sorted.filter((match) => {
-      const status = (match.ExchangeStatus || "pending").toLowerCase();
-      return statusFilter === "all" ? true : status === statusFilter;
-    });
+        return statusFilter === "all" || status === statusFilter;
+      });
   }, [exchanges, currentUserId, statusFilter]);
 
   return (
     <AppLayout>
       <div className="max-w-[1400px] mx-auto space-y-8 pb-20 font-sans">
-        <section className="relative -mt-6 py-8 md:py-10 border-b border-border/55">
-          <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-screen border-b border-border/50 -z-10 pointer-events-none" />
+        <section className="relative -mt-6 py-8 md:py-10">
+          <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-screen -z-10 pointer-events-none" />
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-4 sm:px-6 md:px-10">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight font-heading">
-                  Smart Match
-                </h1>
-              </div>
-            </div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight font-heading">
+              Smart Match
+            </h1>
 
             <Button
               variant="outline"
@@ -281,6 +305,7 @@ export default function Matching() {
         <section className="space-y-6 px-4 sm:px-6 md:px-10">
           <div className="flex p-1.5 bg-muted/30 rounded-full border border-border/50 max-w-md gap-2">
             <button
+              type="button"
               onClick={() => setActiveTab("items")}
               className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs sm:text-sm font-bold rounded-full transition-all ${
                 activeTab === "items"
@@ -288,9 +313,12 @@ export default function Matching() {
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
               }`}
             >
-              <Package className="h-4 w-4" /> เริ่มหาคู่แมตช์
+              <Package className="h-4 w-4" />
+              เริ่มหาคู่แมตช์
             </button>
+
             <button
+              type="button"
               onClick={() => setActiveTab("status")}
               className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs sm:text-sm font-bold rounded-full transition-all ${
                 activeTab === "status"
@@ -298,7 +326,8 @@ export default function Matching() {
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
               }`}
             >
-              <ArrowRightLeft className="h-4 w-4" /> สถานะการแลกเปลี่ยน
+              <ArrowRightLeft className="h-4 w-4" />
+              สถานะการแลกเปลี่ยน
             </button>
           </div>
 
@@ -311,11 +340,9 @@ export default function Matching() {
             </div>
           ) : activeTab === "items" ? (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold font-heading text-foreground/90">
-                  เลือกสิ่งของเพื่อค้นหาคู่แมตช์
-                </p>
-              </div>
+              <p className="text-sm font-semibold font-heading text-foreground/90">
+                เลือกสิ่งของเพื่อค้นหาคู่แมตช์
+              </p>
 
               {displayItems.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
@@ -329,35 +356,25 @@ export default function Matching() {
                           src={getCorrectImagePath(post.ItemImage)}
                           alt={post.ItemName}
                           className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            if (
-                              target.src !==
-                              window.location.origin + "/placeholder.jpg"
-                            ) {
-                              target.src = "/placeholder.jpg";
-                            }
-                          }}
+                          onError={handleImageError}
                         />
                       </div>
 
                       <CardContent className="p-4 space-y-3.5 flex-1 flex flex-col justify-between">
-                        <div className="space-y-1">
-                          <h3 className="font-bold text-sm leading-snug line-clamp-2 text-foreground">
-                            {post.ItemName}
-                          </h3>
-                        </div>
+                        <h3 className="font-bold text-sm leading-snug line-clamp-2 text-foreground">
+                          {post.ItemName}
+                        </h3>
 
                         <div className="flex items-center gap-3 bg-white border border-black dark:bg-zinc-900 dark:border-zinc-100 rounded-2xl p-2.5 w-full">
                           <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-zinc-800 border border-black/20 flex items-center justify-center shrink-0 shadow-sm">
-                            <ArrowLeftRight className="w-4 h-4 text-primary" />
+                            <ArrowRightLeft className="w-4 h-4 text-primary" />
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="text-[10px] text-slate-500 dark:text-zinc-400 font-semibold uppercase tracking-widest mb-0.5 leading-none">
                               อยากแลกกับ
                             </p>
                             <p className="text-sm font-bold text-slate-900 dark:text-white truncate">
-                              {post.DesiredItem}
+                              {post.DesiredItem || "เปิดรับข้อเสนอทั้งหมด"}
                             </p>
                           </div>
                         </div>
@@ -396,46 +413,26 @@ export default function Matching() {
           ) : (
             <div className="space-y-6 animate-slide-up mt-6">
               <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                {[
-                  { id: "all", label: "ทั้งหมด", icon: null },
-                  { id: "pending", label: "รอตอบรับ", icon: Clock },
-                  { id: "accepted", label: "ตอบรับแล้ว", icon: CheckCircle },
-                  {
-                    id: "in_progress",
-                    label: "กำลังดำเนินการ",
-                    icon: ArrowRightLeft,
-                  },
-                  { id: "completed", label: "สำเร็จแล้ว", icon: CheckCircle },
-                  { id: "rejected", label: "ถูกปฏิเสธ", icon: XCircle },
-                  { id: "failed", label: "ยกเลิกแล้ว", icon: AlertCircle },
-                  {
-                    id: "auto_cancelled",
-                    label: "ยกเลิกอัตโนมัติ",
-                    icon: AlertCircle,
-                  },
-                ].map((tab) => {
+                {statusFilters.map((tab) => {
                   const isSelected = statusFilter === tab.id;
+                  const Icon = tab.icon;
                   const config =
-                    statusConfig[tab.id as keyof typeof statusConfig];
+                    tab.id === "all" ? undefined : statusConfig[tab.id];
+
+                  const filterClass = isSelected
+                    ? config
+                      ? `${config.className} border shadow-sm`
+                      : "bg-primary/10 border border-primary/20 text-primary"
+                    : "bg-card/50 text-muted-foreground border-border/60 hover:bg-muted/50";
 
                   return (
                     <Badge
                       key={tab.id}
                       variant="outline"
-                      className={`cursor-pointer whitespace-nowrap px-3 py-1 text-xs font-bold rounded-full flex items-center transition-all ${
-                        isSelected
-                          ? tab.id === "all"
-                            ? "inline-flex items-center justify-center rounded-full bg-primary/10 border border-primary/20 px-3 py-1 text-xs font-bold text-primary shadow-sm shrink-0 whitespace-nowrap"
-                            : `${config?.className} border shadow-sm`
-                          : "bg-card/50 text-muted-foreground border-border/60 hover:bg-muted/50"
-                      }`}
-                      onClick={() =>
-                        setStatusFilter(tab.id as StatusFilterType)
-                      }
+                      className={`cursor-pointer whitespace-nowrap px-3 py-1 text-xs font-bold rounded-full flex items-center transition-all ${filterClass}`}
+                      onClick={() => setStatusFilter(tab.id)}
                     >
-                      {tab.icon && (
-                        <tab.icon className="h-3 w-3 mr-1.5 shrink-0" />
-                      )}
+                      {Icon && <Icon className="h-3 w-3 mr-1.5 shrink-0" />}
                       {tab.label}
                     </Badge>
                   );
@@ -445,14 +442,10 @@ export default function Matching() {
               {filteredMatches.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   {filteredMatches.map((match) => {
-                    const currentStatus = (
-                      match.ExchangeStatus || "pending"
-                    ).toLowerCase();
-                    const config =
-                      statusConfig[
-                        currentStatus as keyof typeof statusConfig
-                      ] || statusConfig.pending;
+                    const currentStatus = getRequestStatus(match.ExchangeStatus);
+                    const config = statusConfig[currentStatus];
                     const StatusIcon = config.icon;
+
                     return (
                       <Card
                         key={match.ExchangeID}
@@ -469,29 +462,21 @@ export default function Matching() {
                               <StatusIcon className="h-3.5 w-3.5 mr-1.5 shrink-0" />
                               <span>{config.label}</span>
                             </Badge>
+
                             {match.ExchangeType === "match" && (
                               <span className="inline-flex items-center justify-center rounded-full bg-primary border border-primary/20 px-3 py-1 text-xs font-bold text-white shadow-sm shrink-0 whitespace-nowrap">
-                                เหมาะสม{" "}
-                                {match.MatchScore
-                                  ? Math.round(match.MatchScore)
-                                  : 0}
-                                %
+                                เหมาะสม {Math.round(match.MatchScore || 0)}%
                               </span>
                             )}
                           </div>
+
                           <div className="flex items-center gap-4">
                             <div className="flex-1 text-center space-y-2 min-w-0">
                               <img
                                 src={getCorrectImagePath(match.myPostImage)}
+                                alt={match.myPostTitle || "สิ่งของของคุณ"}
                                 className="w-20 h-20 rounded-xl object-cover mx-auto shadow-sm bg-muted"
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement;
-                                  if (
-                                    target.src !==
-                                    window.location.origin + "/placeholder.jpg"
-                                  )
-                                    target.src = "/placeholder.jpg";
-                                }}
+                                onError={handleImageError}
                               />
                               <p className="text-xs font-bold line-clamp-1">
                                 {match.myPostTitle || "สิ่งของของคุณ"}
@@ -500,19 +485,15 @@ export default function Matching() {
                                 ของของคุณ
                               </p>
                             </div>
+
                             <ArrowRightLeft className="h-5 w-5 text-primary shrink-0" />
+
                             <div className="flex-1 text-center space-y-2 min-w-0">
                               <img
                                 src={getCorrectImagePath(match.theirPostImage)}
+                                alt={match.theirPostTitle || "ของที่สนใจแลก"}
                                 className="w-20 h-20 rounded-xl object-cover mx-auto shadow-sm bg-muted"
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement;
-                                  if (
-                                    target.src !==
-                                    window.location.origin + "/placeholder.jpg"
-                                  )
-                                    target.src = "/placeholder.jpg";
-                                }}
+                                onError={handleImageError}
                               />
                               <p className="text-xs font-bold line-clamp-1">
                                 {match.theirPostTitle || "ของที่สนใจแลก"}
@@ -522,6 +503,11 @@ export default function Matching() {
                               </p>
                             </div>
                           </div>
+
+                          <div className="flex items-center justify-end text-xs text-muted-foreground gap-1">
+                            ดูรายละเอียด
+                            <ChevronRight className="h-4 w-4" />
+                          </div>
                         </CardContent>
                       </Card>
                     );
@@ -530,7 +516,9 @@ export default function Matching() {
               ) : (
                 <div className="flex flex-col items-center py-16 space-y-3">
                   <AlertCircle className="h-10 w-10 text-muted-foreground/50" />
-                  <p className="text-muted-foreground">ไม่มีรายการในสถานะนี้</p>
+                  <p className="text-muted-foreground">
+                    ไม่มีรายการในสถานะนี้
+                  </p>
                 </div>
               )}
             </div>

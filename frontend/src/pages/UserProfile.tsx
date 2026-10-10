@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
@@ -20,36 +21,60 @@ import ReportModal from "@/components/ReportModal";
 
 interface DBUserReview {
   ExchangeID: number;
-  ReviewerName: string;
-  Rating: number | string;
-  Comment: string;
-  ReviewDate: string;
+  ReviewerName?: string;
+  Rating?: number | string;
+  Comment?: string;
+  ReviewDate?: string;
   ReviewerProfileImage?: string;
+}
+
+interface ProfileUser {
+  MemberID?: number | string;
+  member_id?: number | string;
+  DisplayName?: string;
+  display_name?: string;
+  ProfileImage?: string;
+  profile_image?: string;
 }
 
 interface UserProfileData {
   MemberID?: number;
   DisplayName?: string;
-  Email?: string;
   ProfileImage?: string;
-  MemberStatus?: string;
-  role?: string;
   totalItems?: number;
   successfulExchanges?: number;
-  reviewScore?: string;
+  reviewScore?: string | number;
 }
 
 interface ItemData {
   MemberID?: number | string;
   member_id?: number | string;
   DisplayName?: string;
-  Email?: string;
   ProfileImage?: string;
 }
 
-// =========================================================================
-// COMPONENT: UserProfile (หน้าจอสำหรับแสดงข้อมูลโปรไฟล์ของผู้ใช้งานคนอื่น สถิติ และรีวิวจากผู้ใช้จริง)
-// =========================================================================
+interface ProfileLocationState {
+  fromAdmin?: boolean;
+  authorName?: string;
+  rawProfileImg?: string;
+  authorRating?: string;
+  authorExchanges?: number;
+}
+
+function getImageUrl(image?: string | null) {
+  if (!image) return "";
+
+  const path = image.trim();
+
+  if (!path || path === "null" || path === "undefined") {
+    return "";
+  }
+
+  return path.startsWith("http")
+    ? path
+    : `${IMAGE_BASE_URL}/uploads/${path}`;
+}
+
 export default function UserProfile() {
   const { userId } = useParams<{ userId: string }>();
   const location = useLocation();
@@ -60,150 +85,141 @@ export default function UserProfile() {
   const [isLoading, setIsLoading] = useState(true);
   const [isReportOpen, setIsReportOpen] = useState(false);
 
-  const loggedInUser = JSON.parse(sessionStorage.getItem("user") || "{}");
+  const [loggedInUser] = useState<ProfileUser>(() => {
+    try {
+      return JSON.parse(sessionStorage.getItem("user") || "{}");
+    } catch {
+      return {};
+    }
+  });
 
-  const stateData = location.state as {
-    fromAdmin?: boolean;
-    authorName?: string;
-    authorEmail?: string;
-    rawProfileImg?: string;
-    authorRating?: string;
-    authorExchanges?: number;
-  } | null;
+  const stateData = location.state as ProfileLocationState | null;
+  const fromAdmin = Boolean(stateData?.fromAdmin);
 
-  const fromAdmin = stateData?.fromAdmin || false;
+  const currentUserId = String(
+    loggedInUser.MemberID || loggedInUser.member_id || ""
+  );
 
-  /**
-   * ฟังก์ชัน: โหลดข้อมูลโปรไฟล์ สถิติ และรายการรีวิวจากระบบฐานข้อมูล
-   * มีไว้สำหรับ: เลื่อนหน้าจอขึ้นด้านบนสุด ดึงข้อมูลสิ่งของทั้งหมดมานับจำนวนโพสต์ของผู้ใช้นี้
-   * เรียกใช้งาน API เพื่อดึงคะแนนรีวิว สถิติการแลกเปลี่ยนสำเร็จ และรายการคอมเมนต์รีวิวจริง พร้อมทั้งแม็ปข้อมูลเข้าสู่ State
-   */
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
 
-    const loadProfileAndRealDBStats = async () => {
+    if (!userId) {
+      setIsLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadProfile = async () => {
+      setIsLoading(true);
+
       try {
-        setIsLoading(true);
-
         const itemsRes = await getItems();
-        const items = itemsRes.data || [];
+        const items: ItemData[] = itemsRes?.data || [];
 
-        const userItemsCount = items.filter(
-          (item: ItemData) =>
-            String(item.MemberID || item.member_id) === String(userId),
-        ).length;
-
-        const statsRes = await getUserStats(userId!);
-
-        let dbExchanges = stateData?.authorExchanges || 0;
-        let dbRating = stateData?.authorRating || "0.0";
-        let dbReviews: DBUserReview[] = [];
-
-        if (statsRes && statsRes.success && statsRes.data) {
-          dbExchanges = statsRes.data.successfulExchanges;
-          dbRating = statsRes.data.reviewScore;
-          dbReviews = statsRes.data.reviews || [];
-        }
-
-        setReviews(dbReviews);
-
-        const currentLoggedInID = String(
-          loggedInUser?.MemberID || loggedInUser?.member_id || "",
+        const myItems = items.filter(
+          (item) =>
+            String(item.MemberID || item.member_id) === String(userId)
         );
 
-        if (currentLoggedInID === String(userId)) {
-          setUserData({
-            MemberID: Number(userId),
-            DisplayName:
-              loggedInUser.DisplayName ||
+        const statsRes = await getUserStats(userId);
+
+        let exchanges = stateData?.authorExchanges || 0;
+        let rating: string | number = stateData?.authorRating || "0.0";
+        let userReviews: DBUserReview[] = [];
+
+        if (statsRes?.success && statsRes.data) {
+          exchanges = statsRes.data.successfulExchanges ?? exchanges;
+          rating = statsRes.data.reviewScore ?? rating;
+          userReviews = statsRes.data.reviews || [];
+        }
+
+        const isViewingSelf = currentUserId === String(userId);
+
+        const matchedPost = items.find(
+          (item) =>
+            String(item.MemberID || item.member_id) === String(userId)
+        );
+
+        const profile: UserProfileData = {
+          MemberID: Number(userId),
+          DisplayName: isViewingSelf
+            ? loggedInUser.DisplayName ||
               loggedInUser.display_name ||
-              "ผู้ใช้งานทั่วไป",
-            Email:
-              loggedInUser.Email || loggedInUser.email || "ไม่มีข้อมูลอีเมล",
-            ProfileImage:
-              loggedInUser.ProfileImage || loggedInUser.profile_image || "",
-            totalItems: userItemsCount,
-            successfulExchanges: dbExchanges,
-            reviewScore: dbRating,
-          });
-        } else {
-          const matchedPost = items.find(
-            (item: ItemData) =>
-              String(item.MemberID || item.member_id) === String(userId),
-          );
-          setUserData({
-            MemberID: Number(userId),
-            DisplayName:
-              matchedPost?.DisplayName ||
+              "ผู้ใช้งานทั่วไป"
+            : matchedPost?.DisplayName ||
               stateData?.authorName ||
               "ผู้ใช้งานทั่วไป",
-            Email:
-              matchedPost?.Email ||
-              stateData?.authorEmail ||
-              "ไม่มีข้อมูลอีเมล",
-            ProfileImage:
-              matchedPost?.ProfileImage || stateData?.rawProfileImg || "",
-            totalItems: userItemsCount,
-            successfulExchanges: dbExchanges,
-            reviewScore: dbRating,
-          });
+          ProfileImage: isViewingSelf
+            ? loggedInUser.ProfileImage || loggedInUser.profile_image || ""
+            : matchedPost?.ProfileImage ||
+              stateData?.rawProfileImg ||
+              "",
+          totalItems: myItems.length,
+          successfulExchanges: exchanges,
+          reviewScore: rating,
+        };
+
+        if (isMounted) {
+          setUserData(profile);
+          setReviews(userReviews);
         }
       } catch (error) {
         console.error("Error loading profile statistics:", error);
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
-    if (userId) {
-      loadProfileAndRealDBStats();
-    }
-  }, [userId, stateData]);
+    loadProfile();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [userId, stateData, currentUserId, loggedInUser]);
 
   const isOwner =
-    String(loggedInUser?.MemberID || loggedInUser?.member_id || "") ===
-    String(userData?.MemberID || "");
-
-  if (isLoading) {
-    return (
-      <AppLayout>
-        <div className="max-w-4xl mx-auto px-4 py-20 text-center text-muted-foreground">
-          กำลังโหลดข้อมูลโปรไฟล์และคำรีวิวจริงจากระบบ...
-        </div>
-      </AppLayout>
-    );
-  }
+    Boolean(currentUserId) &&
+    currentUserId === String(userData?.MemberID ?? "");
 
   const profileName = userData?.DisplayName || "ผู้ใช้งานทั่วไป";
-  const profileEmail = userData?.Email || "ไม่มีข้อมูลอีเมล";
+  const profileImageUrl = getImageUrl(userData?.ProfileImage);
 
-  let profileImageUrl = "";
-  const rawImg = userData?.ProfileImage;
-  if (
-    rawImg &&
-    rawImg.trim() !== "undefined" &&
-    rawImg.trim() !== "null" &&
-    rawImg.trim() !== ""
-  ) {
-    profileImageUrl = rawImg.trim().startsWith("http")
-      ? rawImg.trim()
-      : `${IMAGE_BASE_URL}/uploads/${rawImg.trim()}`;
-  }
+  const stats = [
+    {
+      icon: Package,
+      value: String(userData?.totalItems || 0),
+      label: "รายการสิ่งของ",
+    },
+    {
+      icon: ArrowRightLeft,
+      value: String(userData?.successfulExchanges || 0),
+      label: "แลกเปลี่ยนสำเร็จ",
+    },
+    {
+      icon: Star,
+      value: String(userData?.reviewScore ?? "0.0"),
+      label: "คะแนนรีวิว",
+    },
+  ];
 
   const mainContent = (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-8">
+    <div className="mx-auto max-w-4xl space-y-8 px-4 py-8 sm:px-6 sm:py-12">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => navigate(-1)}
-            className="-ml-2 hover:bg-slate-200/60 dark:hover:bg-zinc-800/60 text-foreground transition-all"
+            className="-ml-2 text-foreground transition-all hover:bg-slate-200/60 dark:hover:bg-zinc-800/60"
           >
-            <ArrowLeft className="h-5 w-5 text-foreground" />
+            <ArrowLeft className="h-5 w-5" />
           </Button>
+
           <User className="h-5 w-5 text-primary" />
-          <h1 className="text-xl sm:text-2xl font-bold font-heading">
+          <h1 className="text-xl font-bold font-heading sm:text-2xl">
             โปรไฟล์เจ้าของ
           </h1>
         </div>
@@ -212,58 +228,41 @@ export default function UserProfile() {
           <Button
             variant="ghost"
             size="icon"
-            className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-            onClick={() => setIsReportOpen(true)}
             title="รายงานผู้ใช้นี้"
+            onClick={() => setIsReportOpen(true)}
+            className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
           >
             <Flag className="h-5 w-5" />
           </Button>
         )}
       </div>
 
-      <div className="grid md:grid-cols-[auto_1fr] gap-8 items-start">
-        <Avatar className="h-28 w-28 mx-auto md:mx-0 border-4 border-background shadow-lg">
-          {profileImageUrl && (
-            <AvatarImage
-              src={profileImageUrl}
-              alt={profileName}
-              className="object-cover"
-            />
-          )}
-          <AvatarFallback className="text-4xl font-bold text-primary-foreground eco-gradient">
+      <div className="grid items-start gap-8 md:grid-cols-[auto_1fr]">
+        <Avatar className="mx-auto h-28 w-28 border-4 border-background shadow-lg md:mx-0">
+          <AvatarImage
+            src={profileImageUrl}
+            alt={profileName}
+            className="object-cover"
+          />
+          <AvatarFallback className="eco-gradient text-4xl font-bold text-primary-foreground">
             {profileName.charAt(0).toUpperCase()}
           </AvatarFallback>
         </Avatar>
 
         <div className="space-y-3 text-center md:text-left">
-          <h1 className="text-3xl font-bold flex items-center justify-center md:justify-start gap-2">
+          <h2 className="flex items-center justify-center gap-2 text-3xl font-bold md:justify-start">
             {profileName}
-          </h1>
-          <p className="text-muted-foreground">{profileEmail}</p>
+          </h2>
 
-          <div className="grid grid-cols-3 gap-4 pt-4 max-w-md mx-auto md:mx-0">
-            {[
-              {
-                icon: Package,
-                value: String(userData?.totalItems || 0),
-                label: "รายการสิ่งของ",
-              },
-              {
-                icon: ArrowRightLeft,
-                value: String(userData?.successfulExchanges || 0),
-                label: "แลกเปลี่ยนสำเร็จ",
-              },
-              {
-                icon: Star,
-                value: String(userData?.reviewScore || "0.0"),
-                label: "คะแนนรีวิว",
-              },
-            ].map(({ icon: Icon, value, label }) => (
+          <div className="mx-auto grid max-w-md grid-cols-3 gap-4 pt-4 md:mx-0">
+            {stats.map(({ icon: Icon, value, label }) => (
               <Card key={label} className="glass-card">
-                <CardContent className="p-4 text-center space-y-2">
-                  <Icon className="h-5 w-5 text-primary mx-auto" />
+                <CardContent className="space-y-2 p-4 text-center">
+                  <Icon className="mx-auto h-5 w-5 text-primary" />
                   <p className="text-xl font-bold">{value}</p>
-                  <p className="text-[10px] text-muted-foreground">{label}</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {label}
+                  </p>
                 </CardContent>
               </Card>
             ))}
@@ -273,82 +272,76 @@ export default function UserProfile() {
 
       <Separator />
 
-      <div className="space-y-4">
-        <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
-          <MessageSquare className="h-5 w-5 text-primary" />{" "}
+      <section className="space-y-4">
+        <h2 className="flex items-center gap-2 text-xl font-bold text-foreground">
+          <MessageSquare className="h-5 w-5 text-primary" />
           คำวิจารณ์และรีวิวจากผู้ใช้งานจริง
         </h2>
 
         {reviews.length === 0 ? (
-          <div className="text-center py-12 border border-dashed rounded-xl bg-muted/10 text-muted-foreground">
-            <Star className="h-8 w-8 mx-auto mb-2 opacity-25 text-yellow-500" />
+          <div className="rounded-xl border border-dashed bg-muted/10 py-12 text-center text-muted-foreground">
+            <Star className="mx-auto mb-2 h-8 w-8 text-yellow-500 opacity-25" />
             <p className="text-sm">
               ผู้ใช้งานรายนี้ยังไม่ได้รับคำรีวิวความคิดเห็นในระบบ
             </p>
           </div>
         ) : (
           <div className="grid gap-4">
-            {reviews.map((review) => (
-              <Card
-                key={review.ExchangeID}
-                className="bg-card/50 border shadow-sm"
-              >
-                <CardContent className="p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Avatar className="h-8 w-8">
-                        {review.ReviewerProfileImage &&
-                        review.ReviewerProfileImage.trim() !== "" &&
-                        review.ReviewerProfileImage !== "null" &&
-                        review.ReviewerProfileImage !== "undefined" ? (
+            {reviews.map((review) => {
+              const reviewerName =
+                review.ReviewerName || "ผู้ใช้งานทั่วไป";
+
+              return (
+                <Card
+                  key={review.ExchangeID}
+                  className="border bg-card/50 shadow-sm"
+                >
+                  <CardContent className="space-y-3 p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-8 w-8">
                           <AvatarImage
-                            src={
-                              review.ReviewerProfileImage.trim().startsWith("http")
-                                ? review.ReviewerProfileImage.trim()
-                                : `${IMAGE_BASE_URL}/uploads/${review.ReviewerProfileImage.trim()}`
-                            }
-                            alt={review.ReviewerName}
+                            src={getImageUrl(review.ReviewerProfileImage)}
+                            alt={reviewerName}
                             className="object-cover"
                           />
-                        ) : null}
-                        <AvatarFallback className="text-xs font-semibold bg-primary/20 text-primary">
-                          {review.ReviewerName
-                            ? review.ReviewerName.charAt(0).toUpperCase()
-                            : "U"}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="text-sm font-medium text-foreground">
-                          {review.ReviewerName || "ผู้ใช้งานทั่วไป"}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground">
-                          {review.ReviewDate ? review.ReviewDate : "ไม่มีระบุวันที่"}
-                        </p>
+                          <AvatarFallback className="bg-primary/20 text-xs font-semibold text-primary">
+                            {reviewerName.charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+
+                        <div>
+                          <p className="text-sm font-medium text-foreground">
+                            {reviewerName}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-0.5 rounded-full bg-yellow-500/10 px-2 py-0.5 text-xs font-semibold text-yellow-600">
+                        <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
+                        {Number(review.Rating || 0).toFixed(1)}
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-0.5 bg-yellow-500/10 px-2 py-0.5 rounded-full text-yellow-600 text-xs font-semibold">
-                      <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
-                      {Number(review.Rating || 0).toFixed(1)}
-                    </div>
-                  </div>
-                  <p className="text-sm text-muted-foreground pl-10 italic">
-                    "{review.Comment}"
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
+                    <p className="break-words pl-10 text-sm italic text-muted-foreground">
+                      "{review.Comment || ""}"
+                    </p>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
-      </div>
+      </section>
 
       {fromAdmin && (
         <Button
           variant="secondary"
           onClick={() => navigate("/admin")}
-          className="w-full max-w-xs gap-1.5 bg-primary/10 text-primary hover:bg-primary/20"
+          className="w-full gap-1.5 bg-primary/10 text-primary hover:bg-primary/20"
         >
-          <ShieldAlert className="h-4 w-4" /> กลับหน้า Admin
+          <ShieldAlert className="h-4 w-4" />
+          กลับหน้า Admin
         </Button>
       )}
 
@@ -362,8 +355,24 @@ export default function UserProfile() {
     </div>
   );
 
+  if (isLoading) {
+    const loadingContent = (
+      <div className="mx-auto max-w-4xl px-4 py-20 text-center text-muted-foreground">
+        กำลังโหลดข้อมูลโปรไฟล์และคำรีวิวจริงจากระบบ...
+      </div>
+    );
+
+    return fromAdmin ? (
+      <div className="min-h-screen w-full overflow-y-auto bg-background">
+        {loadingContent}
+      </div>
+    ) : (
+      <AppLayout>{loadingContent}</AppLayout>
+    );
+  }
+
   return fromAdmin ? (
-    <div className="min-h-screen bg-background overflow-y-auto w-full">
+    <div className="min-h-screen w-full overflow-y-auto bg-background">
       {mainContent}
     </div>
   ) : (

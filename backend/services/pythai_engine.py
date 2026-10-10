@@ -1,6 +1,4 @@
-
 import re
-
 from pythainlp.tokenize import word_tokenize
 from pythainlp.corpus import thai_stopwords
 
