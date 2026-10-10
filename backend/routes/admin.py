@@ -663,3 +663,128 @@ def get_user_stats(member_id):
 
         if conn:
             conn.close()
+
+@admin_bp.route("/analytics", methods=["GET"])
+def dashboard_analytics():
+    """ข้อมูลสำหรับกราฟ Dashboard โดยไม่เปลี่ยน response ของ API เดิม"""
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+
+        # สร้างช่วงเดือนย้อนหลัง 6 เดือน รวมเดือนปัจจุบัน
+        today = datetime.date.today()
+        month_keys = []
+        for offset in reversed(range(6)):
+            month_index = (today.year * 12 + (today.month - 1)) - offset
+            year = month_index // 12
+            month = (month_index % 12) + 1
+            month_keys.append(f"{year:04d}-{month:02d}")
+
+        first_year, first_month = map(int, month_keys[0].split("-"))
+        start_date = datetime.datetime(first_year, first_month, 1)
+
+        next_month_index = today.year * 12 + today.month
+        end_year = next_month_index // 12
+        end_month = (next_month_index % 12) + 1
+        end_date = datetime.datetime(end_year, end_month, 1)
+
+        # เตรียม 6 เดือนให้ครบ แม้บางเดือนจะไม่มีข้อมูล
+        monthly_map = {
+            month_key: {"month": month_key, "users": 0, "posts": 0}
+            for month_key in month_keys
+        }
+
+        cursor.execute("""
+            SELECT DATE_FORMAT(RegisterDate, '%Y-%m') AS month_key,
+                   COUNT(*) AS total
+            FROM member
+            WHERE RegisterDate >= %s AND RegisterDate < %s
+            GROUP BY DATE_FORMAT(RegisterDate, '%Y-%m')
+            ORDER BY month_key
+        """, (start_date, end_date))
+        for row in cursor.fetchall():
+            month_key = row.get("month_key")
+            if month_key in monthly_map:
+                monthly_map[month_key]["users"] = int(row.get("total") or 0)
+
+        cursor.execute("""
+            SELECT DATE_FORMAT(PostDate, '%Y-%m') AS month_key,
+                   COUNT(*) AS total
+            FROM item
+            WHERE PostDate >= %s AND PostDate < %s
+            GROUP BY DATE_FORMAT(PostDate, '%Y-%m')
+            ORDER BY month_key
+        """, (start_date, end_date))
+        for row in cursor.fetchall():
+            month_key = row.get("month_key")
+            if month_key in monthly_map:
+                monthly_map[month_key]["posts"] = int(row.get("total") or 0)
+
+                # นับผลการแลกเปลี่ยนตามสถานะที่มีอยู่จริง
+                cursor.execute("""
+                    SELECT
+                        CASE
+                            WHEN ExchangeStatus = 'Completed' THEN 'สำเร็จ'
+                            WHEN ExchangeStatus = 'Cancelled' THEN 'ยกเลิก/ไม่สำเร็จ'
+                            WHEN ExchangeStatus IS NULL OR ExchangeStatus = '' THEN 'ไม่ระบุ'
+                            ELSE ExchangeStatus
+                        END AS status_label,
+                        COUNT(*) AS total
+                    FROM exchange
+                    GROUP BY status_label
+                    ORDER BY total DESC, status_label ASC
+                """)
+
+                exchange_status = [
+                    {
+                        "status": row.get("status_label") or "ไม่ระบุ",
+                        "total": int(row.get("total") or 0)
+                    }
+                    for row in cursor.fetchall()
+                ]
+
+        exchange_status = [
+            {"status": row.get("status_label") or "ไม่ระบุ", "total": int(row.get("total") or 0)}
+            for row in cursor.fetchall()
+        ]
+
+        cursor.execute("""
+            SELECT
+                CASE
+                    WHEN ReportStatus = 'Pending' THEN 'รอตรวจสอบ'
+                    WHEN ReportStatus = 'Resolved' THEN 'ดำเนินการแล้ว'
+                    WHEN ReportStatus IS NULL OR ReportStatus = '' THEN 'ไม่ระบุ'
+                    ELSE ReportStatus
+                END AS status_label,
+                COUNT(*) AS total
+            FROM problem
+            GROUP BY status_label
+            ORDER BY total DESC, status_label ASC
+        """)
+        report_status = [
+            {"status": row.get("status_label") or "ไม่ระบุ", "total": int(row.get("total") or 0)}
+            for row in cursor.fetchall()
+        ]
+
+        return jsonify({
+            "monthlyActivity": list(monthly_map.values()),
+            "exchangeStatus": exchange_status,
+            "reportStatus": report_status
+        }), 200
+
+    except Exception as e:
+        current_app.logger.error(
+            f"Error fetching dashboard analytics: {str(e)}"
+        )
+        return jsonify({
+            "error": "เกิดข้อผิดพลาดในการดึงข้อมูลกราฟ Dashboard"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()

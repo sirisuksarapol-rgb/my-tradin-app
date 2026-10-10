@@ -59,6 +59,7 @@ import {
 } from "@/api/api";
 import { CategoryManagement } from "@/components/CategoryManagement";
 import React from "react";
+import DashboardAnalytics from "@/components/DashboardAnalytics";
 
 interface ApiUser {
   MemberID: string | number;
@@ -971,7 +972,8 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                {/* Main Content */}
+                
+                <DashboardAnalytics />
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                   {/* User Status */}
                   <div className="lg:col-span-2 bg-card border border-border/60 rounded-2xl p-6 shadow-sm">
