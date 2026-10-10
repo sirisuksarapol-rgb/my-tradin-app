@@ -2,8 +2,8 @@ from services.pythai_engine import (
     preprocess_thai_text,
     extract_important_attributes,
 )
-
 from sentence_transformers import SentenceTransformer
+
 from sklearn.metrics.pairwise import cosine_similarity
 
 from db import get_connection
@@ -15,9 +15,12 @@ from db import get_connection
 
 MODEL_NAME = "paraphrase-multilingual-MiniLM-L12-v2"
 
-print("⏳ กำลังโหลดโมเดล AI ภาษาไทย-อังกฤษ...")
+print("กำลังโหลดโมเดล AI จากไฟล์ในเครื่อง...")
 
-model = SentenceTransformer(MODEL_NAME)
+model = SentenceTransformer(
+    MODEL_NAME,
+    local_files_only=True,
+)
 
 print("✅ โมเดลพร้อมใช้งานแล้ว!")
 

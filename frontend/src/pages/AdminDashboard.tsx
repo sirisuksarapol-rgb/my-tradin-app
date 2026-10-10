@@ -980,10 +980,6 @@ export default function AdminDashboard() {
                     <div className="flex items-center justify-between mb-6">
                       <div>
                         <h2 className="font-bold text-lg">สถานะผู้ใช้งาน</h2>
-
-                        <p className="text-sm text-muted-foreground mt-1">
-                          สถานะบัญชีผู้ใช้งานในระบบปัจจุบัน
-                        </p>
                       </div>
 
                       <Users className="w-5 h-5 text-muted-foreground" />
@@ -1092,10 +1088,6 @@ export default function AdminDashboard() {
 
                       <div>
                         <h2 className="font-bold">สิ่งที่ต้องดำเนินการ</h2>
-
-                        <p className="text-xs text-muted-foreground mt-1">
-                          รายการที่ต้องตรวจสอบ
-                        </p>
                       </div>
                     </div>
 
