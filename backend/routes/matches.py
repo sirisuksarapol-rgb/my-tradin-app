@@ -48,12 +48,12 @@ def get_matches(item_id):
                 "message": "โปรดระบุสิ่งของที่ต้องการแลกเปลี่ยน (DesiredItem) เพื่อให้ระบบแนะนำรายการที่เหมาะสม"
             }), 200
 
-        matches = semantic_search(my_item, top_n=10)
+        matches = semantic_search(my_item)
 
         matches = [
             item for item in matches
             if item.get("MemberID") != my_item["MemberID"]
-        ][:6]
+        ]
 
         return jsonify({
             "status": "success",

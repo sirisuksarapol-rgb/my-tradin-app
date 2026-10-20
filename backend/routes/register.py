@@ -38,7 +38,7 @@ def request_otp():
         user = cursor.fetchone()
 
         verify_code = str(random.randint(100000, 999999))
-        expire = datetime.now() + timedelta(minutes=10)
+        expire = datetime.now() + timedelta(minutes=30)
 
         if user:
             member_id, email_verified = user
