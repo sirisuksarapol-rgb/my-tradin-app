@@ -48,7 +48,7 @@ export default function Register() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [profileImagePreview, setProfileImagePreview] = useState<string | null>(null);
   const [otp, setOtp] = useState("");
-  const [timeLeft, setTimeLeft] = useState(600);
+  const [timeLeft, setTimeLeft] = useState(1800);
   const [resendCountdown, setResendCountdown] = useState(60);
 
   const updateField = (field: keyof typeof formData, value: string) => {
@@ -137,7 +137,7 @@ export default function Register() {
 
       if (!isResend) setStep("otp");
 
-      setTimeLeft(600);
+      setTimeLeft(1800);
       setResendCountdown(60);
 
       toast({
